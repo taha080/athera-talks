@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://taha080.github.io/ta-talk/sitemap.xml

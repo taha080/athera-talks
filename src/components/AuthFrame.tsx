@@ -7,11 +7,13 @@ export function AuthFrame({
   subtitle = 'Private messages and voice calls.',
   children,
   wide = false,
+  androidDownload = false,
 }: {
   title?: string
   subtitle?: string
   children: ReactNode
   wide?: boolean
+  androidDownload?: boolean
 }) {
   return (
     <div className="auth-canvas flex min-h-dvh flex-col px-4">
@@ -27,15 +29,25 @@ export function AuthFrame({
         </div>
       </div>
       <footer className="shrink-0 pb-5 pt-2 text-center text-xs leading-4 text-mist">
-        Created by{' '}
-        <a
-          href="https://github.com/taha080"
-          target="_blank"
-          rel="noreferrer noopener"
-          className="text-mist underline-offset-2 hover:underline"
-        >
-          Taha Ahsan
-        </a>
+        <p>
+          Created by{' '}
+          <a
+            href="https://github.com/taha080"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-mist underline-offset-2 hover:underline"
+          >
+            Taha Ahsan
+          </a>
+        </p>
+        {androidDownload ? (
+          <a
+            href={`${import.meta.env.BASE_URL}download.html`}
+            className="mt-1 inline-block text-mist underline-offset-2 hover:underline"
+          >
+            Download Android app
+          </a>
+        ) : null}
       </footer>
     </div>
   )

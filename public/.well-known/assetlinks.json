@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.taha080.atheratalks",
+      "sha256_cert_fingerprints": [
+        "27:63:30:6E:8D:4C:C6:A0:93:34:55:A4:E1:18:CD:05:4F:7D:C9:51:98:C8:BA:CB:FC:7D:AB:17:F0:8F:9A:5C"
+      ]
+    }
+  }
+]

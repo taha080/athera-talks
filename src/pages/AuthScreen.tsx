@@ -181,7 +181,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
   const googleOff = session.google === 'disabled'
 
   return (
-    <AuthFrame title={title}>
+    <AuthFrame title={title} androidDownload={mode === 'sign-in'}>
       {mode !== 'forgot' ? (
         <div className="mb-4 grid grid-cols-2 rounded-lg bg-elevated p-1 text-sm font-medium" role="tablist" aria-label="Account">
           <Tab to="/login" active={mode === 'sign-in'}>
