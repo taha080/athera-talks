@@ -1,10 +1,37 @@
+import { useId } from 'react'
 import { cn } from '../lib/cn'
 
+const INFINITY =
+  'M46.2 31.2 L46.11 33.37 L45.84 35.45 L45.42 37.35 L44.86 39.02 L44.19 40.41 L43.44 41.49 L42.65 42.27 L41.84 42.76 L41.02 42.98 L40.22 42.96 L39.44 42.73 L38.69 42.32 L37.98 41.77 L37.31 41.09 L36.66 40.31 L36.06 39.46 L35.48 38.54 L34.93 37.57 L34.41 36.56 L33.9 35.52 L33.41 34.45 L32.93 33.38 L32.47 32.29 L32 31.2 L31.53 30.11 L31.07 29.02 L30.59 27.95 L30.1 26.88 L29.59 25.84 L29.07 24.83 L28.52 23.86 L27.94 22.94 L27.34 22.09 L26.69 21.31 L26.02 20.63 L25.31 20.08 L24.56 19.67 L23.78 19.44 L22.98 19.42 L22.16 19.64 L21.35 20.13 L20.56 20.91 L19.81 21.99 L19.14 23.38 L18.58 25.05 L18.16 26.95 L17.89 29.03 L17.8 31.2 L17.89 33.37 L18.16 35.45 L18.58 37.35 L19.14 39.02 L19.81 40.41 L20.56 41.49 L21.35 42.27 L22.16 42.76 L22.98 42.98 L23.78 42.96 L24.56 42.73 L25.31 42.32 L26.02 41.77 L26.69 41.09 L27.34 40.31 L27.94 39.46 L28.52 38.54 L29.07 37.57 L29.59 36.56 L30.1 35.52 L30.59 34.45 L31.07 33.38 L31.53 32.29 L32 31.2 L32.47 30.11 L32.93 29.02 L33.41 27.95 L33.9 26.88 L34.41 25.84 L34.93 24.83 L35.48 23.86 L36.06 22.94 L36.66 22.09 L37.31 21.31 L37.98 20.63 L38.69 20.08 L39.44 19.67 L40.22 19.44 L41.02 19.42 L41.84 19.64 L42.65 20.13 L43.44 20.91 L44.19 21.99 L44.86 23.38 L45.42 25.05 L45.84 26.95 L46.11 29.03 L46.2 31.2'
+
 export function Logo({ className }: { className?: string }) {
+  const gradient = `lavender-infinity-${useId().replace(/:/g, '')}`
   return (
     <svg className={cn('h-10 w-10', className)} viewBox="0 0 64 64" aria-hidden="true">
-      <rect width="64" height="64" rx="14" fill="#1a56db" />
-      <path fill="#fff" d="M16 20h32a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H28l-8 8v-8h-4a6 6 0 0 1-6-6V26a6 6 0 0 1 6-6z" />
+      <defs>
+        <linearGradient id={gradient} x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#dcc8fb" />
+          <stop offset="1" stopColor="#a983f0" />
+        </linearGradient>
+      </defs>
+      <rect width="64" height="64" rx="14" fill={`url(#${gradient})`} />
+      <path d={INFINITY} fill="none" stroke="#fff" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M26 42.2 15.4 49.6 20.6 39.4Z"
+        fill="#fff"
+        stroke="#fff"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M38 42.2 48.6 49.6 43.4 39.4Z"
+        fill="#fff"
+        stroke="#fff"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
