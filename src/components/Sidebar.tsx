@@ -26,11 +26,13 @@ export function Sidebar() {
   const peers = useRef(new Map<string, string>())
   peers.current = new Map(chat.conversations.map((item) => [item.id, item.peer.id]))
   const ids = chat.conversations.map((item) => item.id).join(',')
+  const subscribeTyping = useRef(chat.subscribeTyping)
+  subscribeTyping.current = chat.subscribeTyping
 
   useEffect(() => {
     const timers = new Map<string, number>()
     const stops = ids.split(',').filter(Boolean).map((id) =>
-      chat.subscribeTyping(id, (userId) => {
+      subscribeTyping.current(id, (userId) => {
         if (peers.current.get(id) !== userId) return
         setTyping((current) => ({ ...current, [id]: true }))
         const previous = timers.get(id)
@@ -45,7 +47,7 @@ export function Sidebar() {
       stops.forEach((stop) => stop())
       timers.forEach((timer) => window.clearTimeout(timer))
     }
-  }, [chat, ids])
+  }, [ids])
 
   async function onSearch(value: string) {
     setQuery(value)

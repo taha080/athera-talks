@@ -105,15 +105,24 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
     return () => window.removeEventListener('keydown', onKey)
   }, [infoOpen, lightbox])
 
+  const peerId = conversation?.peer.id
+  const conversationId = conversation?.id
+  const subscribeTyping = useRef(chat.subscribeTyping)
+  subscribeTyping.current = chat.subscribeTyping
+
   useEffect(() => {
-    if (!conversation) return
-    return chat.subscribeTyping(conversation.id, (userId) => {
-      if (userId !== conversation.peer.id) return
+    if (!conversationId || !peerId) return
+    const stop = subscribeTyping.current(conversationId, (userId) => {
+      if (userId !== peerId) return
       setTyping(true)
       if (typingTimer.current) window.clearTimeout(typingTimer.current)
       typingTimer.current = window.setTimeout(() => setTyping(false), 3000)
     })
-  }, [chat, conversation])
+    return () => {
+      stop()
+      if (typingTimer.current) window.clearTimeout(typingTimer.current)
+    }
+  }, [conversationId, peerId])
 
   useEffect(() => {
     const id = matches[matchIndex]?.id
