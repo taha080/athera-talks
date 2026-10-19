@@ -327,7 +327,9 @@ body {
 .bubble-creator {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(180deg, #fffdf5 0%, #fff3c4 100%);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.62) 0%, rgb(255 255 255 / 0) 40%),
+    linear-gradient(180deg, #fffdf5 0%, #fff3c4 100%);
   border: 1px solid #f1d27a;
   box-shadow: 0 2px 10px #f7c94855;
   color: #3d2e12;
@@ -810,6 +812,28 @@ textarea:-webkit-autofill {
 
 .bubble-creator::after {
   z-index: 0;
+  width: 48%;
+  background: linear-gradient(
+    118deg,
+    transparent 0%,
+    rgb(255 255 255 / 0) 28%,
+    rgb(255 255 255 / 0.5) 50%,
+    rgb(255 255 255 / 0) 72%,
+    transparent 100%
+  );
+  animation: bubble-shine 7s ease-in-out infinite;
+}
+
+@keyframes bubble-shine {
+  0% {
+    transform: translateX(-180%) skewX(-16deg);
+  }
+  40% {
+    transform: translateX(360%) skewX(-16deg);
+  }
+  100% {
+    transform: translateX(360%) skewX(-16deg);
+  }
 }
 
 .bubble-creator > * {
@@ -932,10 +956,6 @@ textarea:-webkit-autofill {
 [data-theme='light'] .bubble-creator {
   border-radius: 22px;
   box-shadow: 0 1px 2px rgb(61 46 18 / 0.08);
-}
-
-[data-theme='light'] .bubble-creator::after {
-  content: none;
 }
 
 [data-theme='light'] .tail-own::after,
