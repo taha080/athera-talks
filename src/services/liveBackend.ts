@@ -3,7 +3,7 @@ import { parseWallpaper } from '../lib/appearance'
 import { baseMime, mediaBucket } from '../lib/media'
 import { messageKind } from '../lib/messages'
 import { parseTheme } from '../lib/theme'
-import { encodeWaveform, extensionForMime, parseWaveform } from '../lib/voice'
+import { encodeWaveform, extensionForMime, mediaSendError, parseWaveform } from '../lib/voice'
 import { getSupabase } from '../lib/supabase'
 import type { ContactRequest, ContactStatus, Conversation, Message, MessageListener, OutgoingMedia, Profile, Reaction, ReactionChange, ReplyTarget, SearchPerson } from '../types'
 
@@ -84,6 +84,17 @@ function client() {
 function contactStatus(value: string | null | undefined): ContactStatus | null {
   if (value === 'pending' || value === 'accepted' || value === 'declined') return value
   return null
+}
+
+function pause(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+function isRlsError(error: { message?: string; code?: string }): boolean {
+  const text = `${error.code ?? ''} ${error.message ?? ''}`.toLowerCase()
+  return error.code === '42501' || text.includes('row-level security') || text.includes('accepted contact') || text.includes('not a member')
 }
 
 export function mapProfile(row: ProfileRow): Profile {
@@ -443,29 +454,47 @@ export const liveChat = {
     const mime = baseMime(input.mime || (input.kind === 'image' ? 'image/jpeg' : 'audio/webm'))
     const ext = input.kind === 'image' ? 'jpg' : extensionForMime(mime)
     const path = `${input.conversationId}/${userId}/${crypto.randomUUID()}.${ext}`
-    const { error: uploadError } = await supabase.storage.from(bucket).upload(path, input.file, {
-      contentType: mime,
-      upsert: false,
-    })
-    if (uploadError) throw new Error(uploadError.message)
-    const { data, error } = await supabase
-      .from('messages')
-      .insert({
-        conversation_id: input.conversationId,
-        sender_id: userId,
-        body: input.kind === 'voice' ? 'Voice message' : 'Photo',
-        kind: input.kind,
-        media_path: path,
-        media_mime: mime,
-        media_seconds: input.seconds ?? null,
-        waveform: input.waveform ? encodeWaveform(input.waveform) : null,
-        reply_to: input.reply?.id ?? null,
-        reply_preview: input.reply?.preview ?? null,
+    let uploadError: { message: string } | null = null
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const uploaded = await supabase.storage.from(bucket).upload(path, input.file, {
+        contentType: mime,
+        upsert: false,
       })
-      .select(MESSAGE_COLUMNS)
-      .single()
-    if (error) throw new Error(error.message)
-    const [signed] = await signMessages([mapMessage(data as MessageRow)])
+      if (!uploaded.error || /already exists|duplicate/i.test(uploaded.error.message)) {
+        uploadError = null
+        break
+      }
+      uploadError = uploaded.error
+      if (attempt < 2) await pause(350 * (attempt + 1))
+    }
+    if (uploadError) throw new Error(mediaSendError(uploadError.message, input.kind))
+    const row = {
+      conversation_id: input.conversationId,
+      sender_id: userId,
+      body: input.kind === 'voice' ? 'Voice message' : 'Photo',
+      kind: input.kind,
+      media_path: path,
+      media_mime: mime,
+      media_seconds: input.seconds ?? null,
+      waveform: input.waveform ? encodeWaveform(input.waveform) : null,
+      reply_to: input.reply?.id ?? null,
+      reply_preview: input.reply?.preview ?? null,
+    }
+    let inserted: MessageRow | null = null
+    let insertError: { message: string; code?: string } | null = null
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const result = await supabase.from('messages').insert(row).select(MESSAGE_COLUMNS).single()
+      if (!result.error && result.data) {
+        inserted = result.data as MessageRow
+        insertError = null
+        break
+      }
+      insertError = result.error
+      if (!result.error || isRlsError(result.error) || attempt === 1) break
+      await pause(400)
+    }
+    if (!inserted) throw new Error(mediaSendError(insertError?.message ?? 'Could not send.', input.kind))
+    const [signed] = await signMessages([mapMessage(inserted)])
     return signed
   },
 

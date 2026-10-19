@@ -1,14 +1,10 @@
-// Google STUN discovers a public address. TURN relays audio when NAT blocks a direct path.
-// Defaults use Metered Open Relay's published static secret. Override with VITE_TURN_*.
+// Each call asks the turn-credentials Edge Function for Metered iceServers.
+// The Metered API key stays in the function secret METERED_API_KEY. If that
+// fetch fails, the call uses the static Metered relay below. An explicit
+// VITE_TURN_* override still wins. VITE_TURN_URLS=none stays on Google STUN.
 
-export const DEFAULT_TURN_SECRET = 'openrelayprojectsecret'
-
-export const DEFAULT_TURN_URLS = [
-  'turns:staticauth.openrelay.metered.ca:443?transport=tcp',
-  'turn:staticauth.openrelay.metered.ca:443?transport=tcp',
-  'turn:staticauth.openrelay.metered.ca:80?transport=tcp',
-  'turn:staticauth.openrelay.metered.ca:80',
-]
+import { CONNECT_TIMEOUT_MESSAGE } from './callMachine'
+import { getSupabase } from './supabase'
 
 export type TurnEnv = {
   urls?: string
@@ -38,25 +34,86 @@ export async function turnRestCredential(
   return { username, credential }
 }
 
+// Some relays advertise port 53. Browsers time out on it.
+export const METERED_FALLBACK_USERNAME = '8c806b1e87da68a6d13d1051'
+export const METERED_FALLBACK_CREDENTIAL = 'CWOTQy7sg1frPlo+'
+
+export const METERED_FALLBACK_URLS = [
+  'stun:stun.relay.metered.ca:80',
+  'turn:global.relay.metered.ca:80',
+  'turn:global.relay.metered.ca:80?transport=tcp',
+  'turn:global.relay.metered.ca:443',
+  'turns:global.relay.metered.ca:443?transport=tcp',
+] as const
+
+export function meteredFallbackServers(): RTCIceServer[] {
+  return METERED_FALLBACK_URLS.map((urls) =>
+    urls.startsWith('turn')
+      ? { urls, username: METERED_FALLBACK_USERNAME, credential: METERED_FALLBACK_CREDENTIAL }
+      : { urls },
+  )
+}
+
+export function iceServersOrFallback(fetched: RTCIceServer[] | null): RTCIceServer[] {
+  return fetched?.length ? fetched : meteredFallbackServers()
+}
+
+export function usableTurnUrl(url: string): boolean {
+  return !/:53(?:\?|$)/.test(url)
+}
+
+export function filterBrowserIceServers(servers: RTCIceServer[]): RTCIceServer[] {
+  const next: RTCIceServer[] = []
+  for (const server of servers) {
+    const urls = (Array.isArray(server.urls) ? server.urls : [server.urls]).filter(
+      (url): url is string => typeof url === 'string' && usableTurnUrl(url),
+    )
+    if (!urls.length) continue
+    next.push({ ...server, urls })
+  }
+  return next
+}
+
 export async function buildIceServers(env: TurnEnv = {}): Promise<RTCIceServer[]> {
   const servers = googleStunServers()
   const raw = (env.urls ?? '').trim()
-  if (raw.toLowerCase() === 'none') return servers
+  if (!raw || raw.toLowerCase() === 'none') return servers
 
   const urls = raw
-    ? raw
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean)
-    : DEFAULT_TURN_URLS
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => item && usableTurnUrl(item))
+  if (!urls.length) return servers
   const username = (env.username ?? '').trim()
   const credential = (env.credential ?? '').trim()
+  const secret = (env.secret ?? '').trim()
   const auth =
-    username && credential
-      ? { username, credential }
-      : await turnRestCredential((env.secret ?? '').trim() || DEFAULT_TURN_SECRET)
+    username && credential ? { username, credential } : secret ? await turnRestCredential(secret) : null
+  if (!auth) return servers
   servers.push({ urls, ...auth })
   return servers
+}
+
+export async function fetchTurnIceServers(): Promise<RTCIceServer[] | null> {
+  const supabase = getSupabase()
+  if (!supabase) return null
+  try {
+    const { data, error } = await supabase.functions.invoke('turn-credentials')
+    const iceServers = data && typeof data === 'object' ? (data as { iceServers?: RTCIceServer[] }).iceServers : undefined
+    if (error || !Array.isArray(iceServers)) return null
+    const filtered = filterBrowserIceServers(iceServers)
+    return filtered.length ? filtered : null
+  } catch {
+    return null
+  }
+}
+
+export async function resolveIceServers(env: TurnEnv = {}): Promise<RTCIceServer[]> {
+  const raw = (env.urls ?? '').trim()
+  const secret = (env.secret ?? '').trim()
+  const manual = Boolean(raw || ((env.username ?? '').trim() && (env.credential ?? '').trim()) || secret)
+  if (manual) return buildIceServers(env)
+  return iceServersOrFallback(await fetchTurnIceServers())
 }
 
 export function turnEnvFromImport(): TurnEnv {
@@ -110,8 +167,31 @@ export function pickRemoteStream(streams: readonly MediaStream[], track: MediaSt
   return new MediaStream([track])
 }
 
-export function formatCallLink(ice: string, path: string, inbound: number, outbound: number, playback: string): string {
-  return `ICE ${ice} · ${path} · in ${inbound} · out ${outbound} · ${playback}`
+const CANDIDATE_ORDER = ['host', 'srflx', 'prflx', 'relay']
+
+export function candidateType(candidate: string | null | undefined): string | null {
+  const match = candidate?.match(/\btyp ([a-z0-9]+)/)
+  return match?.[1] ?? null
+}
+
+export function formatCandidateTypes(types: Iterable<string>): string {
+  const present = new Set(types)
+  const listed = CANDIDATE_ORDER.filter((type) => present.has(type))
+  for (const type of present) {
+    if (!listed.includes(type)) listed.push(type)
+  }
+  return listed.length ? listed.join(', ') : 'none'
+}
+
+export function formatCallLink(
+  ice: string,
+  path: string,
+  inbound: number,
+  outbound: number,
+  playback: string,
+  candidates = 'none',
+): string {
+  return `ICE ${ice} · path ${path} · candidates ${candidates} · in ${inbound} · out ${outbound} · ${playback}`
 }
 
 export function waitForIceCandidate(pc: RTCPeerConnection, timeoutMs = 1500): Promise<void> {
@@ -131,11 +211,9 @@ export function waitForIceCandidate(pc: RTCPeerConnection, timeoutMs = 1500): Pr
 }
 
 export async function createPeerConnection(policy: IcePolicy = 'all'): Promise<RTCPeerConnection> {
-  const iceServers = await buildIceServers(readTurnOverride() ?? turnEnvFromImport())
+  const iceServers = await resolveIceServers(readTurnOverride() ?? turnEnvFromImport())
   return new RTCPeerConnection({ iceServers, iceTransportPolicy: policy })
 }
-
-const NETWORK_FAILURE = 'The call could not connect. A firewall or mobile network may be blocking the voice path.'
 
 export function mediaError(error: unknown): string {
   if (error instanceof DOMException) {
@@ -154,5 +232,5 @@ export function mediaError(error: unknown): string {
 }
 
 export function networkFailure(): string {
-  return NETWORK_FAILURE
+  return CONNECT_TIMEOUT_MESSAGE
 }

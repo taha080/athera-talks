@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useCall } from '../context/CallContext'
-import { callHeadline } from '../lib/callMachine'
+import { callHeadline, RELAY_RETRY_STATUS } from '../lib/callMachine'
 import { cn } from '../lib/cn'
 import { Avatar } from './Avatar'
 import { DisplayName } from './CreatorBadge'
@@ -37,14 +37,19 @@ export function CallScreen() {
   }
 
   const peer = call.peer
-  const headline = callHeadline(call.phase, call.connectedAt, now)
+  const headline = callHeadline(call.phase, call.connectedAt, now, call.relaying)
   const timing = call.phase === 'connected'
+  const relayNotice = headline === RELAY_RETRY_STATUS
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-between bg-ink px-6 py-10 text-center" role="dialog" aria-modal="true" aria-label="Voice call">
       <p
         className={cn(
-          timing ? 'text-3xl font-semibold tabular-nums tracking-normal text-paper' : 'text-xs font-medium uppercase tracking-[0.16em] text-mist',
+          timing
+            ? 'text-3xl font-semibold tabular-nums tracking-normal text-paper'
+            : relayNotice
+              ? 'max-w-sm text-sm font-medium normal-case tracking-normal text-paper'
+              : 'text-xs font-medium uppercase tracking-[0.16em] text-mist',
         )}
         data-testid="call-status"
       >

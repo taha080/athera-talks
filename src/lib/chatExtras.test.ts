@@ -3,7 +3,8 @@ import { THEME_GROUPS, pairedWallpaper, parseWallpaper, wallpaperClass } from '.
 import { messageKind, messagePreview } from './messages'
 import { isOnline, presenceLabel } from './presence'
 import { receiptTick } from './receipts'
-import { encodeWaveform, extensionForMime, parseWaveform, pickAudioMime } from './voice'
+import { baseMime } from './media'
+import { collectRecording, createAudioRecorder, encodeWaveform, extensionForMime, mediaSendError, nextVoiceTap, parseWaveform, pickAudioMime } from './voice'
 
 describe('appearance', () => {
   it('keeps known wallpapers and falls back to plain', () => {
@@ -51,6 +52,58 @@ describe('voice helpers', () => {
     expect(extensionForMime('audio/mp4')).toBe('m4a')
     expect(extensionForMime('audio/webm;codecs=opus')).toBe('webm')
     expect(parseWaveform(encodeWaveform([1.2, 140, -4]))).toEqual([1, 100, 0])
+    expect(baseMime('audio/webm;codecs=opus')).toBe('audio/webm')
+    expect(baseMime('video/webm')).toBe('audio/webm')
+    expect(baseMime('video/mp4')).toBe('audio/mp4')
+  })
+
+  it('falls through when the first recorder type throws', () => {
+    const stream = {} as MediaStream
+    const created: string[] = []
+    const chosen = createAudioRecorder(stream, {
+      supported: (type) => type === 'audio/webm;codecs=opus' || type === 'audio/mp4',
+      create: (_stream, mimeType) => {
+        created.push(mimeType)
+        if (mimeType.startsWith('audio/webm')) throw new Error('unsupported')
+        return { mimeType } as MediaRecorder
+      },
+    })
+    expect(created).toEqual(['audio/webm;codecs=opus', 'audio/mp4'])
+    expect(chosen.mimeType).toBe('audio/mp4')
+    expect(mediaSendError('new row violates row-level security policy')).toMatch(/accepted contact/)
+    expect(mediaSendError('You can only message an accepted contact.')).toMatch(/accepted contact/)
+    expect(mediaSendError('mime type audio/webm is not supported', 'voice')).toMatch(/format was rejected/)
+  })
+
+  it('keeps a chunk that arrives as the recorder stops', async () => {
+    const chunks: Blob[] = []
+    let onStop: (() => void) | null = null
+    const media = {
+      state: 'recording' as RecordingState,
+      addEventListener: (_name: string, listener: () => void) => {
+        onStop = listener
+      },
+      requestData: () => {
+        chunks.push(new Blob(['hello']))
+      },
+      stop: () => {
+        media.state = 'inactive'
+        chunks.push(new Blob(['voice']))
+        onStop?.()
+      },
+    }
+    const blob = await collectRecording(media as unknown as MediaRecorder, chunks, 'audio/webm;codecs=opus')
+    expect(blob.type).toBe('audio/webm')
+    expect(blob.size).toBe(10)
+  })
+
+  it('keeps the same voice button from recording through the extra click', () => {
+    expect(nextVoiceTap('idle', false, false)).toBe('record')
+    expect(nextVoiceTap('idle', true, false)).toBe('send-text')
+    expect(nextVoiceTap('recording', false, false)).toBe('send-voice')
+    expect(nextVoiceTap('sending', false, false)).toBe('ignore')
+    expect(nextVoiceTap('recording', false, true)).toBe('ignore')
+    expect(nextVoiceTap('idle', false, true)).toBe('ignore')
   })
 })
 

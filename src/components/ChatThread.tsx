@@ -256,7 +256,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-6" onScroll={onScroll}>
         {chat.messagesLoading ? <MessageSkeleton /> : null}
         {!chat.messagesLoading && chat.messages.length === 0 ? (
-          <p className="mx-auto mt-16 max-w-xs text-center text-sm leading-6 text-mist">No messages yet. Say hello, send a photo, or hold the mic for a voice note.</p>
+          <p className="mx-auto mt-16 max-w-xs text-center text-sm leading-6 text-mist">No messages yet. Say hello, send a photo, or tap the mic for a voice note.</p>
         ) : null}
         {chat.messages.map((message, index) => {
           const day = dayKey(message.createdAt)
@@ -334,7 +334,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
         </button>
       ) : null}
       {actionError ? <p className="px-4 pb-1 text-sm text-danger">{actionError}</p> : null}
-      <div className="px-2 pb-2 pt-1 sm:px-4">
+      <div className="relative z-30 px-2 pb-2 pt-1 sm:px-4">
         <Composer
           peerName={conversation.peer.username}
           reply={reply}
