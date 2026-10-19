@@ -55,7 +55,7 @@ export function CallScreen() {
           {call.phase !== 'connected' && call.phase !== 'failed' ? (
             <span className="absolute inset-4 animate-ping rounded-full bg-sakura/20" />
           ) : null}
-          <Avatar name={peer?.username ?? 'caller'} url={peer?.avatarUrl} size="xl" />
+          <Avatar name={peer?.username ?? 'caller'} url={peer?.avatarUrl} size="xl" creator={peer?.isCreator} />
         </div>
         <h2 className="mt-6 flex items-center justify-center gap-1.5 text-3xl font-semibold tracking-tight">
           <DisplayName name={`@${peer?.username ?? 'caller'}`} creator={peer?.isCreator} />

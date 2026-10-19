@@ -190,7 +190,7 @@ export function Sidebar() {
             {results.map((person) => (
               <article key={person.id} className="mx-3 my-2 rounded-xl border border-line bg-panel p-3 shadow-sm">
                 <div className="flex items-center gap-3">
-                  <Avatar name={person.username} url={person.avatarUrl} size="sm" />
+                  <Avatar name={person.username} url={person.avatarUrl} size="sm" creator={person.isCreator} />
                   <span className="min-w-0">
                     <DisplayName name={person.username} creator={person.isCreator} className="text-sm font-semibold" />
                     {person.favouriteAnime ? <span className="block truncate text-xs text-mist">{person.favouriteAnime}</span> : null}
@@ -247,7 +247,7 @@ export function Sidebar() {
                       active ? 'bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]' : 'hover-wash',
                     )}
                   >
-                    <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} online={isOnline(conversation.peer.lastSeenAt)} />
+                    <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} online={isOnline(conversation.peer.lastSeenAt)} creator={conversation.peer.isCreator} />
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-2">
                         <DisplayName
@@ -362,7 +362,7 @@ function RequestsPanel({
           {incoming.map((request) => (
             <li key={request.id} className="rounded-xl border border-line bg-panel p-3 shadow-sm">
               <div className="flex items-center gap-3">
-                <Avatar name={request.peer.username} url={request.peer.avatarUrl} size="sm" />
+                <Avatar name={request.peer.username} url={request.peer.avatarUrl} size="sm" creator={request.peer.isCreator} />
                 <DisplayName name={request.peer.username} creator={request.peer.isCreator} className="text-sm font-semibold" />
               </div>
               <div className="mt-3 flex gap-2">
@@ -383,7 +383,7 @@ function RequestsPanel({
         <ul className="mt-2 space-y-2">
           {outgoing.map((request) => (
             <li key={request.id} className="flex items-center gap-3 rounded-xl border border-line bg-panel p-3 shadow-sm">
-              <Avatar name={request.peer.username} url={request.peer.avatarUrl} size="sm" />
+              <Avatar name={request.peer.username} url={request.peer.avatarUrl} size="sm" creator={request.peer.isCreator} />
               <span className="min-w-0 flex-1">
                 <DisplayName name={request.peer.username} creator={request.peer.isCreator} className="text-sm font-semibold" />
                 <span className="text-xs text-mist">Pending</span>

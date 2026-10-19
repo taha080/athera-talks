@@ -192,7 +192,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
         <Link to="/" className={`${iconButton} md:hidden`} aria-label="Back to chats">
           <BackIcon className="h-5 w-5" />
         </Link>
-        <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} size="sm" online={online} />
+        <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} size="sm" online={online} creator={conversation.peer.isCreator} />
         <div className="min-w-0 flex-1">
           <DisplayName name={conversation.peer.username} creator={conversation.peer.isCreator} className="text-sm font-semibold" />
           <p className={`truncate text-xs ${typing || online ? 'text-foam' : 'text-mist'}`}>{status}</p>
