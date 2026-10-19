@@ -686,6 +686,44 @@ textarea:-webkit-autofill {
   animation: creator-shine 2.5s linear infinite;
 }
 
+/* Soft diagonal sweep on the verified tick and creator bubbles. 0.9s of a 3s cycle. */
+.verified-tick {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  overflow: hidden;
+}
+
+.verified-tick::after,
+.bubble-creator::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  bottom: -50%;
+  left: 0;
+  width: 42%;
+  pointer-events: none;
+  background: linear-gradient(
+    118deg,
+    transparent 0%,
+    rgb(255 255 255 / 0) 34%,
+    rgb(255 255 255 / 0.32) 50%,
+    rgb(255 255 255 / 0) 66%,
+    transparent 100%
+  );
+  transform: translateX(-180%) skewX(-16deg);
+  animation: soft-shine 3s ease-in-out infinite;
+}
+
+.bubble-creator::after {
+  z-index: 0;
+}
+
+.bubble-creator > * {
+  position: relative;
+  z-index: 1;
+}
+
 .creator-ring {
   padding: 2px;
   background: conic-gradient(from 0deg, #fff4b0, #f7c948, #c8901a, #fbe08a, #fff4b0);
@@ -712,6 +750,18 @@ textarea:-webkit-autofill {
   }
 }
 
+@keyframes soft-shine {
+  0% {
+    transform: translateX(-180%) skewX(-16deg);
+  }
+  30% {
+    transform: translateX(360%) skewX(-16deg);
+  }
+  100% {
+    transform: translateX(360%) skewX(-16deg);
+  }
+}
+
 @keyframes creator-ring-pulse {
   0%,
   100% {
@@ -732,7 +782,9 @@ textarea:-webkit-autofill {
   }
 
   .creator-shine,
-  .creator-ring {
+  .creator-ring,
+  .verified-tick::after,
+  .bubble-creator::after {
     animation: none;
   }
 }
