@@ -63,9 +63,10 @@ export function CreatorBadge({ className, size = 18 }: { className?: string; siz
           </defs>
           <path d={SCALLOP} fill={`url(#${gold})`} />
           <text
-            x="16"
-            y="17.4"
+            x="50%"
+            y="50%"
             textAnchor="middle"
+            dominantBaseline="central"
             fill="#6b4300"
             fontFamily="Georgia, 'Times New Roman', serif"
             fontSize="16"
