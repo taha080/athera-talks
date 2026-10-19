@@ -11,7 +11,18 @@ import {
 } from 'react'
 import { callReducer, initialCallState } from '../lib/callMachine'
 import { rememberCandidate, takeCandidates, type IceQueue } from '../lib/iceQueue'
-import { createPeerConnection, mediaError, networkFailure } from '../lib/webrtc'
+import {
+  createPeerConnection,
+  formatCallLink,
+  hasLiveAudioSender,
+  mediaError,
+  networkFailure,
+  pickRemoteStream,
+  readIcePolicy,
+  SILENT_WAV,
+  waitForIceCandidate,
+  type IcePolicy,
+} from '../lib/webrtc'
 import { closeOutbox, sendSignal, subscribeSignals } from '../services/signaling'
 import type { CallSignal, Profile } from '../types'
 import { useSession } from './SessionContext'
@@ -24,6 +35,7 @@ type CallValue = {
   error: string | null
   banner: string | null
   demo: boolean
+  debug: string
   startCall: (peer: Profile, conversationId: string) => Promise<void>
   accept: () => Promise<void>
   reject: () => Promise<void>
@@ -39,6 +51,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const { mode, profile } = useSession()
   const [state, dispatch] = useReducer(callReducer, initialCallState)
   const [banner, setBanner] = useState<string | null>(null)
+  const [debug, setDebug] = useState('')
   const stateRef = useRef(state)
   const profileRef = useRef(profile)
   const pcRef = useRef<RTCPeerConnection | null>(null)
@@ -48,13 +61,46 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const activeCallRef = useRef<string | null>(null)
   const pendingOfferRef = useRef<RTCSessionDescriptionInit | null>(null)
   const remoteReadyRef = useRef(false)
+  const roleRef = useRef<'caller' | 'callee' | null>(null)
+  const policyRef = useRef<IcePolicy>('all')
+  const relayTriedRef = useRef(false)
+  const waitRef = useRef<number | null>(null)
   const demoTimer = useRef<number | null>(null)
+  const restartRelayRef = useRef<() => Promise<void>>(async () => {})
   stateRef.current = state
   profileRef.current = profile
 
-  const cleanupMedia = useCallback(() => {
+  const playRemote = useCallback(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.muted = false
+    audio.autoplay = true
+    audio.volume = 1
+    const pending = audio.play()
+    if (pending) void pending.catch(() => {})
+  }, [])
+
+  // Must run synchronously inside the Start / Accept click, before any await.
+  const primePlayback = useCallback(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.muted = false
+    audio.autoplay = true
+    audio.volume = 1
+    if (!audio.srcObject && !audio.src) audio.src = SILENT_WAV
+    const pending = audio.play()
+    if (pending) void pending.catch(() => {})
+  }, [])
+
+  const clearTimers = useCallback(() => {
     if (demoTimer.current) window.clearTimeout(demoTimer.current)
+    if (waitRef.current) window.clearTimeout(waitRef.current)
     demoTimer.current = null
+    waitRef.current = null
+  }, [])
+
+  const cleanupMedia = useCallback(() => {
+    clearTimers()
     localRef.current?.getTracks().forEach((track) => track.stop())
     localRef.current = null
     pcRef.current?.close()
@@ -63,10 +109,17 @@ export function CallProvider({ children }: { children: ReactNode }) {
     activeCallRef.current = null
     pendingOfferRef.current = null
     remoteReadyRef.current = false
-    if (audioRef.current) audioRef.current.srcObject = null
+    roleRef.current = null
+    policyRef.current = 'all'
+    relayTriedRef.current = false
+    if (audioRef.current) {
+      audioRef.current.srcObject = null
+      audioRef.current.removeAttribute('src')
+    }
+    setDebug('')
     const peerId = stateRef.current.peer?.id
     if (peerId && mode === 'live') void closeOutbox(peerId)
-  }, [mode])
+  }, [clearTimers, mode])
 
   const deliver = useCallback(
     async (to: Profile, signal: CallSignal) => {
@@ -84,48 +137,183 @@ export function CallProvider({ children }: { children: ReactNode }) {
     iceQueueRef.current = taken.queue
     for (const candidate of taken.candidates) {
       try {
-        await pc.addIceCandidate(candidate)
+        await pc.addIceCandidate({
+          candidate: candidate.candidate,
+          sdpMid: candidate.sdpMid,
+          sdpMLineIndex: candidate.sdpMLineIndex,
+        })
       } catch {
         // A late candidate can arrive after the call ends.
       }
     }
   }, [])
 
-  const attachPeer = useCallback(
-    async (peer: Profile, conversationId: string, me: Profile) => {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-      localRef.current = stream
-      const pc = await createPeerConnection()
+  const failFinal = useCallback(
+    (message: string) => {
+      if (stateRef.current.phase === 'idle' || stateRef.current.phase === 'failed') return
+      clearTimers()
+      localRef.current?.getTracks().forEach((track) => track.stop())
+      localRef.current = null
+      pcRef.current?.close()
+      pcRef.current = null
+      dispatch({ type: 'fail', error: message })
+    },
+    [clearTimers],
+  )
+
+  const publishLink = useCallback(async () => {
+    const pc = pcRef.current
+    if (!pc) return
+    let inbound = 0
+    let outbound = 0
+    let path = 'none'
+    try {
+      const stats = await pc.getStats()
+      stats.forEach((report) => {
+        const kind = 'kind' in report ? report.kind : undefined
+        if (report.type === 'inbound-rtp' && kind !== 'video') inbound += Number('bytesReceived' in report ? report.bytesReceived : 0)
+        if (report.type === 'outbound-rtp' && kind !== 'video') outbound += Number('bytesSent' in report ? report.bytesSent : 0)
+        if (report.type === 'transport' && 'selectedCandidatePairId' in report && report.selectedCandidatePairId) {
+          const pair = stats.get(String(report.selectedCandidatePairId))
+          const localId = pair && 'localCandidateId' in pair ? pair.localCandidateId : undefined
+          const local = localId ? stats.get(String(localId)) : undefined
+          if (local && 'candidateType' in local && local.candidateType) path = String(local.candidateType)
+        }
+      })
+    } catch {
+      return
+    }
+    const audio = audioRef.current
+    const playback = audio && !audio.paused && !audio.muted && audio.srcObject ? 'playing' : 'silent'
+    if (inbound > 0) playRemote()
+    setDebug(formatCallLink(pc.iceConnectionState, path, inbound, outbound, playback))
+  }, [playRemote])
+
+  const openPeer = useCallback(
+    async (peer: Profile, conversationId: string, me: Profile, policy: IcePolicy) => {
+      let stream = localRef.current
+      const live = stream?.getAudioTracks().filter((track) => track.readyState === 'live') ?? []
+      if (!stream || live.length === 0) {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+        localRef.current = stream
+      }
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = !stateRef.current.muted
+      })
+      const pc = await createPeerConnection(policy)
+      policyRef.current = policy
       pcRef.current = pc
-      stream.getTracks().forEach((track) => pc.addTrack(track, stream))
+      // Both sides add the microphone before createOffer / createAnswer.
+      stream.getAudioTracks().forEach((track) => pc.addTrack(track, stream))
+      if (!hasLiveAudioSender(pc.getSenders())) {
+        throw new Error('The microphone is not on this call.')
+      }
       pc.onicecandidate = (event) => {
-        if (!event.candidate) return
+        if (pcRef.current !== pc || !event.candidate) return
         void deliver(peer, {
           kind: 'ice',
           conversationId,
           from: me,
           candidate: event.candidate.toJSON(),
-        })
+        }).catch(() => {})
       }
       pc.ontrack = (event) => {
+        if (pcRef.current !== pc) return
         const audio = audioRef.current
         if (!audio) return
-        audio.srcObject = event.streams[0]
-        void audio.play().catch(() => {})
+        event.track.enabled = true
+        const remote = pickRemoteStream(event.streams, event.track)
+        audio.muted = false
+        audio.srcObject = remote
+        playRemote()
       }
-      const failNetwork = () => {
-        dispatch({ type: 'fail', error: networkFailure() })
-        localRef.current?.getTracks().forEach((track) => track.stop())
+      const markConnected = () => {
+        if (pcRef.current !== pc) return
+        const ice = pc.iceConnectionState
+        if (ice !== 'connected' && ice !== 'completed') return
+        playRemote()
+        dispatch({ type: 'connected', at: Date.now() })
+        void publishLink()
       }
-      pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'connected') dispatch({ type: 'connected', at: Date.now() })
-        if (pc.connectionState === 'failed') failNetwork()
+      const giveUp = () => {
+        if (pcRef.current !== pc) return
+        if (!relayTriedRef.current && policyRef.current === 'all' && roleRef.current === 'caller') {
+          void restartRelayRef.current()
+          return
+        }
+        if (!relayTriedRef.current && roleRef.current === 'callee') {
+          if (waitRef.current) window.clearTimeout(waitRef.current)
+          waitRef.current = window.setTimeout(() => {
+            if (pcRef.current === pc) failFinal(networkFailure())
+          }, 8000)
+          return
+        }
+        failFinal(networkFailure())
       }
       pc.oniceconnectionstatechange = () => {
-        if (pc.iceConnectionState === 'failed') failNetwork()
+        if (pc.iceConnectionState === 'failed') giveUp()
+        else markConnected()
       }
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'failed') giveUp()
+        else markConnected()
+      }
+      setDebug(formatCallLink(pc.iceConnectionState, 'none', 0, 0, 'silent'))
+      return pc
     },
-    [deliver],
+    [deliver, failFinal, playRemote, publishLink],
+  )
+
+  const restartRelay = useCallback(async () => {
+    if (relayTriedRef.current || roleRef.current !== 'caller') return
+    const peer = stateRef.current.peer
+    const conversationId = stateRef.current.conversationId
+    const me = profileRef.current
+    if (!peer || !conversationId || !me) return
+    relayTriedRef.current = true
+    pcRef.current?.close()
+    pcRef.current = null
+    remoteReadyRef.current = false
+    iceQueueRef.current = new Map()
+    try {
+      const pc = await openPeer(peer, conversationId, me, 'relay')
+      if (!hasLiveAudioSender(pc.getSenders())) throw new Error('The microphone is not on this call.')
+      const offer = await pc.createOffer()
+      await pc.setLocalDescription(offer)
+      await waitForIceCandidate(pc)
+      const local = pc.localDescription
+      if (!local) throw new Error('Could not start the voice call.')
+      await deliver(peer, { kind: 'offer', conversationId, from: me, sdp: local.toJSON() })
+    } catch (error) {
+      failFinal(mediaError(error))
+    }
+  }, [deliver, failFinal, openPeer])
+  restartRelayRef.current = restartRelay
+
+  const answerOffer = useCallback(
+    async (from: Profile, conversationId: string, sdp: RTCSessionDescriptionInit, me: Profile, restart: boolean) => {
+      if (restart) {
+        relayTriedRef.current = true
+        pcRef.current?.close()
+        pcRef.current = null
+        remoteReadyRef.current = false
+        iceQueueRef.current = new Map()
+      }
+      const policy: IcePolicy = restart ? 'relay' : readIcePolicy()
+      let pc = pcRef.current
+      if (!pc || restart) pc = await openPeer(from, conversationId, me, policy)
+      if (!hasLiveAudioSender(pc.getSenders())) throw new Error('The microphone is not on this call.')
+      await pc.setRemoteDescription(sdp)
+      await flushIce(conversationId)
+      if (!hasLiveAudioSender(pc.getSenders())) throw new Error('The microphone is not on this call.')
+      const answer = await pc.createAnswer()
+      await pc.setLocalDescription(answer)
+      await waitForIceCandidate(pc)
+      const local = pc.localDescription
+      if (!local) throw new Error('Could not start the voice call.')
+      await deliver(from, { kind: 'answer', conversationId, from: me, sdp: local.toJSON() })
+    },
+    [deliver, flushIce, openPeer],
   )
 
   const onSignal = useCallback(
@@ -134,6 +322,20 @@ export function CallProvider({ children }: { children: ReactNode }) {
       if (!me || signal.from.id === me.id) return
       const phase = stateRef.current.phase
       const currentId = stateRef.current.conversationId
+
+      if (signal.kind === 'offer' && signal.sdp && activeCallRef.current === signal.conversationId) {
+        const remote = pcRef.current?.remoteDescription?.sdp
+        if (remote && remote !== signal.sdp.sdp) {
+          try {
+            await answerOffer(signal.from, signal.conversationId, signal.sdp, me, true)
+          } catch (error) {
+            failFinal(mediaError(error))
+          }
+          return
+        }
+        if (!remote) pendingOfferRef.current = signal.sdp
+        return
+      }
 
       if (signal.kind === 'ring' || signal.kind === 'offer') {
         if (signal.sdp) pendingOfferRef.current = signal.sdp
@@ -165,6 +367,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       if (!currentId || signal.conversationId !== currentId) return
 
       if (signal.kind === 'answer' && signal.sdp && pcRef.current) {
+        if (pcRef.current.signalingState !== 'have-local-offer') return
         await pcRef.current.setRemoteDescription(signal.sdp)
         await flushIce(signal.conversationId)
         dispatch({ type: 'remote-joined' })
@@ -177,7 +380,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         setBanner(signal.kind === 'reject' ? 'Call declined' : 'Call ended')
       }
     },
-    [cleanupMedia, deliver, flushIce],
+    [answerOffer, cleanupMedia, deliver, failFinal, flushIce],
   )
 
   const onSignalRef = useRef(onSignal)
@@ -196,11 +399,21 @@ export function CallProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timer)
   }, [banner])
 
+  useEffect(() => {
+    if (mode !== 'live' || state.phase === 'idle' || state.phase === 'incoming') return
+    void publishLink()
+    const timer = window.setInterval(() => void publishLink(), 500)
+    return () => window.clearInterval(timer)
+  }, [mode, publishLink, state.phase])
+
   const startCall = useCallback(
     async (peer: Profile, conversationId: string) => {
+      primePlayback()
       const me = profileRef.current
       if (!me || stateRef.current.phase !== 'idle') return
       activeCallRef.current = conversationId
+      roleRef.current = 'caller'
+      relayTriedRef.current = false
       dispatch({ type: 'start', conversationId, peer })
       setBanner(null)
       if (mode === 'demo') {
@@ -210,14 +423,16 @@ export function CallProvider({ children }: { children: ReactNode }) {
         return
       }
       try {
-        await attachPeer(peer, conversationId, me)
-        const pc = pcRef.current
-        if (!pc) return
+        const pc = await openPeer(peer, conversationId, me, readIcePolicy())
+        if (!hasLiveAudioSender(pc.getSenders())) throw new Error('The microphone is not on this call.')
         const offer = await pc.createOffer()
         await pc.setLocalDescription(offer)
+        await waitForIceCandidate(pc)
+        const local = pc.localDescription
+        if (!local) throw new Error('Could not start the voice call.')
         await deliver(peer, { kind: 'ring', conversationId, from: me })
         dispatch({ type: 'ringing' })
-        await deliver(peer, { kind: 'offer', conversationId, from: me, sdp: offer })
+        await deliver(peer, { kind: 'offer', conversationId, from: me, sdp: local.toJSON() })
       } catch (error) {
         dispatch({ type: 'fail', error: mediaError(error) })
         localRef.current?.getTracks().forEach((track) => track.stop())
@@ -226,20 +441,22 @@ export function CallProvider({ children }: { children: ReactNode }) {
         pcRef.current = null
       }
     },
-    [attachPeer, deliver, mode],
+    [deliver, mode, openPeer, primePlayback],
   )
 
   const accept = useCallback(async () => {
+    primePlayback()
     const snap = stateRef.current
     const me = profileRef.current
     if (!me || snap.phase !== 'incoming' || !snap.peer || !snap.conversationId) return
+    roleRef.current = 'callee'
+    relayTriedRef.current = readIcePolicy() === 'relay'
     dispatch({ type: 'accept' })
     if (mode === 'demo') {
       dispatch({ type: 'connected', at: Date.now() })
       return
     }
     try {
-      await attachPeer(snap.peer, snap.conversationId, me)
       const started = Date.now()
       let offer = pendingOfferRef.current
       while (!offer && Date.now() - started < 4000) {
@@ -247,18 +464,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
         offer = pendingOfferRef.current
       }
       if (!offer) throw new Error('Still waiting for the call offer. Ask them to call again.')
-      const pc = pcRef.current
-      if (!pc) return
-      await pc.setRemoteDescription(offer)
-      await flushIce(snap.conversationId)
-      const answer = await pc.createAnswer()
-      await pc.setLocalDescription(answer)
-      await deliver(snap.peer, {
-        kind: 'answer',
-        conversationId: snap.conversationId,
-        from: me,
-        sdp: answer,
-      })
+      await answerOffer(snap.peer, snap.conversationId, offer, me, false)
+      playRemote()
     } catch (error) {
       dispatch({ type: 'fail', error: mediaError(error) })
       localRef.current?.getTracks().forEach((track) => track.stop())
@@ -266,7 +473,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       pcRef.current?.close()
       pcRef.current = null
     }
-  }, [attachPeer, deliver, flushIce, mode])
+  }, [answerOffer, mode, playRemote, primePlayback])
 
   const finish = useCallback(
     async (kind: 'reject' | 'hangup') => {
@@ -305,6 +512,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     error: state.error,
     banner,
     demo: mode === 'demo',
+    debug,
     startCall,
     accept,
     reject,
@@ -317,7 +525,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   return (
     <CallContext.Provider value={value}>
       {children}
-      <audio ref={audioRef} autoPlay playsInline className="hidden" />
+      <audio ref={audioRef} autoPlay playsInline data-testid="remote-audio" className="pointer-events-none fixed bottom-0 left-0 h-px w-px" />
     </CallContext.Provider>
   )
 }

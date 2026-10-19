@@ -68,8 +68,71 @@ export function turnEnvFromImport(): TurnEnv {
   }
 }
 
-export async function createPeerConnection(): Promise<RTCPeerConnection> {
-  return new RTCPeerConnection({ iceServers: await buildIceServers(turnEnvFromImport()) })
+export type IcePolicy = 'all' | 'relay'
+
+// Same-tab overrides so a relay-only check can point at a TURN server.
+const TURN_OVERRIDE_KEY = 'athera:turn'
+const ICE_POLICY_KEY = 'athera:ice'
+
+// A tiny silent clip played inside the call button's click, so later remote audio
+// is allowed after the microphone prompt. display:none on the element blocks this.
+export const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='
+
+export function readTurnOverride(): TurnEnv | null {
+  if (typeof sessionStorage === 'undefined') return null
+  const raw = sessionStorage.getItem(TURN_OVERRIDE_KEY)
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as TurnEnv
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export function readIcePolicy(): IcePolicy {
+  if (typeof sessionStorage === 'undefined') return 'all'
+  return sessionStorage.getItem(ICE_POLICY_KEY) === 'relay' ? 'relay' : 'all'
+}
+
+export function hasLiveAudioSender(
+  senders: { track: { kind: string; readyState: string; enabled: boolean } | null }[],
+): boolean {
+  return senders.some(
+    (sender) => sender.track?.kind === 'audio' && sender.track.readyState === 'live' && sender.track.enabled,
+  )
+}
+
+export function pickRemoteStream(streams: readonly MediaStream[], track: MediaStreamTrack): MediaStream {
+  const existing = streams[0]
+  if (existing?.getAudioTracks().length) return existing
+  return new MediaStream([track])
+}
+
+export function formatCallLink(ice: string, path: string, inbound: number, outbound: number, playback: string): string {
+  return `ICE ${ice} · ${path} · in ${inbound} · out ${outbound} · ${playback}`
+}
+
+export function waitForIceCandidate(pc: RTCPeerConnection, timeoutMs = 1500): Promise<void> {
+  if (pc.localDescription?.sdp?.includes('a=candidate:')) return Promise.resolve()
+  return new Promise((resolve) => {
+    const finish = () => {
+      window.clearTimeout(timer)
+      pc.removeEventListener('icecandidate', onCandidate)
+      resolve()
+    }
+    const onCandidate = () => {
+      if (pc.iceGatheringState === 'complete' || pc.localDescription?.sdp?.includes('a=candidate:')) finish()
+    }
+    const timer = window.setTimeout(finish, timeoutMs)
+    pc.addEventListener('icecandidate', onCandidate)
+  })
+}
+
+export async function createPeerConnection(policy: IcePolicy = 'all'): Promise<RTCPeerConnection> {
+  const iceServers = await buildIceServers(readTurnOverride() ?? turnEnvFromImport())
+  return new RTCPeerConnection({ iceServers, iceTransportPolicy: policy })
 }
 
 const NETWORK_FAILURE = 'The call could not connect. A firewall or mobile network may be blocking the voice path.'

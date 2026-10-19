@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildIceServers, googleStunServers, mediaError, turnRestCredential } from './webrtc'
+import { buildIceServers, formatCallLink, googleStunServers, hasLiveAudioSender, mediaError, turnRestCredential } from './webrtc'
 
 describe('buildIceServers', () => {
   it('always includes Google STUN and adds a TURN relay by default', async () => {
@@ -32,6 +32,24 @@ describe('turnRestCredential', () => {
     const creds = await turnRestCredential('openrelayprojectsecret', 1_700_000_000_000)
     expect(creds.username.startsWith(String(1_700_000_000 + 12 * 60 * 60))).toBe(true)
     expect(creds.credential.length).toBeGreaterThan(10)
+  })
+})
+
+describe('call audio helpers', () => {
+  it('treats only a live enabled microphone as ready to offer', () => {
+    expect(
+      hasLiveAudioSender([{ track: { kind: 'audio', readyState: 'live', enabled: true } }]),
+    ).toBe(true)
+    expect(
+      hasLiveAudioSender([{ track: { kind: 'audio', readyState: 'live', enabled: false } }]),
+    ).toBe(false)
+    expect(hasLiveAudioSender([{ track: null }])).toBe(false)
+  })
+
+  it('formats the on-screen ICE line', () => {
+    expect(formatCallLink('connected', 'relay', 12, 34, 'playing')).toBe(
+      'ICE connected · relay · in 12 · out 34 · playing',
+    )
   })
 })
 

@@ -53,6 +53,11 @@ export function CallScreen() {
           {call.phase === 'connected' ? formatDuration(seconds) : '0:00'}
         </p>
         {call.error ? <p className="mx-auto mt-4 max-w-sm text-sm text-sakura">{call.error}</p> : null}
+        {call.debug ? (
+          <p className="mt-3 font-mono text-[11px] tracking-wide text-mist" data-testid="call-debug">
+            {call.debug}
+          </p>
+        ) : null}
         {call.demo && call.phase === 'connected' ? (
           <p className="mt-3 text-xs text-mist">This preview does not use your microphone.</p>
         ) : null}
