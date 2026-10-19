@@ -16,23 +16,15 @@ export function CreatorBadge({ className, size = 18 }: { className?: string; siz
   const px = `${size}px`
   return (
     <span title={LABEL} role="img" aria-label={LABEL} className={cn('inline-flex shrink-0 items-center gap-1', className)}>
-      <span
-        className="verified-tick"
-        style={{
-          width: px,
-          height: px,
-          mask: `url(#${tickMask}) center / 100% 100% no-repeat`,
-          WebkitMask: `url(#${tickMask}) center / 100% 100% no-repeat`,
-        }}
-      >
+      <span className="verified-tick" style={{ width: px, height: px }}>
         <svg viewBox="0 0 32 32" className="h-full w-full" aria-hidden="true">
           <defs>
             <linearGradient id={blue} x1="16" y1="2" x2="16" y2="30" gradientUnits="userSpaceOnUse">
               <stop offset="0" stopColor="#4cc3ff" />
               <stop offset="1" stopColor="#0a7cff" />
             </linearGradient>
-            <mask id={tickMask} maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">
-              <path d={SCALLOP} fill="#ffffff" transform="scale(0.03125)" />
+            <mask id={tickMask} maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+              <path d={SCALLOP} fill="#ffffff" />
             </mask>
           </defs>
           <path d={SCALLOP} fill={`url(#${blue})`} />
@@ -45,6 +37,13 @@ export function CreatorBadge({ className, size = 18 }: { className?: string; siz
             strokeLinejoin="round"
           />
         </svg>
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+          style={{ mask: `url(#${tickMask})`, WebkitMask: `url(#${tickMask})` }}
+        >
+          <span className="creator-sweep" />
+        </span>
       </span>
       <span className="relative inline-flex" style={{ width: px, height: px, filter: 'drop-shadow(0 0 3px #f7c94899)' }}>
         <svg viewBox="0 0 32 32" className="h-full w-full overflow-visible" aria-hidden="true">

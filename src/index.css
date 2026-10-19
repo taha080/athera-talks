@@ -694,7 +694,7 @@ textarea:-webkit-autofill {
   overflow: hidden;
 }
 
-.verified-tick::after,
+.creator-sweep,
 .bubble-creator::after {
   content: '';
   position: absolute;
@@ -783,7 +783,7 @@ textarea:-webkit-autofill {
 
   .creator-shine,
   .creator-ring,
-  .verified-tick::after,
+  .creator-sweep,
   .bubble-creator::after {
     animation: none;
   }
