@@ -10,7 +10,7 @@ export function subscribeSignals(userId: string, onSignal: (signal: CallSignal) 
   const supabase = getSupabase()
   if (!supabase) return () => {}
   const channel = supabase.channel(`inbox:${userId}`, {
-    config: { broadcast: { self: false } },
+    config: { broadcast: { self: false, ack: true } },
   })
   channel.on('broadcast', { event: 'signal' }, ({ payload }) => {
     if (isCallSignal(payload)) onSignal(payload)
@@ -27,18 +27,19 @@ export async function sendSignal(toUserId: string, signal: CallSignal): Promise<
   let entry = outbox.get(toUserId)
   if (!entry) {
     const channel = supabase.channel(`inbox:${toUserId}`, {
-      config: { broadcast: { self: false } },
+      config: { broadcast: { self: false, ack: true } },
     })
     const ready = new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Call signaling timed out.')), 8000)
-      channel.subscribe((status) => {
+      channel.subscribe((status, err) => {
         if (status === 'SUBSCRIBED') {
           clearTimeout(timer)
-          resolve()
+          // The socket can report SUBSCRIBED before the server will relay.
+          setTimeout(resolve, 150)
         }
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           clearTimeout(timer)
-          reject(new Error('Could not open the call channel.'))
+          reject(new Error(err?.message || 'Could not open the call channel.'))
         }
       })
     })

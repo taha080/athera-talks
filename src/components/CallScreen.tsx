@@ -25,22 +25,24 @@ export function CallScreen() {
   const peer = call.peer
   const seconds = call.startedAt ? Math.floor((now - call.startedAt) / 1000) : 0
   const status =
-    call.phase === 'incoming'
-      ? 'Incoming voice call'
+    call.phase === 'incoming' || call.phase === 'ringing'
+      ? 'Ringing…'
       : call.phase === 'outgoing'
         ? 'Calling…'
         : call.phase === 'connecting'
           ? 'Connecting…'
-          : call.demo
-            ? 'Demo call'
-            : 'Voice connected'
+          : call.phase === 'failed'
+            ? 'Call failed'
+            : call.demo
+              ? 'Demo call'
+              : 'Connected'
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-between bg-ink/95 px-6 py-10 text-center backdrop-blur-md" role="dialog" aria-label="Voice call">
       <p className="text-xs uppercase tracking-[0.22em] text-mist">{status}</p>
       <div>
         <div className="relative mx-auto grid h-40 w-40 place-items-center">
-          {call.phase !== 'connected' ? (
+          {call.phase !== 'connected' && call.phase !== 'failed' ? (
             <span className="absolute inset-0 animate-ping rounded-full bg-sakura/20" />
           ) : null}
           <Avatar name={peer?.username ?? 'fan'} url={peer?.avatarUrl} size="xl" />
@@ -66,6 +68,10 @@ export function CallScreen() {
               <PhoneIcon className="h-7 w-7" />
             </RoundButton>
           </>
+        ) : call.phase === 'failed' ? (
+          <RoundButton label="Close" tone="danger" onClick={() => void call.hangup()}>
+            <EndIcon className="h-7 w-7" />
+          </RoundButton>
         ) : (
           <>
             <RoundButton label={call.muted ? 'Unmute' : 'Mute'} tone="ghost" pressed={call.muted} onClick={call.toggleMute}>

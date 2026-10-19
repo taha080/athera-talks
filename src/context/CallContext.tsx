@@ -10,7 +10,8 @@ import {
   type RefObject,
 } from 'react'
 import { callReducer, initialCallState } from '../lib/callMachine'
-import { createPeerConnection, mediaError } from '../lib/webrtc'
+import { rememberCandidate, takeCandidates, type IceQueue } from '../lib/iceQueue'
+import { createPeerConnection, mediaError, networkFailure } from '../lib/webrtc'
 import { closeOutbox, sendSignal, subscribeSignals } from '../services/signaling'
 import type { CallSignal, Profile } from '../types'
 import { useSession } from './SessionContext'
@@ -43,7 +44,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const localRef = useRef<MediaStream | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const pendingIceRef = useRef<RTCIceCandidateInit[]>([])
+  const iceQueueRef = useRef<IceQueue>(new Map())
+  const activeCallRef = useRef<string | null>(null)
   const pendingOfferRef = useRef<RTCSessionDescriptionInit | null>(null)
   const remoteReadyRef = useRef(false)
   const demoTimer = useRef<number | null>(null)
@@ -57,7 +59,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
     localRef.current = null
     pcRef.current?.close()
     pcRef.current = null
-    pendingIceRef.current = []
+    iceQueueRef.current = new Map()
+    activeCallRef.current = null
     pendingOfferRef.current = null
     remoteReadyRef.current = false
     if (audioRef.current) audioRef.current.srcObject = null
@@ -73,13 +76,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
     [mode],
   )
 
-  const flushIce = useCallback(async () => {
+  const flushIce = useCallback(async (conversationId: string) => {
     const pc = pcRef.current
-    if (!pc) return
+    if (!pc || !pc.remoteDescription) return
     remoteReadyRef.current = true
-    const queued = pendingIceRef.current
-    pendingIceRef.current = []
-    for (const candidate of queued) {
+    const taken = takeCandidates(iceQueueRef.current, conversationId)
+    iceQueueRef.current = taken.queue
+    for (const candidate of taken.candidates) {
       try {
         await pc.addIceCandidate(candidate)
       } catch {
@@ -92,7 +95,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     async (peer: Profile, conversationId: string, me: Profile) => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
       localRef.current = stream
-      const pc = createPeerConnection()
+      const pc = await createPeerConnection()
       pcRef.current = pc
       stream.getTracks().forEach((track) => pc.addTrack(track, stream))
       pc.onicecandidate = (event) => {
@@ -110,16 +113,16 @@ export function CallProvider({ children }: { children: ReactNode }) {
         audio.srcObject = event.streams[0]
         void audio.play().catch(() => {})
       }
+      const failNetwork = () => {
+        dispatch({ type: 'fail', error: networkFailure() })
+        localRef.current?.getTracks().forEach((track) => track.stop())
+      }
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'connected') {
-          dispatch({ type: 'connected', at: Date.now() })
-        }
-        if (pc.connectionState === 'failed') {
-          dispatch({
-            type: 'fail',
-            error: 'Could not connect the voice call. A strict network may need a TURN relay, which v1 does not include.',
-          })
-        }
+        if (pc.connectionState === 'connected') dispatch({ type: 'connected', at: Date.now() })
+        if (pc.connectionState === 'failed') failNetwork()
+      }
+      pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === 'failed') failNetwork()
       }
     },
     [deliver],
@@ -134,13 +137,27 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
       if (signal.kind === 'ring' || signal.kind === 'offer') {
         if (signal.sdp) pendingOfferRef.current = signal.sdp
-        if (phase === 'idle') {
+        if (phase === 'idle' && !activeCallRef.current) {
+          activeCallRef.current = signal.conversationId
           dispatch({ type: 'incoming', conversationId: signal.conversationId, peer: signal.from })
           return
         }
-        if (currentId === signal.conversationId) return
+        if ((currentId ?? activeCallRef.current) === signal.conversationId) return
         if (signal.kind === 'ring') {
           await deliver(signal.from, { kind: 'reject', conversationId: signal.conversationId, from: me })
+        }
+        return
+      }
+
+      if (signal.kind === 'ice' && signal.candidate) {
+        iceQueueRef.current = rememberCandidate(
+          iceQueueRef.current,
+          signal.conversationId,
+          signal.candidate,
+          activeCallRef.current,
+        )
+        if (remoteReadyRef.current && activeCallRef.current === signal.conversationId) {
+          await flushIce(signal.conversationId)
         }
         return
       }
@@ -149,21 +166,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
       if (signal.kind === 'answer' && signal.sdp && pcRef.current) {
         await pcRef.current.setRemoteDescription(signal.sdp)
-        await flushIce()
+        await flushIce(signal.conversationId)
         dispatch({ type: 'remote-joined' })
-        return
-      }
-
-      if (signal.kind === 'ice' && signal.candidate) {
-        if (!pcRef.current || !remoteReadyRef.current) {
-          pendingIceRef.current.push(signal.candidate)
-          return
-        }
-        try {
-          await pcRef.current.addIceCandidate(signal.candidate)
-        } catch {
-          // Ignore candidates that arrive after close.
-        }
         return
       }
 
@@ -196,6 +200,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     async (peer: Profile, conversationId: string) => {
       const me = profileRef.current
       if (!me || stateRef.current.phase !== 'idle') return
+      activeCallRef.current = conversationId
       dispatch({ type: 'start', conversationId, peer })
       setBanner(null)
       if (mode === 'demo') {
@@ -211,9 +216,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
         const offer = await pc.createOffer()
         await pc.setLocalDescription(offer)
         await deliver(peer, { kind: 'ring', conversationId, from: me })
+        dispatch({ type: 'ringing' })
         await deliver(peer, { kind: 'offer', conversationId, from: me, sdp: offer })
       } catch (error) {
         dispatch({ type: 'fail', error: mediaError(error) })
+        localRef.current?.getTracks().forEach((track) => track.stop())
+        localRef.current = null
+        pcRef.current?.close()
+        pcRef.current = null
       }
     },
     [attachPeer, deliver, mode],
@@ -240,7 +250,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       const pc = pcRef.current
       if (!pc) return
       await pc.setRemoteDescription(offer)
-      await flushIce()
+      await flushIce(snap.conversationId)
       const answer = await pc.createAnswer()
       await pc.setLocalDescription(answer)
       await deliver(snap.peer, {
@@ -251,6 +261,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
       })
     } catch (error) {
       dispatch({ type: 'fail', error: mediaError(error) })
+      localRef.current?.getTracks().forEach((track) => track.stop())
+      localRef.current = null
+      pcRef.current?.close()
+      pcRef.current = null
     }
   }, [attachPeer, deliver, flushIce, mode])
 

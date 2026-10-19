@@ -160,7 +160,7 @@ The setup screen, landing page, chat list, and profile include a **Dark / Naruto
 
 Chat writes a row in `messages`. The browser listens on Supabase Realtime for inserts in conversations you belong to.
 
-A voice call does not go through a media server. Each browser opens a WebRTC peer connection, uses public Google STUN servers to discover a path, and exchanges the offer, answer, and network candidates on a Realtime broadcast channel named `inbox:<user id>`. Both people need Athera Talks open. There is no TURN relay in v1, so some office or school networks cannot connect. The call timer, mute, and hang-up controls still work in the demo without a microphone.
+A voice call does not go through a media server. Each browser opens a WebRTC peer connection and exchanges the offer, answer, and network candidates on a Realtime broadcast channel named `inbox:<user id>`. Both people need Athera Talks open. Google STUN finds a direct path. When a mobile or office network blocks that path, the call falls back to Metered Open Relay (TURN) using the published static secret. Set `VITE_TURN_USERNAME` and `VITE_TURN_CREDENTIAL` (and optional `VITE_TURN_URLS`) to use your own relay. Set `VITE_TURN_URLS=none` to stay on STUN only. The call screen shows Calling, Ringing, Connecting, Connected, or Call failed with the reason. A blocked microphone is reported on that screen. The call timer, mute, and hang-up controls still work in the demo without a microphone. Signaling does not use a database table, so no extra SQL is required. `public.messages` is already in the `supabase_realtime` publication.
 
 ## Deploy to GitHub Pages
 
