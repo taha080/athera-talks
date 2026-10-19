@@ -32,7 +32,7 @@ export function Avatar({
   const ring = creator ? (size === 'xl' ? 'creator-ring creator-ring-lg' : 'creator-ring') : ''
   const initials = name.slice(0, 2).toUpperCase()
   const face = url ? (
-    <img src={url} alt="" className={cn('shrink-0 rounded-full object-cover', px)} />
+    <img src={url} alt="" className={cn('block shrink-0 rounded-full bg-panel object-cover', px)} />
   ) : (
     <span
       aria-hidden="true"
@@ -43,9 +43,9 @@ export function Avatar({
     </span>
   )
   return (
-    <span className={cn('relative inline-flex shrink-0 rounded-full', ring)}>
-      {face}
-      {online ? <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-panel bg-foam" aria-label="Online" /> : null}
+    <span className="relative inline-flex shrink-0">
+      <span className={cn('inline-flex overflow-hidden rounded-full', ring)}>{face}</span>
+      {online ? <span className="absolute bottom-0 right-0 z-10 h-3 w-3 rounded-full border-2 border-panel bg-foam" aria-label="Online" /> : null}
     </span>
   )
 }

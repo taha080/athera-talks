@@ -20,7 +20,8 @@ import {
 } from '../lib/auth'
 import { readSupabaseEnv } from '../lib/config'
 import { startMode } from '../lib/mode'
-import { blobToDataUrl, fitImage, squareAvatar } from '../lib/image'
+import { prepareAvatar } from '../lib/avatarFile'
+import { blobToDataUrl, fitImage } from '../lib/image'
 import { getSupabase } from '../lib/supabase'
 import { appUrl } from '../lib/url'
 import {
@@ -299,13 +300,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const uploadAvatarFile = useCallback(
     async (file: File) => {
       if (!profile) throw new Error('Sign in first.')
-      if (!file.type.startsWith('image/')) throw new Error('Choose an image file.')
-      if (file.size > 2_000_000) throw new Error('Choose an image under 2 MB.')
-      const blob = await squareAvatar(file)
+      const prepared = await prepareAvatar(file, profile.isCreator === true)
       const next =
         mode === 'demo'
-          ? await demoBackend.uploadAvatar(await blobToDataUrl(blob))
-          : await uploadAvatar(profile.id, blob)
+          ? await demoBackend.uploadAvatar(await blobToDataUrl(prepared.blob))
+          : await uploadAvatar(profile.id, prepared.blob, prepared.extension)
       setProfile(next)
     },
     [mode, profile],

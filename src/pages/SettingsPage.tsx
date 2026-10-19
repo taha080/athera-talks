@@ -130,7 +130,7 @@ function ProfileSection() {
           Upload avatar
           <input
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
+            accept={profile.isCreator ? 'image/png,image/jpeg,image/webp,image/gif' : 'image/png,image/jpeg,image/webp'}
             className="sr-only"
             onChange={(event) => void onFile(event.target.files?.[0])}
           />
