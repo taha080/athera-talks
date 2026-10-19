@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Brand } from '../components/Brand'
 import { Credit } from '../components/Credit'
 import { Glow } from '../components/SetupScreen'
+import { ThemeSwitcher } from '../components/ThemeSwitcher'
 import { GoogleIcon } from '../components/Icons'
 import { useSession } from '../context/SessionContext'
 import { isValidEmail, normalizeUsername, passwordIssue, usernameIssue } from '../lib/auth'
@@ -175,6 +176,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
         </section>
 
         <section className="rounded-[2rem] border border-line bg-panel/90 p-6 shadow-2xl shadow-black/40 sm:p-8">
+          <ThemeSwitcher className="mb-5 justify-between" />
           {mode === 'forgot' ? (
             <div>
               <h2 className="text-2xl font-semibold">Reset your password</h2>

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { BackIcon } from '../components/Icons'
 import { Credit } from '../components/Credit'
+import { ThemeSwitcher } from '../components/ThemeSwitcher'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
 import { usernameIssue } from '../lib/auth'
@@ -120,6 +121,12 @@ export function ProfilePage() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="rounded-3xl border border-line bg-elevated/60 px-4 py-4">
+          <p className="text-sm font-medium">Appearance</p>
+          <p className="mt-1 text-xs leading-5 text-mist">Dark is the default. Naruto uses orange, black, and leaf blue.</p>
+          <ThemeSwitcher className="mt-3 justify-between" />
         </div>
 
         {error ? <p className="text-sm text-sakura">{error}</p> : null}

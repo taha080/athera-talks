@@ -4,6 +4,7 @@ import { Credit } from './components/Credit'
 import { MissingProfile, Shell } from './components/Shell'
 import { SetupScreen, Splash } from './components/SetupScreen'
 import { SessionProvider, useSession } from './context/SessionContext'
+import { ThemeProvider } from './context/ThemeContext'
 import { routerBasename } from './lib/url'
 import { AuthScreen } from './pages/AuthScreen'
 import { HomePage } from './pages/HomePage'
@@ -13,11 +14,13 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage'
 export default function App() {
   return (
     <AppErrorBoundary>
-      <BrowserRouter basename={routerBasename(import.meta.env.BASE_URL)}>
-        <SessionProvider>
-          <Gate />
-        </SessionProvider>
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter basename={routerBasename(import.meta.env.BASE_URL)}>
+          <SessionProvider>
+            <Gate />
+          </SessionProvider>
+        </BrowserRouter>
+      </ThemeProvider>
     </AppErrorBoundary>
   )
 }

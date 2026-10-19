@@ -16,6 +16,14 @@
       rel="stylesheet"
     />
     <title>T.A.Talk</title>
+    <script>
+      try {
+        var savedTheme = localStorage.getItem('tatalk:theme')
+        document.documentElement.setAttribute('data-theme', savedTheme === 'naruto' ? 'naruto' : 'dark')
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark')
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

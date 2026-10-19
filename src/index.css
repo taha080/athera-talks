@@ -1,16 +1,50 @@
 @import 'tailwindcss';
 
-@theme {
+/* Utilities point at these variables so a theme can restyle the app at runtime. */
+@theme inline {
   --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif;
-  --color-ink: #09080f;
-  --color-panel: #13111e;
-  --color-elevated: #1d1930;
-  --color-line: #322b4a;
-  --color-sakura: #ff4f8b;
-  --color-violet: #8d6bff;
-  --color-mist: #a79fbf;
-  --color-foam: #3ddc97;
-  --color-paper: #f7f4ff;
+  --color-ink: var(--ink);
+  --color-panel: var(--panel);
+  --color-elevated: var(--elevated);
+  --color-line: var(--line);
+  --color-sakura: var(--accent);
+  --color-violet: var(--accent-2);
+  --color-mist: var(--mist);
+  --color-foam: var(--foam);
+  --color-paper: var(--paper);
+}
+
+:root,
+[data-theme='dark'] {
+  --ink: #09080f;
+  --panel: #13111e;
+  --elevated: #1d1930;
+  --line: #322b4a;
+  --accent: #ff4f8b;
+  --accent-2: #8d6bff;
+  --mist: #a79fbf;
+  --foam: #3ddc97;
+  --paper: #f7f4ff;
+  --scrollbar: #3a3358;
+  --pattern: none;
+}
+
+/* Orange, black, and a leaf-village blue. Art is original CSS and SVG. */
+[data-theme='naruto'] {
+  --ink: #120d09;
+  --panel: #1c140e;
+  --elevated: #2c1d13;
+  --line: #4a3424;
+  --accent: #ff7a18;
+  --accent-2: #2f6f9a;
+  --mist: #cbbba8;
+  --foam: #7dce82;
+  --paper: #fff6ec;
+  --scrollbar: #5c4030;
+  --pattern:
+    radial-gradient(circle at 0% 0%, color-mix(in oklab, var(--accent) 18%, transparent), transparent 36%),
+    radial-gradient(circle at 100% 100%, color-mix(in oklab, var(--accent-2) 22%, transparent), transparent 40%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' fill='none'%3E%3Cpath d='M36 22c10 12 15 22 15 32 0 9-6 16-15 18-9-2-15-9-15-18 0-10 5-20 15-32z' fill='%23ff7a18' fill-opacity='.08'/%3E%3Ccircle cx='128' cy='118' r='22' stroke='%232f6f9a' stroke-opacity='.2' stroke-width='2'/%3E%3Ccircle cx='128' cy='118' r='10' stroke='%232f6f9a' stroke-opacity='.2' stroke-width='2'/%3E%3C/svg%3E");
 }
 
 html,
@@ -22,25 +56,41 @@ body,
 body {
   margin: 0;
   overflow-x: hidden;
-  background: var(--color-ink);
-  color: var(--color-paper);
+  background-color: var(--ink);
+  background-image: var(--pattern);
+  background-size: auto, auto, 180px 180px;
+  color: var(--paper);
   font-family: var(--font-sans);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #3a3358 transparent;
+  scrollbar-color: var(--scrollbar) transparent;
 }
 
 ::selection {
-  background: #ff4f8b55;
+  background: color-mix(in oklab, var(--accent) 40%, transparent);
 }
 
 input:-webkit-autofill,
 textarea:-webkit-autofill {
-  -webkit-text-fill-color: #f7f4ff;
-  caret-color: #f7f4ff;
+  -webkit-text-fill-color: var(--paper);
+  caret-color: var(--paper);
   transition: background-color 9999s ease-out;
+}
+
+/* Naruto chat bubbles: orange fading into leaf blue, with a small original leaf. */
+[data-theme='naruto'] .bubble-own {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='white' fill-opacity='.22' d='M32 8c10 12 16 22 16 34 0 10-7 16-16 18-9-2-16-8-16-18C16 30 22 20 32 8z'/%3E%3C/svg%3E"),
+    linear-gradient(155deg, #ffb15a 0%, #ff6a00 72%, #2a6a92 100%);
+  background-repeat: no-repeat;
+  background-position: right 10px bottom 8px, center;
+  background-size: 26px 26px, cover;
+}
+
+[data-theme='naruto'] .bubble-other {
+  box-shadow: inset 3px 0 0 #2f6f9a;
 }
 
 @media (prefers-reduced-motion: reduce) {

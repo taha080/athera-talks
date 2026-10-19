@@ -84,8 +84,8 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
                 <div
                   className={
                     mine
-                      ? 'rounded-3xl rounded-br-md bg-gradient-to-br from-sakura to-violet px-4 py-2.5 text-white'
-                      : 'rounded-3xl rounded-bl-md bg-elevated px-4 py-2.5'
+                      ? 'bubble-own relative overflow-hidden rounded-3xl rounded-br-md bg-gradient-to-br from-sakura to-violet px-4 py-2.5 text-white'
+                      : 'bubble-other rounded-3xl rounded-bl-md bg-elevated px-4 py-2.5'
                   }
                 >
                   <p className="whitespace-pre-wrap text-sm leading-6">{message.body}</p>

@@ -16,7 +16,7 @@ If Supabase keys are missing, the app shows a setup screen instead of crashing. 
 - One-to-one chat: search, conversation list, timestamps, read check marks
 - Voice calls: start, incoming accept or decline, mute, hang up, call timer
 - Profile: username, avatar upload, favourite anime
-- Dark theme with a sakura and violet accent, usable on a phone
+- Dark theme by default, plus a Naruto theme (orange, black, and leaf-village blue) saved in this browser
 
 ## Screenshots
 
@@ -33,6 +33,10 @@ If Supabase keys are missing, the app shows a setup screen instead of crashing. 
 ![Incoming call](docs/screenshots/incoming-call.png)
 
 ![Profile](docs/screenshots/profile.png)
+
+![Naruto sign in](docs/screenshots/naruto-sign-in.png)
+
+![Naruto chat](docs/screenshots/naruto-chat.png)
 
 ## Folder structure
 
@@ -141,6 +145,10 @@ With no `.env` (or with the placeholder values still in place), the first screen
 - **Reset demo chats** on the profile puts the sample messages back
 
 Nothing in demo mode is stored on a server.
+
+## Themes
+
+The landing page, chat list, and profile include a **Dark / Naruto** switch. Dark is the sakura and violet look. Naruto shifts the background toward black, buttons and your bubbles toward orange with a leaf-blue edge, and the logo to an original leaf-and-ring mark. The choice is stored in `localStorage` under `tatalk:theme`, so a refresh keeps it. The leaf icon and background pattern are original SVG and CSS, not official artwork.
 
 ## How chat and calls work
 

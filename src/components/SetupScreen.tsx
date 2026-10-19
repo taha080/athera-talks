@@ -1,5 +1,6 @@
 import { Brand } from './Brand'
 import { Credit } from './Credit'
+import { ThemeSwitcher } from './ThemeSwitcher'
 import { primaryButton } from '../lib/styles'
 import { useSession } from '../context/SessionContext'
 
@@ -16,7 +17,10 @@ export function SetupScreen() {
     <div className="relative grid min-h-dvh place-items-center px-4 py-10">
       <Glow />
       <div className="relative w-full max-w-lg rounded-[2rem] border border-line bg-panel/90 p-8 shadow-2xl shadow-black/40">
-        <Brand large />
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <Brand large />
+          <ThemeSwitcher />
+        </div>
         <h1 className="mt-8 text-3xl font-semibold tracking-tight">Connect Supabase to start talking.</h1>
         <p className="mt-3 text-sm leading-6 text-mist">
           The app did not find <code className="text-paper">VITE_SUPABASE_URL</code> and{' '}

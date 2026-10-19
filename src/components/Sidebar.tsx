@@ -7,12 +7,16 @@ import { cn } from '../lib/cn'
 import { formatListTime } from '../lib/format'
 import { fieldClass } from '../lib/styles'
 import type { Profile } from '../types'
+import { useTheme } from '../context/ThemeContext'
 import { Avatar } from './Avatar'
 import { Credit } from './Credit'
 import { PhoneIcon, SearchIcon } from './Icons'
+import { LeafMark } from './LeafMark'
+import { ThemeSwitcher } from './ThemeSwitcher'
 
 export function Sidebar() {
   const { profile, signOut, mode } = useSession()
+  const { theme } = useTheme()
   const chat = useChat()
   const call = useCall()
   const navigate = useNavigate()
@@ -46,9 +50,12 @@ export function Sidebar() {
   return (
     <div className="flex h-full min-h-0 flex-col bg-panel/80">
       <header className="flex items-center justify-between gap-3 px-4 py-4">
-        <div>
-          <p className="text-lg font-semibold tracking-tight">T.A.Talk</p>
-          <p className="text-xs text-mist">@{profile?.username}</p>
+        <div className="flex items-center gap-2">
+          {theme === 'naruto' ? <LeafMark className="h-9 w-9 text-sakura" /> : null}
+          <div>
+            <p className="text-lg font-semibold tracking-tight">T.A.Talk</p>
+            <p className="text-xs text-mist">@{profile?.username}</p>
+          </div>
         </div>
         <Link to="/profile" aria-label="Open profile" className="rounded-full ring-sakura/40 focus-visible:ring-2">
           <Avatar name={profile?.username ?? 'you'} url={profile?.avatarUrl} size="sm" />
@@ -152,6 +159,7 @@ export function Sidebar() {
             Preview incoming call
           </button>
         ) : null}
+        <ThemeSwitcher className="justify-between" />
         <button type="button" onClick={() => void signOut().then(() => navigate('/login'))} className="w-full rounded-full bg-white/5 px-3 py-2 text-sm font-medium text-paper hover:bg-white/10">
           Sign out
         </button>
