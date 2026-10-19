@@ -1,61 +1,29 @@
 import { describe, expect, it } from 'vitest'
-import {
-  buildIceServers,
-  candidateType,
-  filterBrowserIceServers,
-  formatCallLink,
-  formatCandidateTypes,
-  googleStunServers,
-  hasLiveAudioSender,
-  mediaError,
-  turnRestCredential,
-  usableTurnUrl,
-} from './webrtc'
+import { buildIceServers, formatCallLink, googleStunServers, hasLiveAudioSender, mediaError, turnRestCredential } from './webrtc'
 
 describe('buildIceServers', () => {
-  it('stays on Google STUN until a relay is configured', async () => {
-    expect(await buildIceServers()).toEqual(googleStunServers())
-    expect(await buildIceServers({ urls: 'none' })).toEqual(googleStunServers())
-    expect(await buildIceServers({ urls: 'turn:example.com:443?transport=tcp' })).toEqual(googleStunServers())
+  it('always includes Google STUN and adds a TURN relay by default', async () => {
+    const servers = await buildIceServers()
+    expect(servers.slice(0, 2)).toEqual(googleStunServers())
+    const turn = servers[2]
+    expect(turn?.username).toMatch(/^\d+:athera$/)
+    expect(turn?.credential).toBeTruthy()
+    expect(turn?.urls).toEqual(expect.arrayContaining([expect.stringMatching(/^turns?:/)]))
   })
 
-  it('uses explicit TURN credentials, including TCP 443 and turns', async () => {
+  it('uses explicit TURN credentials and can be turned off', async () => {
     const custom = await buildIceServers({
-      urls: 'turns:turn.example.com:443?transport=tcp,turn:turn.example.com:443?transport=tcp,turn:turn.example.com:53?transport=udp',
+      urls: 'turn:example.com:443?transport=tcp',
       username: 'user',
       credential: 'pass',
     })
     expect(custom[2]).toMatchObject({
-      urls: ['turns:turn.example.com:443?transport=tcp', 'turn:turn.example.com:443?transport=tcp'],
+      urls: ['turn:example.com:443?transport=tcp'],
       username: 'user',
       credential: 'pass',
     })
-  })
-
-  it('drops the browser-blocked port 53 URL and keeps turns on 443', () => {
-    expect(usableTurnUrl('turns:turn.cloudflare.com:443?transport=tcp')).toBe(true)
-    expect(usableTurnUrl('turns:turn.cloudflare.com:5349?transport=tcp')).toBe(true)
-    expect(usableTurnUrl('turn:turn.cloudflare.com:53?transport=udp')).toBe(false)
-    const filtered = filterBrowserIceServers([
-      { urls: ['stun:stun.cloudflare.com:3478'] },
-      {
-        urls: [
-          'turn:turn.cloudflare.com:3478?transport=udp',
-          'turn:turn.cloudflare.com:443?transport=udp',
-          'turn:turn.cloudflare.com:3478?transport=tcp',
-          'turn:turn.cloudflare.com:80?transport=tcp',
-          'turns:turn.cloudflare.com:5349?transport=tcp',
-          'turns:turn.cloudflare.com:443?transport=tcp',
-          'turn:turn.cloudflare.com:53?transport=udp',
-        ],
-        username: 'short',
-        credential: 'lived',
-      },
-    ])
-    const urls = filtered[1]?.urls
-    expect(urls).toContain('turns:turn.cloudflare.com:443?transport=tcp')
-    expect(urls).toContain('turn:turn.cloudflare.com:3478?transport=tcp')
-    expect(urls).not.toContain('turn:turn.cloudflare.com:53?transport=udp')
+    const stunOnly = await buildIceServers({ urls: 'none' })
+    expect(stunOnly).toEqual(googleStunServers())
   })
 })
 
@@ -79,11 +47,9 @@ describe('call audio helpers', () => {
   })
 
   it('formats the on-screen ICE line', () => {
-    expect(formatCallLink('connected', 'relay', 12, 34, 'playing', 'host, srflx, relay')).toBe(
-      'ICE connected · path relay · candidates host, srflx, relay · in 12 · out 34 · playing',
+    expect(formatCallLink('connected', 'relay', 12, 34, 'playing')).toBe(
+      'ICE connected · relay · in 12 · out 34 · playing',
     )
-    expect(candidateType('candidate:1 1 UDP 1 1.2.3.4 9 typ srflx raddr 0.0.0.0 rport 9')).toBe('srflx')
-    expect(formatCandidateTypes(['relay', 'host', 'srflx'])).toBe('host, srflx, relay')
   })
 })
 

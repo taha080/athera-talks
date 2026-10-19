@@ -83,20 +83,14 @@ export function callReducer(state: CallState, action: CallAction): CallState {
   }
 }
 
-export const CONNECT_TIMEOUT_MS = 25_000
-export const RELAY_RETRY_MS = 8_000
-export const RELAY_RETRY_STATUS = "Couldn't connect, retrying via relay…"
-export const CONNECT_TIMEOUT_MESSAGE =
-  "Couldn't connect. The voice relay did not come up within 25 seconds. Check the network and try again."
-
-export function callHeadline(phase: CallPhase, connectedAt: number | null, now: number, relay = false): string {
+export function callHeadline(phase: CallPhase, connectedAt: number | null, now: number): string {
   if (phase === 'connected' && connectedAt) {
     const elapsed = Math.max(0, Math.floor((now - connectedAt) / 1000))
     return formatCallClock(elapsed)
   }
   if (phase === 'incoming') return 'Ringing…'
   if (phase === 'outgoing' || phase === 'ringing') return 'Calling…'
-  if (phase === 'connecting') return relay ? RELAY_RETRY_STATUS : 'Connecting…'
+  if (phase === 'connecting') return 'Connecting…'
   if (phase === 'failed') return 'Call failed'
   return ''
 }
