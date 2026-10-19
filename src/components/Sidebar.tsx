@@ -261,15 +261,15 @@ export function Sidebar() {
               const preview = typing[conversation.id] ? 'typing…' : conversation.lastMessage?.body ?? 'No messages yet'
               return (
                 <li key={conversation.id}>
-                  <Link
-                    to={`/c/${conversation.id}`}
-                    aria-current={active ? 'page' : undefined}
+                  <div
                     className={cn(
                       'flex items-center gap-3 border-b border-line/70 px-3 py-2.5 transition',
                       active ? 'bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]' : 'hover-wash',
                     )}
                   >
-                    <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} online={isOnline(conversation.peer.lastSeenAt)} />
+                    <Link to={`/c/${conversation.id}`} aria-current={active ? 'page' : undefined} className="shrink-0">
+                      <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} online={isOnline(conversation.peer.lastSeenAt)} />
+                    </Link>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-2">
                         <span className="flex min-w-0 items-center gap-1">
@@ -278,21 +278,19 @@ export function Sidebar() {
                               type="button"
                               aria-label="Unpin chat"
                               title="Unpin"
-                              className="relative z-10 shrink-0 text-sakura"
-                              onClick={(event) => {
-                                event.preventDefault()
-                                event.stopPropagation()
-                                void chat.setChatPin(conversation.id, false)
-                              }}
+                              className="shrink-0 text-sakura"
+                              onClick={() => void chat.setChatPin(conversation.id, false)}
                             >
                               <PinIcon className="h-3.5 w-3.5 fill-current" />
                             </button>
                           ) : null}
-                          <DisplayName
-                            name={conversation.peer.username}
-                            creator={conversation.peer.isCreator}
-                            className={cn('text-sm', conversation.unread > 0 ? 'font-semibold' : 'font-medium')}
-                          />
+                          <Link to={`/c/${conversation.id}`} className="min-w-0">
+                            <DisplayName
+                              name={conversation.peer.username}
+                              creator={conversation.peer.isCreator}
+                              className={cn('text-sm', conversation.unread > 0 ? 'font-semibold' : 'font-medium')}
+                            />
+                          </Link>
                         </span>
                         {conversation.lastMessage ? (
                           <time className={cn('shrink-0 text-[11px]', conversation.unread > 0 ? 'text-sakura' : 'text-mist')} dateTime={conversation.lastMessage.createdAt}>
@@ -300,7 +298,7 @@ export function Sidebar() {
                           </time>
                         ) : null}
                       </span>
-                      <span className="mt-0.5 flex items-center justify-between gap-2">
+                      <Link to={`/c/${conversation.id}`} className="mt-0.5 flex items-center justify-between gap-2">
                         <span className={cn('flex min-w-0 items-center gap-1 text-sm', typing[conversation.id] ? 'text-foam' : 'text-mist')}>
                           {tick ? (
                             <CheckIcon className={cn('h-3.5 w-3.5 shrink-0', tick === 'seen' ? 'text-sakura' : '')} double={tick !== 'sent'} />
@@ -312,9 +310,9 @@ export function Sidebar() {
                             {conversation.unread}
                           </span>
                         ) : null}
-                      </span>
+                      </Link>
                     </span>
-                  </Link>
+                  </div>
                 </li>
               )
             })}
