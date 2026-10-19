@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { EMOJI } from '../lib/emoji'
 import { fitImage } from '../lib/image'
 import { encodeWaveform, pickAudioMime } from '../lib/voice'
 import { formatDuration } from '../lib/format'
 import type { ReplyTarget } from '../types'
-import { CloseIcon, ImageIcon, MicIcon, SendIcon, SmileIcon } from './Icons'
+import { CloseIcon, ImageIcon, MicIcon, SendIcon, SmileIcon, TrashIcon } from './Icons'
 
-type Phase = 'idle' | 'recording' | 'locked'
+type Phase = 'idle' | 'recording'
 
 export function Composer({
   peerName,
@@ -37,14 +37,10 @@ export function Composer({
   const timer = useRef<number | null>(null)
   const peakTimer = useRef<number | null>(null)
   const audioContext = useRef<AudioContext | null>(null)
-  const holding = useRef(false)
-  const locked = useRef(false)
   const finishing = useRef(false)
+  const starting = useRef(false)
   const lastType = useRef(0)
-  const shell = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLTextAreaElement>(null)
-  const originX = useRef(0)
-  const [slide, setSlide] = useState(0)
 
   useEffect(() => {
     return () => {
@@ -123,7 +119,7 @@ export function Composer({
       if (event.data.size > 0) chunks.current.push(event.data)
     }
     recorder.current = media
-    media.start()
+    media.start(250)
     started.current = Date.now()
     setSeconds(0)
     setPhase('recording')
@@ -136,6 +132,7 @@ export function Composer({
     if (Context) {
       const audio = new Context()
       audioContext.current = audio
+      void audio.resume()
       const source = audio.createMediaStreamSource(live)
       const analyser = audio.createAnalyser()
       analyser.fftSize = 256
@@ -156,8 +153,6 @@ export function Composer({
     const media = recorder.current
     const elapsed = Math.max(1, Math.round((Date.now() - started.current) / 1000))
     const type = mime.current || media?.mimeType || 'audio/webm'
-    locked.current = false
-    holding.current = false
     if (!media) {
       stopTracks()
       finishing.current = false
@@ -177,7 +172,7 @@ export function Composer({
     setPhase('idle')
     if (!send) return
     if (blob.size < 400) {
-      setError('Hold the mic a little longer.')
+      setError('Record a little longer.')
       return
     }
     setError('')
@@ -189,58 +184,25 @@ export function Composer({
     }
   }
 
-  async function onMicDown(event: PointerEvent<HTMLButtonElement>) {
-    event.preventDefault()
-    if (phase !== 'idle') return
-    holding.current = true
+  async function startRecording() {
+    if (phase !== 'idle' || starting.current) return
+    starting.current = true
     try {
-      originX.current = event.clientX
-      setSlide(0)
-      shell.current?.setPointerCapture(event.pointerId)
       await begin()
-      if (!holding.current && !locked.current) {
-        await finish(false)
-      }
     } catch (err) {
       stopTracks()
+      recorder.current = null
       setPhase('idle')
       setError(err instanceof Error ? err.message : 'Microphone permission is needed.')
+    } finally {
+      starting.current = false
     }
-  }
-
-  function onMicUp() {
-    if (phase !== 'recording' || locked.current) {
-      holding.current = false
-      return
-    }
-    const elapsed = Date.now() - started.current
-    holding.current = false
-    if (elapsed < 400) {
-      locked.current = true
-      setPhase('locked')
-      return
-    }
-    void finish(true)
   }
 
   const recording = phase !== 'idle'
 
   return (
-    <div
-      ref={shell}
-      className="composer-shell rounded-xl border border-line bg-panel px-2 py-1.5 shadow-md"
-      onPointerUp={onMicUp}
-      onPointerMove={(event) => {
-        if (phase !== 'recording' || locked.current) return
-        const dx = Math.min(0, event.clientX - originX.current)
-        setSlide(dx)
-        if (dx < -88) void finish(false)
-      }}
-      onPointerCancel={() => {
-        holding.current = false
-        if (!locked.current && recorder.current) void finish(false)
-      }}
-    >
+    <div className="composer-shell rounded-xl border border-line bg-panel px-2 py-1.5 shadow-md">
       {reply ? (
         <div className="mb-2 flex items-center gap-2 rounded-lg border-l-4 border-sakura bg-elevated px-3 py-2 text-sm">
           <p className="min-w-0 flex-1 truncate text-mist">{reply.preview}</p>
@@ -267,20 +229,16 @@ export function Composer({
         </div>
       ) : null}
       {recording ? (
-        <div className="flex items-center gap-2 px-1">
+        <div className="flex items-center gap-2 px-1" role="group" aria-label="Voice recording">
           <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#e5484d]" />
           <p className="tabular-nums text-sm font-medium">{formatDuration(seconds)}</p>
-          <p className="min-w-0 flex-1 text-center text-sm text-mist" style={{ transform: `translateX(${slide}px)` }}>
-            {phase === 'locked' ? 'Tap send to share' : 'Slide to cancel'}
-          </p>
-          <button type="button" className="rounded-full px-3 py-2 text-sm text-mist hover:text-paper" onClick={() => void finish(false)}>
-            Cancel
+          <span className="min-w-0 flex-1" />
+          <button type="button" className="hover-wash grid h-10 w-10 shrink-0 place-items-center rounded-full text-mist hover:text-paper" aria-label="Discard recording" onClick={() => void finish(false)}>
+            <TrashIcon className="h-5 w-5" />
           </button>
-          {phase === 'locked' ? (
-            <button type="button" className="send-button grid h-10 w-10 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label="Send voice message" onClick={() => void finish(true)}>
-              <SendIcon className="h-5 w-5" />
-            </button>
-          ) : null}
+          <button type="button" className="send-button grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label="Send voice message" onClick={() => void finish(true)}>
+            <SendIcon className="h-5 w-5" />
+          </button>
         </div>
       ) : (
         <form
@@ -333,9 +291,9 @@ export function Composer({
           ) : (
             <button
               type="button"
-              className="send-button grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110"
+              className="send-button grid h-10 w-10 shrink-0 touch-manipulation place-items-center rounded-full bg-sakura text-white transition hover:brightness-110"
               aria-label="Record voice message"
-              onPointerDown={(event) => void onMicDown(event)}
+              onClick={() => void startRecording()}
             >
               <MicIcon className="h-5 w-5" />
             </button>
