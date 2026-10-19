@@ -257,14 +257,16 @@ export async function savePreferences(userId: string, patch: PreferencePatch): P
   return withWallpaper(mapProfile(data as ProfileRow))
 }
 
-export async function uploadAvatar(userId: string, blob: Blob): Promise<Profile> {
+export async function uploadAvatar(userId: string, blob: Blob, extension: 'gif' | 'jpg' = 'jpg'): Promise<Profile> {
   const supabase = client()
-  const path = `${userId}/avatar.jpg`
+  const path = `${userId}/avatar.${extension}`
   const { error: uploadError } = await supabase.storage.from('avatars').upload(path, blob, {
     upsert: true,
-    contentType: 'image/jpeg',
+    contentType: extension === 'gif' ? 'image/gif' : 'image/jpeg',
   })
   if (uploadError) throw new Error(uploadError.message)
+  const previous = `${userId}/avatar.${extension === 'gif' ? 'jpg' : 'gif'}`
+  await supabase.storage.from('avatars').remove([previous])
   const { data } = supabase.storage.from('avatars').getPublicUrl(path)
   const publicUrl = `${data.publicUrl}?v=${Date.now()}`
   const { data: row, error } = await supabase
