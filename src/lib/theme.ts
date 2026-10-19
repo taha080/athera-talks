@@ -21,7 +21,7 @@ export const THEMES = [
 
 export type ThemeName = (typeof THEMES)[number]
 
-/** Signed-in default. Matches the neutral sign-up screen. */
+/** Signed-in default. Flat lavender from the Lavender Infinity mark. */
 export const DEFAULT_THEME: ThemeName = 'light'
 
 const THEME_COLOR: Record<ThemeName, string> = {
@@ -31,7 +31,7 @@ const THEME_COLOR: Record<ThemeName, string> = {
   sakura: '#1a0d14',
   ocean: '#04161a',
   forest: '#0c1410',
-  light: '#eef1f4',
+  light: '#d4b3f8',
   amoled: '#000000',
   blush: '#fff5f7',
   lavender: '#f7f4fc',
