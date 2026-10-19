@@ -20,6 +20,20 @@
 }
 
 :root,
+[data-theme='light'] {
+  --ink: #eef1f4;
+  --panel: #ffffff;
+  --elevated: #f7f8fa;
+  --line: #e2e6eb;
+  --accent: #1a56db;
+  --accent-2: #1a56db;
+  --mist: #5c6570;
+  --foam: #0e7a45;
+  --paper: #1c2128;
+  --scrollbar: #d0d5dc;
+  --pattern: none;
+}
+
 [data-theme='dark'] {
   --ink: #0c1016;
   --panel: #141a22;
@@ -102,20 +116,6 @@
   --foam: #b6e3a8;
   --paper: #f4fff6;
   --scrollbar: #355443;
-  --pattern: none;
-}
-
-[data-theme='light'] {
-  --ink: #f3f5f7;
-  --panel: #ffffff;
-  --elevated: #eef1f4;
-  --line: #d8dee6;
-  --accent: #1a56db;
-  --accent-2: #1a56db;
-  --mist: #5c6773;
-  --foam: #0e7a45;
-  --paper: #12161c;
-  --scrollbar: #d0d5dc;
   --pattern: none;
 }
 
@@ -292,6 +292,7 @@ body {
   color: #9f1239;
 }
 
+/* Same tokens as the light default, so auth never follows a chosen in-app theme. */
 .auth-canvas {
   --ink: #eef1f4;
   --panel: #ffffff;
@@ -449,6 +450,20 @@ textarea:-webkit-autofill {
 .wallpaper-plain {
   background-image: radial-gradient(circle, color-mix(in oklab, var(--accent) 22%, transparent) 0.7px, transparent 0.9px);
   background-size: 22px 22px;
+}
+
+.app-canvas {
+  background-color: var(--ink);
+}
+
+[data-theme='light'] .app-canvas,
+[data-theme='light'] .wallpaper-plain {
+  background-color: var(--ink);
+  background-image:
+    radial-gradient(circle at 12% -10%, rgb(26 86 219 / 0.08), transparent 36%),
+    radial-gradient(circle at 100% 100%, rgb(26 86 219 / 0.05), transparent 32%);
+  background-attachment: fixed;
+  background-size: auto;
 }
 
 .wallpaper-ink {

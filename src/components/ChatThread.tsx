@@ -233,7 +233,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
       {searchOpen ? (
         <div className="flex items-center gap-2 border-b border-line bg-panel px-3 py-2">
           <input
-            className="h-9 min-w-0 flex-1 rounded-full border border-line bg-elevated px-3 text-sm outline-none focus:border-sakura"
+            className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-elevated px-3 text-sm outline-none focus:border-sakura focus:ring-2 focus:ring-sakura/30"
             value={search}
             onChange={(event) => {
               setSearch(event.target.value)

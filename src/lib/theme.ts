@@ -21,6 +21,9 @@ export const THEMES = [
 
 export type ThemeName = (typeof THEMES)[number]
 
+/** Signed-in default. Matches the neutral sign-up screen. */
+export const DEFAULT_THEME: ThemeName = 'light'
+
 const THEME_COLOR: Record<ThemeName, string> = {
   dark: '#0c1016',
   naruto: '#070d18',
@@ -28,7 +31,7 @@ const THEME_COLOR: Record<ThemeName, string> = {
   sakura: '#1a0d14',
   ocean: '#04161a',
   forest: '#0c1410',
-  light: '#f3f5f7',
+  light: '#eef1f4',
   amoled: '#000000',
   blush: '#fff5f7',
   lavender: '#f7f4fc',
@@ -41,14 +44,14 @@ const THEME_COLOR: Record<ThemeName, string> = {
 }
 
 export function parseTheme(value: string | null | undefined): ThemeName {
-  return THEMES.includes(value as ThemeName) ? (value as ThemeName) : 'dark'
+  return THEMES.includes(value as ThemeName) ? (value as ThemeName) : DEFAULT_THEME
 }
 
 export function readStoredTheme(storage: { getItem: (key: string) => string | null } | null): ThemeName {
   try {
     return parseTheme(storage?.getItem(THEME_KEY))
   } catch {
-    return 'dark'
+    return DEFAULT_THEME
   }
 }
 

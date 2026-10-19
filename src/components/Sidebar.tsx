@@ -4,6 +4,7 @@ import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
 import { cn } from '../lib/cn'
+import { iconButton } from '../lib/styles'
 import { formatListTime } from '../lib/format'
 import { isOnline } from '../lib/presence'
 import { receiptTick } from '../lib/receipts'
@@ -78,12 +79,12 @@ export function Sidebar() {
     <div className="relative flex h-full min-h-0 flex-col bg-panel">
       <header className="flex h-14 items-center gap-2 px-3">
         <h1 className="min-w-0 flex-1 text-lg font-semibold tracking-tight">Chats</h1>
-        <button type="button" className="hover-wash grid h-9 w-9 place-items-center rounded-full text-mist hover:text-paper" aria-label="New chat" onClick={() => searchRef.current?.focus()}>
+        <button type="button" className={iconButton} aria-label="New chat" onClick={() => searchRef.current?.focus()}>
           <PlusIcon className="h-5 w-5" />
         </button>
         <button
           type="button"
-          className="hover-wash grid h-9 w-9 place-items-center rounded-full text-mist hover:text-paper"
+          className={iconButton}
           aria-label="Chat list menu"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((open) => !open)}
@@ -119,14 +120,14 @@ export function Sidebar() {
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-mist" />
           <input
             ref={searchRef}
-            className="h-10 w-full rounded-full border border-line bg-elevated pl-9 pr-3 text-sm text-paper outline-none transition placeholder:text-mist/70 focus:border-sakura"
+            className="h-10 w-full rounded-lg border border-line bg-elevated pl-9 pr-3 text-sm text-paper outline-none transition placeholder:text-mist/70 focus:border-sakura focus:ring-2 focus:ring-sakura/30"
             value={query}
             onChange={(event) => void onSearch(event.target.value)}
             placeholder="Search or start a chat"
             aria-label="Search username"
           />
         </label>
-        <div className="mt-2 flex gap-1 pb-2" role="tablist" aria-label="Chat filters">
+        <div className="mt-2 flex gap-1 rounded-lg bg-elevated p-1" role="tablist" aria-label="Chat filters">
           {(['all', 'unread'] as const).map((item) => (
             <button
               key={item}
@@ -134,8 +135,8 @@ export function Sidebar() {
               role="tab"
               aria-selected={filter === item}
               className={cn(
-                'rounded-full px-3 py-1 text-xs font-medium transition',
-                filter === item ? 'bg-sakura text-white' : 'bg-elevated text-mist hover:text-paper',
+                'rounded-md px-3 py-1 text-xs font-medium transition',
+                filter === item ? 'bg-panel text-paper shadow-sm' : 'text-mist hover:text-paper',
               )}
               onClick={() => setFilter(item)}
             >

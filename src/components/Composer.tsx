@@ -228,7 +228,7 @@ export function Composer({
   return (
     <div
       ref={shell}
-      className="rounded-[24px] border border-line bg-panel px-2 py-1.5 shadow-md"
+      className="rounded-xl border border-line bg-panel px-2 py-1.5 shadow-md"
       onPointerUp={onMicUp}
       onPointerMove={(event) => {
         if (phase !== 'recording' || locked.current) return

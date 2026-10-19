@@ -22,7 +22,7 @@ export function Shell() {
   return (
     <ChatProvider>
       <CallProvider>
-        <div className="flex h-dvh overflow-hidden bg-ink text-paper">
+        <div className="app-canvas flex h-dvh overflow-hidden text-paper">
           <NavRail />
           <aside
             className={cn(
@@ -32,7 +32,7 @@ export function Shell() {
           >
             <Sidebar />
           </aside>
-          <section className={cn('min-h-0 min-w-0 flex-1 flex-col bg-ink', showList ? 'hidden md:flex' : 'flex')}>
+          <section className={cn('min-h-0 min-w-0 flex-1 flex-col', showList ? 'hidden md:flex' : 'flex')}>
             <Outlet />
           </section>
           <CallScreen />
@@ -94,7 +94,7 @@ function RailLink({
       to={to}
       aria-label={label}
       aria-current={active ? 'page' : undefined}
-      className={cn(iconButton, active ? 'bg-white/10 text-paper' : '')}
+      className={cn(iconButton, active ? 'bg-elevated text-paper' : '')}
     >
       {children}
     </Link>
