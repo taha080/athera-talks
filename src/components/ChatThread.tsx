@@ -181,16 +181,12 @@ function MessageRow({
   return (
     <div className={mine ? 'ml-auto max-w-[80%]' : 'mr-auto max-w-[80%]'}>
       <div className="relative">
-        <button
-          type="button"
+        <div
           className={
             mine
               ? 'bubble-own bubble-in relative w-full overflow-hidden rounded-3xl rounded-br-md bg-gradient-to-br from-sakura to-violet px-4 py-2.5 text-left text-white'
               : 'bubble-other bubble-in w-full rounded-3xl rounded-bl-md bg-elevated px-4 py-2.5 text-left'
           }
-          onClick={onOpenMenu}
-          aria-expanded={menuOpen}
-          aria-label="Message actions"
         >
           {message.replyPreview && !deleted ? (
             <p className={mine ? 'mb-1 truncate border-l-2 border-white/70 pl-2 text-xs text-white/80' : 'mb-1 truncate border-l-2 border-sakura pl-2 text-xs text-mist'}>
@@ -218,8 +214,13 @@ function MessageRow({
                 <CheckIcon className={tick === 'seen' ? 'h-3.5 w-3.5 text-foam' : 'h-3.5 w-3.5'} double={tick !== 'sent'} />
               </span>
             ) : null}
+            {!deleted ? (
+              <button type="button" className="ml-1 underline-offset-2 hover:underline" aria-expanded={menuOpen} aria-label="Message actions" onClick={onOpenMenu}>
+                ···
+              </button>
+            ) : null}
           </p>
-        </button>
+        </div>
         {menuOpen && !deleted ? (
           <div className={mine ? 'absolute right-0 z-10 mt-1 w-44 rounded-2xl border border-line bg-panel p-1 shadow-xl' : 'absolute left-0 z-10 mt-1 w-44 rounded-2xl border border-line bg-panel p-1 shadow-xl'}>
             <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-white/5" onClick={onReply}>

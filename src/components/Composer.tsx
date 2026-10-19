@@ -42,6 +42,7 @@ export function Composer({
   const locked = useRef(false)
   const finishing = useRef(false)
   const lastType = useRef(0)
+  const shell = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     return () => {
@@ -184,7 +185,7 @@ export function Composer({
     if (phase !== 'idle') return
     holding.current = true
     try {
-      event.currentTarget.setPointerCapture(event.pointerId)
+      shell.current?.setPointerCapture(event.pointerId)
       await begin()
       if (!holding.current && !locked.current) {
         await finish(false)
@@ -214,7 +215,15 @@ export function Composer({
   const recording = phase !== 'idle'
 
   return (
-    <div className="border-t border-line px-3 py-3">
+    <div
+      ref={shell}
+      className="border-t border-line px-3 py-3"
+      onPointerUp={onMicUp}
+      onPointerCancel={() => {
+        holding.current = false
+        if (!locked.current && recorder.current) void finish(false)
+      }}
+    >
       {reply ? (
         <div className="mb-2 flex items-center gap-2 rounded-2xl border-l-4 border-sakura bg-white/5 px-3 py-2 text-sm">
           <p className="min-w-0 flex-1 truncate text-mist">{reply.preview}</p>
@@ -303,11 +312,6 @@ export function Composer({
               className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-ink"
               aria-label="Record voice message"
               onPointerDown={(event) => void onMicDown(event)}
-              onPointerUp={onMicUp}
-              onPointerCancel={() => {
-                holding.current = false
-                if (!locked.current && recorder.current) void finish(false)
-              }}
             >
               <MicIcon className="h-5 w-5" />
             </button>
