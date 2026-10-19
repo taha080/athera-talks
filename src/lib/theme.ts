@@ -31,7 +31,7 @@ const THEME_COLOR: Record<ThemeName, string> = {
   sakura: '#1a0d14',
   ocean: '#04161a',
   forest: '#0c1410',
-  light: '#d4b3f8',
+  light: '#ffffff',
   amoled: '#000000',
   blush: '#fff5f7',
   lavender: '#f7f4fc',

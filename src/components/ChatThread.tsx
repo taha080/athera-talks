@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
@@ -24,6 +24,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
   const [reply, setReply] = useState<ReplyTarget | null>(null)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [reactId, setReactId] = useState<string | null>(null)
+  const [actionsId, setActionsId] = useState<string | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -55,6 +56,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
     setReply(null)
     setMenuId(null)
     setReactId(null)
+    setActionsId(null)
     setInfoOpen(false)
     setSearchOpen(false)
     setSearch('')
@@ -93,6 +95,19 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
       setDividerId((current) => current ?? chat.messages[Math.max(0, chat.messages.length - added)]?.id ?? null)
     }
   }, [chat.messages, chat.messagesLoading, profile?.id])
+
+  useEffect(() => {
+    if (!actionsId) return
+    function onPointerDown(event: PointerEvent) {
+      const row = document.querySelector(`[data-message-id="${actionsId}"]`)
+      if (event.target instanceof Node && row?.contains(event.target)) return
+      setActionsId(null)
+      setMenuId(null)
+      setReactId(null)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [actionsId])
 
   useEffect(() => {
     if (!infoOpen && !lightbox) return
@@ -167,6 +182,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
     try {
       await task
       setMenuId(null)
+      setActionsId(null)
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Could not update that message.')
     }
@@ -181,11 +197,12 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
       chat.pushToast('Could not copy that message')
     }
     setMenuId(null)
+    setActionsId(null)
   }
 
   return (
     <div
-      className={`relative flex h-full min-h-0 flex-col ${wallpaperClass(wallpaper)}`}
+      className={`chat-column relative flex h-full min-h-0 flex-col ${wallpaperClass(wallpaper)}`}
       style={customImage ? { backgroundImage: `url("${customImage}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
     >
       <header className="chat-header relative flex h-14 shrink-0 items-center gap-2 border-b border-line bg-panel px-2">
@@ -194,8 +211,8 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
         </Link>
         <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} size="sm" online={online} creator={conversation.peer.isCreator} />
         <div className="min-w-0 flex-1">
-          <DisplayName name={conversation.peer.username} creator={conversation.peer.isCreator} className="text-sm font-semibold" />
-          <p className={`truncate text-xs ${typing || online ? 'text-foam' : 'text-mist'}`}>{status}</p>
+          <DisplayName name={conversation.peer.username} creator={conversation.peer.isCreator} className="chat-title text-sm font-semibold" />
+          <p className={`chat-status truncate text-xs ${typing || online ? 'text-foam' : 'text-mist'}`}>{status}</p>
         </div>
         <button type="button" className={iconButton} aria-label="Start voice call" onClick={() => void call.startCall(conversation.peer, conversation.id)}>
           <PhoneIcon className="h-5 w-5" />
@@ -253,7 +270,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
         </div>
       ) : null}
 
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-6" onScroll={onScroll}>
+      <div ref={scroller} className="chat-stream min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-6" onScroll={onScroll}>
         {chat.messagesLoading ? <MessageSkeleton /> : null}
         {!chat.messagesLoading && chat.messages.length === 0 ? (
           <p className="mx-auto mt-16 max-w-xs text-center text-sm leading-6 text-mist">No messages yet. Say hello, send a photo, or hold the mic for a voice note.</p>
@@ -266,10 +283,10 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
           const pos = groupPosition(chat.messages, index)
           const hit = Boolean(query) && !message.deletedAt && message.body.toLowerCase().includes(query)
           return (
-            <div key={message.id} data-message-id={message.id} className={pos === 'start' || pos === 'single' ? 'mt-2.5 first:mt-0' : 'mt-0.5'}>
+            <div key={message.id} data-message-id={message.id} className={pos === 'start' || pos === 'single' ? 'msg-cluster mt-2.5 first:mt-0' : 'msg-follow mt-0.5'}>
               {showDay ? (
                 <div className="sticky top-2 z-10 my-3 flex justify-center">
-                  <span className="rounded-full border border-line bg-panel/95 px-3 py-1 text-[11px] font-medium text-mist shadow-sm backdrop-blur">
+                  <span className="day-chip rounded-full border border-line bg-panel/95 px-3 py-1 text-[11px] font-medium text-mist shadow-sm backdrop-blur">
                     {formatDayLabel(message.createdAt)}
                   </span>
                 </div>
@@ -288,6 +305,12 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
                 receiptsShared={conversation.peer.showReadReceipts !== false}
                 menuOpen={menuId === message.id}
                 reactOpen={reactId === message.id}
+                actionsOpen={actionsId === message.id}
+                onOpenActions={() => {
+                  setActionsId(message.id)
+                  setMenuId(null)
+                  setReactId(null)
+                }}
                 onOpenMenu={() => {
                   setMenuId((current) => (current === message.id ? null : message.id))
                   setReactId(null)
@@ -295,6 +318,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
                 onReply={() => {
                   setReply({ id: message.id, preview: messagePreview(message).slice(0, 80) })
                   setMenuId(null)
+                  setActionsId(null)
                 }}
                 onReact={() => setReactId((current) => (current === message.id ? null : message.id))}
                 onCopy={() => void copyMessage(message)}
@@ -334,7 +358,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
         </button>
       ) : null}
       {actionError ? <p className="px-4 pb-1 text-sm text-danger">{actionError}</p> : null}
-      <div className="px-2 pb-2 pt-1 sm:px-4">
+      <div className="composer-dock px-2 pb-2 pt-1 sm:px-4">
         <Composer
           peerName={conversation.peer.username}
           reply={reply}
@@ -375,6 +399,8 @@ function MessageRow({
   receiptsShared,
   menuOpen,
   reactOpen,
+  actionsOpen,
+  onOpenActions,
   onOpenMenu,
   onReply,
   onReact,
@@ -394,6 +420,8 @@ function MessageRow({
   receiptsShared: boolean
   menuOpen: boolean
   reactOpen: boolean
+  actionsOpen: boolean
+  onOpenActions: () => void
   onOpenMenu: () => void
   onReply: () => void
   onReact: () => void
@@ -417,13 +445,48 @@ function MessageRow({
   const firstLink = parts.find((part) => part.type === 'link')?.value
   const bubble = creator ? 'bubble-creator' : mine ? 'bubble-own' : 'bubble-other'
   const tail = !creator && tailed ? (mine ? 'tail-own' : 'tail-other') : ''
+  const cancelPress = useRef<(() => void) | null>(null)
+
+  useEffect(() => () => cancelPress.current?.(), [])
+
+  function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.button !== 0 || deleted) return
+    const target = event.target
+    if (!(target instanceof Element) || target.closest('a, button, input, textarea, label')) return
+    const startX = event.clientX
+    const startY = event.clientY
+    const timer = window.setTimeout(() => {
+      stop()
+      window.getSelection()?.removeAllRanges()
+      onOpenActions()
+    }, 450)
+    function stop() {
+      window.clearTimeout(timer)
+      window.removeEventListener('pointerup', stop)
+      window.removeEventListener('pointercancel', stop)
+      window.removeEventListener('pointermove', move)
+      cancelPress.current = null
+    }
+    function move(moveEvent: PointerEvent) {
+      if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) > 12) stop()
+    }
+    cancelPress.current = stop
+    window.addEventListener('pointerup', stop)
+    window.addEventListener('pointercancel', stop)
+    window.addEventListener('pointermove', move)
+  }
+
   return (
-    <div className={`msg-group relative flex max-w-[min(78%,26rem)] flex-col ${mine ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
+    <div
+      className={`msg-group relative flex max-w-[min(78%,26rem)] flex-col ${mine ? 'ml-auto items-end' : 'mr-auto items-start'} ${actionsOpen ? 'is-actions-open' : ''}`}
+      onPointerDown={onPointerDown}
+      onContextMenu={(event) => event.preventDefault()}
+    >
       {(pos === 'start' || pos === 'single') && !senderCreator ? (
-        <DisplayName name={senderName} creator={senderCreator} className="mb-0.5 px-1 text-[11px] font-medium text-mist" />
+        <DisplayName name={senderName} creator={senderCreator} className="msg-sender mb-0.5 px-1 text-[11px] font-medium text-mist" />
       ) : null}
       {!deleted ? (
-        <div className={`msg-actions absolute -top-8 z-10 flex gap-0.5 rounded-full border border-line bg-panel p-0.5 shadow-sm ${mine ? 'right-0' : 'left-0'}`}>
+        <div className={`msg-actions absolute top-1 z-10 flex gap-0.5 rounded-full border border-line bg-panel p-0.5 shadow-sm ${mine ? 'right-1' : 'left-1'}`} hidden={!actionsOpen}>
           <Tiny label="Reply" onClick={onReply}><ReplyIcon className="h-3.5 w-3.5" /></Tiny>
           <Tiny label="React" onClick={onReact}><SmileIcon className="h-3.5 w-3.5" /></Tiny>
           <Tiny label="Copy" onClick={onCopy}><CopyIcon className="h-3.5 w-3.5" /></Tiny>
@@ -431,7 +494,7 @@ function MessageRow({
         </div>
       ) : null}
       <div className={`relative min-w-0 ${highlighted ? 'rounded-[18px] ring-2 ring-sakura/70' : ''}`}>
-        <div data-creator-bubble={creator ? 'true' : undefined} className={`${bubble} bubble-in relative text-left ${radius} ${image && !creator ? 'overflow-hidden p-1' : 'px-2.5 py-1.5'} ${tail}`}>
+        <div data-creator-bubble={creator ? 'true' : undefined} className={`${bubble} bubble-in relative text-left ${radius} ${image && !creator ? 'overflow-hidden p-1' : 'bubble-pad px-2.5 py-1.5'} ${tail}`}>
           {creator ? <CreatorMessageHeader /> : null}
           {message.replyPreview && !deleted ? (
             <p className={ownTone ? 'mb-1 truncate rounded-md border-l-2 border-white/70 bg-black/10 px-2 py-1 text-xs text-white/85' : 'mb-1 truncate rounded-md border-l-2 border-sakura bg-black/5 px-2 py-1 text-xs text-mist'}>
@@ -477,7 +540,7 @@ function MessageRow({
           )}
         </div>
         {reactions.length > 0 ? (
-          <div className={`mt-1 flex flex-wrap gap-1 ${mine ? 'justify-end' : ''}`}>
+          <div className={`msg-reactions mt-1 flex flex-wrap gap-1 ${mine ? 'justify-end' : ''}`}>
             {reactions.map((reaction) => (
               <button
                 key={reaction.emoji}
@@ -529,7 +592,7 @@ function Meta({
   floated?: boolean
 }) {
   return (
-    <span className={`${floated ? 'float-right ml-2 mt-1.5' : 'mt-0.5 flex justify-end'} inline-flex items-center gap-1 px-0.5 text-[11px] leading-none ${mine ? 'text-white/75' : 'text-mist'}`}>
+    <span className={`msg-meta ${floated ? 'float-right ml-2 mt-1.5' : 'mt-0.5 flex justify-end'} inline-flex items-center gap-1 px-0.5 text-[11px] leading-none ${mine ? 'text-white/75' : 'text-mist'}`}>
       <time dateTime={createdAt}>{formatMessageTime(createdAt)}</time>
       {showTick ? (
         <span title={tick} aria-label={tick}>
