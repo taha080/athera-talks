@@ -90,7 +90,7 @@ export function Sidebar() {
   const visible = chat.conversations.filter((item) => filter === 'all' || item.unread > 0)
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col bg-panel">
+    <div className="relative flex h-full min-h-0 flex-col">
       <header className="flex h-14 items-center gap-2 px-3">
         <h1 className="min-w-0 flex-1 text-lg font-semibold tracking-tight">{showRequests ? 'Requests' : 'Chats'}</h1>
         <Link
@@ -146,7 +146,7 @@ export function Sidebar() {
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-mist" />
           <input
             ref={searchRef}
-            className="h-10 w-full rounded-lg border border-line bg-elevated pl-9 pr-3 text-sm text-paper outline-none transition placeholder:text-mist/70 focus:border-sakura focus:ring-2 focus:ring-sakura/30"
+            className="chat-list-search h-10 w-full rounded-lg border border-line bg-elevated pl-9 pr-3 text-sm text-paper outline-none transition placeholder:text-mist/70 focus:border-sakura focus:ring-2 focus:ring-sakura/30"
             value={query}
             onChange={(event) => void onSearch(event.target.value)}
             placeholder="Search username"
@@ -243,7 +243,7 @@ export function Sidebar() {
                     to={`/c/${conversation.id}`}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'flex items-center gap-3 border-b border-line/70 px-3 py-2.5 transition',
+                      'chat-list-row flex items-center gap-3 border-b border-line/70 px-3 py-2.5 transition',
                       active ? 'bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]' : 'hover-wash',
                     )}
                   >
@@ -403,7 +403,7 @@ function ListSkeleton() {
   return (
     <div aria-hidden="true">
       {Array.from({ length: 7 }, (_, index) => (
-        <div key={index} className="flex items-center gap-3 border-b border-line/60 px-3 py-3">
+        <div key={index} className="chat-list-row flex items-center gap-3 border-b border-line/60 px-3 py-3">
           <span className="skeleton h-12 w-12 rounded-full" />
           <span className="min-w-0 flex-1 space-y-2">
             <span className="skeleton block h-3 w-2/5 rounded" />

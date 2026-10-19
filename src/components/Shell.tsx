@@ -26,7 +26,7 @@ export function Shell() {
           <NavRail />
           <aside
             className={cn(
-              'min-h-0 w-full flex-col border-line bg-panel md:flex md:w-[360px] md:shrink-0 md:border-r',
+              'chat-list min-h-0 w-full flex-col border-line bg-panel md:flex md:w-[360px] md:shrink-0 md:border-r',
               showList ? 'flex' : 'hidden',
             )}
           >

@@ -492,6 +492,18 @@ textarea:-webkit-autofill {
   background-size: auto;
 }
 
+[data-theme='light'] .chat-list {
+  background: radial-gradient(320px 260px at 0% 100%, #e9d5ff, transparent 70%), radial-gradient(260px 200px at 100% 0%, #fbcfe8, transparent 70%), #faf5ff;
+}
+
+[data-theme='light'] .chat-list-search {
+  background-color: rgba(255,255,255,.75);
+}
+
+[data-theme='light'] .chat-list-row {
+  border-color: rgba(15,23,42,.06);
+}
+
 .wallpaper-ink {
   background-color: var(--ink);
 }
