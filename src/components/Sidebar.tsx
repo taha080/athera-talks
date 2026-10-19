@@ -90,8 +90,8 @@ export function Sidebar() {
   const visible = chat.conversations.filter((item) => filter === 'all' || item.unread > 0)
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col bg-panel">
-      <header className="flex h-14 items-center gap-2 px-3">
+    <div className="chat-list relative flex h-full min-h-0 flex-col bg-panel">
+      <header className="chat-header flex h-14 items-center gap-2 px-3">
         <h1 className="min-w-0 flex-1 text-lg font-semibold tracking-tight">{showRequests ? 'Requests' : 'Chats'}</h1>
         <Link
           to={showRequests ? '/' : '/?requests=1'}
@@ -244,7 +244,7 @@ export function Sidebar() {
                     aria-current={active ? 'page' : undefined}
                     className={cn(
                       'flex items-center gap-3 border-b border-line/70 px-3 py-2.5 transition',
-                      active ? 'bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]' : 'hover-wash',
+                      active ? 'is-active bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]' : 'hover-wash',
                     )}
                   >
                     <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} online={isOnline(conversation.peer.lastSeenAt)} creator={conversation.peer.isCreator} />

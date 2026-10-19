@@ -188,7 +188,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
       className={`relative flex h-full min-h-0 flex-col ${wallpaperClass(wallpaper)}`}
       style={customImage ? { backgroundImage: `url("${customImage}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
     >
-      <header className="relative flex h-14 shrink-0 items-center gap-2 border-b border-line bg-panel px-2">
+      <header className="chat-header relative flex h-14 shrink-0 items-center gap-2 border-b border-line bg-panel px-2">
         <Link to="/" className={`${iconButton} md:hidden`} aria-label="Back to chats">
           <BackIcon className="h-5 w-5" />
         </Link>
