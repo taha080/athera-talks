@@ -1,12 +1,18 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useCall } from '../context/CallContext'
+import { useChat } from '../context/ChatContext'
 import { EMOJI } from '../lib/emoji'
 import { fitImage } from '../lib/image'
-import { encodeWaveform, pickAudioMime } from '../lib/voice'
 import { formatDuration } from '../lib/format'
+import { collectRecording, createAudioRecorder, encodeWaveform, RECORDER_TIMESLICE_MS } from '../lib/voice'
 import type { ReplyTarget } from '../types'
 import { CloseIcon, ImageIcon, MicIcon, SendIcon, SmileIcon } from './Icons'
 
-type Phase = 'idle' | 'recording' | 'locked'
+type Phase = 'idle' | 'recording' | 'sending'
+
+function callOwnsMic(phase: string): boolean {
+  return phase !== 'idle' && phase !== 'failed'
+}
 
 export function Composer({
   peerName,
@@ -23,6 +29,8 @@ export function Composer({
   onSendFile: (file: Blob, mime: string, kind: 'voice' | 'image', seconds?: number, waveform?: number[]) => Promise<void>
   onTyping: () => void
 }) {
+  const chat = useChat()
+  const call = useCall()
   const [draft, setDraft] = useState('')
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [phase, setPhase] = useState<Phase>('idle')
@@ -37,20 +45,41 @@ export function Composer({
   const timer = useRef<number | null>(null)
   const peakTimer = useRef<number | null>(null)
   const audioContext = useRef<AudioContext | null>(null)
-  const holding = useRef(false)
-  const locked = useRef(false)
   const finishing = useRef(false)
+  const stopping = useRef(false)
+  const starting = useRef(false)
   const lastType = useRef(0)
-  const shell = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLTextAreaElement>(null)
-  const originX = useRef(0)
-  const [slide, setSlide] = useState(0)
+  const phaseRef = useRef<Phase>('idle')
+  const callPhase = useRef(call.phase)
+  const sendFileRef = useRef(onSendFile)
+  const toastRef = useRef(chat.pushToast)
+  const finishRef = useRef<(send: boolean, discardNote?: string) => Promise<void>>(async () => {})
+  callPhase.current = call.phase
+  sendFileRef.current = onSendFile
+  toastRef.current = chat.pushToast
+
+  function setPhaseSafe(next: Phase) {
+    phaseRef.current = next
+    setPhase(next)
+  }
+
+  function report(message: string) {
+    setError(message)
+    toastRef.current(message)
+  }
 
   useEffect(() => {
     return () => {
+      stopping.current = true
       stopTracks()
     }
   }, [])
+
+  useEffect(() => {
+    if (phaseRef.current !== 'recording' || !callOwnsMic(call.phase)) return
+    void finishRef.current(false, 'End the call before recording a voice note.')
+  }, [call.phase])
 
   function stopTracks() {
     if (timer.current) window.clearInterval(timer.current)
@@ -102,145 +131,146 @@ export function Composer({
       await onSendFile(blob, 'image/jpeg', 'image')
       setEmojiOpen(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send that photo.')
+      const message = err instanceof Error ? err.message : 'Could not send that photo.'
+      setError(message)
+      chat.pushToast(message)
     }
   }
 
-  async function begin() {
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-      setError('This browser cannot record voice notes.')
-      return
-    }
-    setError('')
-    const live = await navigator.mediaDevices.getUserMedia({ audio: true })
-    stream.current = live
-    const chosen = pickAudioMime((type) => MediaRecorder.isTypeSupported(type))
-    mime.current = chosen
-    const media = chosen ? new MediaRecorder(live, { mimeType: chosen }) : new MediaRecorder(live)
-    chunks.current = []
-    peaks.current = []
-    media.ondataavailable = (event) => {
-      if (event.data.size > 0) chunks.current.push(event.data)
-    }
-    recorder.current = media
-    media.start()
-    started.current = Date.now()
-    setSeconds(0)
-    setPhase('recording')
-    timer.current = window.setInterval(() => {
-      const elapsed = Math.floor((Date.now() - started.current) / 1000)
-      setSeconds(elapsed)
-      if (elapsed >= 120) void finish(true)
-    }, 200)
-    const Context = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-    if (Context) {
-      const audio = new Context()
-      audioContext.current = audio
-      const source = audio.createMediaStreamSource(live)
-      const analyser = audio.createAnalyser()
-      analyser.fftSize = 256
-      source.connect(analyser)
-      const data = new Uint8Array(analyser.fftSize)
-      peakTimer.current = window.setInterval(() => {
-        analyser.getByteTimeDomainData(data)
-        let peak = 0
-        for (const value of data) peak = Math.max(peak, Math.abs(value - 128))
-        peaks.current.push(Math.round((peak / 128) * 100))
-      }, 100)
-    }
-  }
-
-  async function finish(send: boolean) {
+  async function finish(send: boolean, discardNote?: string) {
     if (finishing.current) return
     finishing.current = true
+    stopping.current = true
     const media = recorder.current
     const elapsed = Math.max(1, Math.round((Date.now() - started.current) / 1000))
     const type = mime.current || media?.mimeType || 'audio/webm'
-    locked.current = false
-    holding.current = false
     if (!media) {
       stopTracks()
+      recorder.current = null
       finishing.current = false
-      setPhase('idle')
+      setPhaseSafe('idle')
+      if (discardNote) report(discardNote)
       return
     }
-    const blob = await new Promise<Blob>((resolve) => {
-      media.onstop = () => {
-        resolve(new Blob(chunks.current, { type: type.split(';')[0] || 'audio/webm' }))
-      }
-      if (media.state !== 'inactive') media.stop()
-      else resolve(new Blob(chunks.current, { type: type.split(';')[0] || 'audio/webm' }))
-    })
+    const blob = await collectRecording(media, chunks.current, type)
     stopTracks()
     recorder.current = null
-    finishing.current = false
-    setPhase('idle')
-    if (!send) return
+    if (!send) {
+      finishing.current = false
+      setPhaseSafe('idle')
+      if (discardNote) report(discardNote)
+      return
+    }
     if (blob.size < 400) {
-      setError('Hold the mic a little longer.')
+      finishing.current = false
+      setPhaseSafe('idle')
+      report('That recording was empty. Tap the mic and try again.')
       return
     }
     setError('')
+    setPhaseSafe('sending')
     try {
       const waveform = encodeWaveform(peaks.current).split(',').filter(Boolean).map(Number)
-      await onSendFile(blob, type, 'voice', elapsed, waveform)
+      await sendFileRef.current(blob, type, 'voice', elapsed, waveform)
+      setPhaseSafe('idle')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send that voice note.')
+      setPhaseSafe('idle')
+      report(err instanceof Error ? err.message : 'Could not send that voice note.')
+    } finally {
+      finishing.current = false
     }
   }
+  finishRef.current = finish
 
-  async function onMicDown(event: PointerEvent<HTMLButtonElement>) {
-    event.preventDefault()
-    if (phase !== 'idle') return
-    holding.current = true
+  function onMicLost() {
+    if (stopping.current || finishing.current || phaseRef.current !== 'recording') return
+    const message = callOwnsMic(callPhase.current)
+      ? 'End the call before recording a voice note.'
+      : 'The microphone disconnected. Tap the mic and record again.'
+    void finishRef.current(false, message)
+  }
+
+  async function begin() {
+    if (starting.current || phaseRef.current !== 'idle') return
+    if (callOwnsMic(callPhase.current)) {
+      report('End the call before recording a voice note.')
+      return
+    }
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      report('This browser cannot record voice notes.')
+      return
+    }
+    starting.current = true
+    setError('')
+    stopping.current = false
     try {
-      originX.current = event.clientX
-      setSlide(0)
-      shell.current?.setPointerCapture(event.pointerId)
-      await begin()
-      if (!holding.current && !locked.current) {
-        await finish(false)
+      const live = await navigator.mediaDevices.getUserMedia({ audio: true })
+      if (callOwnsMic(callPhase.current) || phaseRef.current !== 'idle') {
+        live.getTracks().forEach((track) => track.stop())
+        report('End the call before recording a voice note.')
+        return
+      }
+      stream.current = live
+      live.getAudioTracks().forEach((track) => {
+        track.addEventListener('ended', onMicLost)
+      })
+      const created = createAudioRecorder(live, {
+        supported: (type) => (typeof MediaRecorder.isTypeSupported === 'function' ? MediaRecorder.isTypeSupported(type) : false),
+        create: (source, mimeType) => (mimeType ? new MediaRecorder(source, { mimeType }) : new MediaRecorder(source)),
+      })
+      mime.current = created.mimeType
+      chunks.current = []
+      peaks.current = []
+      created.recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunks.current.push(event.data)
+      }
+      recorder.current = created.recorder
+      created.recorder.start(RECORDER_TIMESLICE_MS)
+      started.current = Date.now()
+      setSeconds(0)
+      setPhaseSafe('recording')
+      timer.current = window.setInterval(() => {
+        const elapsed = Math.floor((Date.now() - started.current) / 1000)
+        setSeconds(elapsed)
+        if (elapsed >= 120) void finishRef.current(true)
+      }, 200)
+      const Context = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (Context) {
+        const audio = new Context()
+        audioContext.current = audio
+        const source = audio.createMediaStreamSource(live)
+        const analyser = audio.createAnalyser()
+        analyser.fftSize = 256
+        source.connect(analyser)
+        const data = new Uint8Array(analyser.fftSize)
+        peakTimer.current = window.setInterval(() => {
+          analyser.getByteTimeDomainData(data)
+          let peak = 0
+          for (const value of data) peak = Math.max(peak, Math.abs(value - 128))
+          peaks.current.push(Math.round((peak / 128) * 100))
+        }, 100)
       }
     } catch (err) {
+      stopping.current = true
       stopTracks()
-      setPhase('idle')
-      setError(err instanceof Error ? err.message : 'Microphone permission is needed.')
+      recorder.current = null
+      setPhaseSafe('idle')
+      const name = err && typeof err === 'object' && 'name' in err ? String(err.name) : ''
+      const denied = name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError'
+      report(
+        denied
+          ? 'Microphone permission is needed. Allow the mic for this site and tap again.'
+          : err instanceof Error
+            ? err.message
+            : 'Microphone permission is needed. Allow the mic for this site and tap again.',
+      )
+    } finally {
+      starting.current = false
     }
   }
-
-  function onMicUp() {
-    if (phase !== 'recording' || locked.current) {
-      holding.current = false
-      return
-    }
-    const elapsed = Date.now() - started.current
-    holding.current = false
-    if (elapsed < 400) {
-      locked.current = true
-      setPhase('locked')
-      return
-    }
-    void finish(true)
-  }
-
-  const recording = phase !== 'idle'
 
   return (
-    <div
-      ref={shell}
-      className="rounded-xl border border-line bg-panel px-2 py-1.5 shadow-md"
-      onPointerUp={onMicUp}
-      onPointerMove={(event) => {
-        if (phase !== 'recording' || locked.current) return
-        const dx = Math.min(0, event.clientX - originX.current)
-        setSlide(dx)
-        if (dx < -88) void finish(false)
-      }}
-      onPointerCancel={() => {
-        holding.current = false
-        if (!locked.current && recorder.current) void finish(false)
-      }}
-    >
+    <div className="rounded-xl border border-line bg-panel px-2 py-1.5 shadow-md">
       {reply ? (
         <div className="mb-2 flex items-center gap-2 rounded-lg border-l-4 border-sakura bg-elevated px-3 py-2 text-sm">
           <p className="min-w-0 flex-1 truncate text-mist">{reply.preview}</p>
@@ -266,21 +296,22 @@ export function Composer({
           ))}
         </div>
       ) : null}
-      {recording ? (
-        <div className="flex items-center gap-2 px-1">
+      {phase === 'sending' ? (
+        <div className="flex items-center gap-2 px-1 py-2" data-testid="voice-sending" role="status">
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-sakura" />
+          <p className="text-sm text-mist">Sending voice note…</p>
+        </div>
+      ) : phase === 'recording' ? (
+        <div className="flex items-center gap-2 px-1" data-testid="voice-recording">
           <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#e5484d]" />
           <p className="tabular-nums text-sm font-medium">{formatDuration(seconds)}</p>
-          <p className="min-w-0 flex-1 text-center text-sm text-mist" style={{ transform: `translateX(${slide}px)` }}>
-            {phase === 'locked' ? 'Tap send to share' : 'Slide to cancel'}
-          </p>
-          <button type="button" className="rounded-full px-3 py-2 text-sm text-mist hover:text-paper" onClick={() => void finish(false)}>
+          <p className="min-w-0 flex-1 text-center text-sm text-mist">Tap send when you’re done</p>
+          <button type="button" className="touch-manipulation rounded-full px-3 py-2 text-sm text-mist hover:text-paper" aria-label="Cancel voice message" onClick={() => void finish(false)}>
             Cancel
           </button>
-          {phase === 'locked' ? (
-            <button type="button" className="grid h-10 w-10 place-items-center rounded-full bg-sakura text-white" aria-label="Send voice message" onClick={() => void finish(true)}>
-              <SendIcon className="h-5 w-5" />
-            </button>
-          ) : null}
+          <button type="button" className="touch-manipulation grid h-10 w-10 place-items-center rounded-full bg-sakura text-white" aria-label="Send voice message" onClick={() => void finish(true)}>
+            <SendIcon className="h-5 w-5" />
+          </button>
         </div>
       ) : (
         <form
@@ -333,9 +364,9 @@ export function Composer({
           ) : (
             <button
               type="button"
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110"
+              className="touch-manipulation grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110"
               aria-label="Record voice message"
-              onPointerDown={(event) => void onMicDown(event)}
+              onClick={() => void begin()}
             >
               <MicIcon className="h-5 w-5" />
             </button>
