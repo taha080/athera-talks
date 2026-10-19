@@ -3,6 +3,16 @@ export const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/m
 // Chrome on Android only flushes a final chunk when start() was given a timeslice.
 export const RECORDER_TIMESLICE_MS = 250
 
+export type VoiceTapPhase = 'idle' | 'recording' | 'sending'
+
+// One control stays on screen. A touch fires pointerup and a later click; the click must not run again.
+export function nextVoiceTap(phase: VoiceTapPhase, hasDraft: boolean, clickAlreadyHandled: boolean): 'record' | 'send-voice' | 'send-text' | 'ignore' {
+  if (clickAlreadyHandled || phase === 'sending') return 'ignore'
+  if (phase === 'recording') return 'send-voice'
+  if (hasDraft) return 'send-text'
+  return 'record'
+}
+
 export function pickAudioMime(supported: (type: string) => boolean): string {
   return MIME_CANDIDATES.find((type) => supported(type)) ?? ''
 }

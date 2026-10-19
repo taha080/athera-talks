@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { flushSync } from 'react-dom'
 import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
 import { EMOJI } from '../lib/emoji'
 import { fitImage } from '../lib/image'
 import { formatDuration } from '../lib/format'
-import { collectRecording, createAudioRecorder, encodeWaveform, RECORDER_TIMESLICE_MS } from '../lib/voice'
+import { collectRecording, createAudioRecorder, encodeWaveform, nextVoiceTap, RECORDER_TIMESLICE_MS } from '../lib/voice'
 import type { ReplyTarget } from '../types'
 import { CloseIcon, ImageIcon, MicIcon, SendIcon, SmileIcon } from './Icons'
 
@@ -13,6 +13,53 @@ type Phase = 'idle' | 'recording' | 'sending'
 
 function callOwnsMic(phase: string): boolean {
   return phase !== 'idle' && phase !== 'failed'
+}
+
+const tapButtonClass =
+  'touch-manipulation relative z-10 grid h-11 w-11 min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-full bg-sakura text-white transition active:brightness-90'
+
+function useReliableTap(run: () => void) {
+  const runRef = useRef(run)
+  runRef.current = run
+  const suppressClick = useRef(false)
+  const last = useRef(0)
+  const clearSuppress = useRef<number | null>(null)
+
+  function fire() {
+    const now = Date.now()
+    if (now - last.current < 80) return
+    last.current = now
+    runRef.current()
+  }
+
+  return {
+    onPointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
+      if (event.button !== 0) return
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId)
+      } catch {
+        // The pointer can already be gone on a very short tap.
+      }
+    },
+    onPointerUp(event: ReactPointerEvent<HTMLButtonElement>) {
+      if (event.button !== 0) return
+      suppressClick.current = true
+      if (clearSuppress.current) window.clearTimeout(clearSuppress.current)
+      clearSuppress.current = window.setTimeout(() => {
+        suppressClick.current = false
+      }, 700)
+      fire()
+    },
+    onClick(event: ReactMouseEvent<HTMLButtonElement>) {
+      if (suppressClick.current) {
+        suppressClick.current = false
+        event.preventDefault()
+        return
+      }
+      event.preventDefault()
+      fire()
+    },
+  }
 }
 
 export function Composer({
@@ -35,6 +82,7 @@ export function Composer({
   const [draft, setDraft] = useState('')
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [phase, setPhase] = useState<Phase>('idle')
+  const [arming, setArming] = useState(false)
   const [seconds, setSeconds] = useState(0)
   const [error, setError] = useState('')
   const recorder = useRef<MediaRecorder | null>(null)
@@ -56,9 +104,23 @@ export function Composer({
   const sendFileRef = useRef(onSendFile)
   const toastRef = useRef(chat.pushToast)
   const finishRef = useRef<(send: boolean, discardNote?: string) => Promise<void>>(async () => {})
+  const beginRef = useRef<() => void>(() => {})
+  const submitRef = useRef<() => void>(() => {})
+  const draftRef = useRef('')
   callPhase.current = call.phase
   sendFileRef.current = onSendFile
   toastRef.current = chat.pushToast
+  draftRef.current = draft
+
+  const voiceTap = useReliableTap(() => {
+    const action = nextVoiceTap(phaseRef.current, draftRef.current.trim().length > 0, false)
+    if (action === 'send-voice') void finishRef.current(true)
+    else if (action === 'send-text') submitRef.current()
+    else if (action === 'record') beginRef.current()
+  })
+  const cancelTap = useReliableTap(() => {
+    if (phaseRef.current === 'recording') void finishRef.current(false)
+  })
 
   function setPhaseSafe(next: Phase) {
     phaseRef.current = next
@@ -111,6 +173,7 @@ export function Composer({
     const body = draft.trim()
     if (!body) return
     setDraft('')
+    draftRef.current = ''
     setEmojiOpen(false)
     if (box.current) box.current.style.height = 'auto'
     setError('')
@@ -178,7 +241,9 @@ export function Composer({
       setPhaseSafe('idle')
       report(err instanceof Error ? err.message : 'Could not send that voice note.')
     } finally {
+      if (phaseRef.current === 'sending') setPhaseSafe('idle')
       finishing.current = false
+      starting.current = false
     }
   }
   finishRef.current = finish
@@ -202,6 +267,7 @@ export function Composer({
       return
     }
     starting.current = true
+    setArming(true)
     setError('')
     stopping.current = false
     try {
@@ -229,6 +295,7 @@ export function Composer({
       created.recorder.start(RECORDER_TIMESLICE_MS)
       started.current = Date.now()
       setSeconds(0)
+      setArming(false)
       setPhaseSafe('recording')
       timer.current = window.setInterval(() => {
         const elapsed = Math.floor((Date.now() - started.current) / 1000)
@@ -255,6 +322,7 @@ export function Composer({
       stopping.current = true
       stopTracks()
       recorder.current = null
+      setArming(false)
       setPhaseSafe('idle')
       const name = err && typeof err === 'object' && 'name' in err ? String(err.name) : ''
       const denied = name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError'
@@ -267,11 +335,20 @@ export function Composer({
       )
     } finally {
       starting.current = false
+      setArming(false)
     }
   }
+  beginRef.current = () => {
+    void begin()
+  }
+  submitRef.current = () => {
+    void submitText()
+  }
+
+  const actionLabel = phase === 'sending' ? 'Sending voice note' : phase === 'recording' ? 'Send voice message' : draft.trim() ? 'Send message' : 'Record voice message'
 
   return (
-    <div className="rounded-xl border border-line bg-panel px-2 py-1.5 shadow-md">
+    <div className="relative z-30 rounded-xl border border-line bg-panel px-2 py-1.5 shadow-md" style={{ touchAction: 'manipulation' }}>
       {reply ? (
         <div className="mb-2 flex items-center gap-2 rounded-lg border-l-4 border-sakura bg-elevated px-3 py-2 text-sm">
           <p className="min-w-0 flex-1 truncate text-mist">{reply.preview}</p>
@@ -297,83 +374,90 @@ export function Composer({
           ))}
         </div>
       ) : null}
-      {phase === 'sending' ? (
-        <div className="flex items-center gap-2 px-1 py-2" data-testid="voice-sending" role="status">
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-sakura" />
-          <p className="text-sm text-mist">Sending voice note…</p>
-        </div>
-      ) : phase === 'recording' ? (
-        <div className="flex items-center gap-2 px-1" data-testid="voice-recording">
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#e5484d]" />
-          <p className="tabular-nums text-sm font-medium">{formatDuration(seconds)}</p>
-          <p className="min-w-0 flex-1 text-center text-sm text-mist">Tap send when you’re done</p>
-          <button type="button" className="touch-manipulation rounded-full px-3 py-2 text-sm text-mist hover:text-paper" aria-label="Cancel voice message" onClick={() => void finish(false)}>
-            Cancel
-          </button>
-          <button type="button" className="touch-manipulation grid h-10 w-10 place-items-center rounded-full bg-sakura text-white" aria-label="Send voice message" onClick={() => void finish(true)}>
-            <SendIcon className="h-5 w-5" />
-          </button>
-        </div>
-      ) : (
-        <form
-          className="flex items-end gap-2"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void submitText()
-          }}
-        >
-          <button type="button" className="hover-wash grid h-10 w-10 shrink-0 place-items-center rounded-full text-mist hover:text-paper" aria-label="Emoji" aria-expanded={emojiOpen} onClick={() => setEmojiOpen((open) => !open)}>
-            <SmileIcon className="h-5 w-5" />
-          </button>
-          <label className="hover-wash grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full text-mist hover:text-paper" aria-label="Attach a photo">
-            <ImageIcon className="h-5 w-5" />
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              className="sr-only"
-              onChange={(event) => {
-                void onImage(event.target.files?.[0])
-                event.target.value = ''
-              }}
-            />
-          </label>
-          <label className="min-w-0 flex-1">
-            <span className="sr-only">Message</span>
-            <textarea
-              ref={box}
-              className="max-h-32 min-h-10 w-full resize-none bg-transparent px-1 py-2.5 text-sm leading-5 text-paper outline-none placeholder:text-mist/70"
-              rows={1}
-              maxLength={4000}
-              value={draft}
-              placeholder={`Message @${peerName}`}
-              onChange={(event) => {
-                noteTyping(event.target.value)
-                grow(event.target)
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault()
-                  void submitText()
-                }
-              }}
-            />
-          </label>
-          {draft.trim() ? (
-            <button type="submit" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label="Send message">
-              <SendIcon className="h-5 w-5" />
-            </button>
-          ) : (
+      <form
+        className="flex items-end gap-2"
+        style={{ touchAction: 'manipulation' }}
+        onSubmit={(event) => {
+          event.preventDefault()
+          void submitText()
+        }}
+      >
+        {phase === 'sending' ? (
+          <div className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-1" data-testid="voice-sending" role="status">
+            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-sakura" />
+            <p className="text-sm text-mist">Sending voice note…</p>
+          </div>
+        ) : phase === 'recording' ? (
+          <div className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-1" data-testid="voice-recording">
+            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#e5484d]" />
+            <p className="tabular-nums text-sm font-medium">{formatDuration(seconds)}</p>
+            <p className="min-w-0 flex-1 text-center text-sm text-mist">Tap send when you’re done</p>
             <button
               type="button"
-              className="touch-manipulation grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110"
-              aria-label="Record voice message"
-              onClick={() => void begin()}
+              className="touch-manipulation min-h-[44px] min-w-[44px] rounded-full px-3 text-sm text-mist hover:text-paper"
+              style={{ touchAction: 'manipulation' }}
+              aria-label="Cancel voice message"
+              onPointerDown={cancelTap.onPointerDown}
+              onPointerUp={cancelTap.onPointerUp}
+              onClick={cancelTap.onClick}
             >
-              <MicIcon className="h-5 w-5" />
+              Cancel
             </button>
-          )}
-        </form>
-      )}
+          </div>
+        ) : (
+          <>
+            <button type="button" className="hover-wash grid h-11 w-11 min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-full text-mist hover:text-paper" aria-label="Emoji" aria-expanded={emojiOpen} onClick={() => setEmojiOpen((open) => !open)}>
+              <SmileIcon className="h-5 w-5" />
+            </button>
+            <label className="hover-wash grid h-11 w-11 min-h-[44px] min-w-[44px] shrink-0 cursor-pointer place-items-center rounded-full text-mist hover:text-paper" aria-label="Attach a photo">
+              <ImageIcon className="h-5 w-5" />
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="sr-only"
+                onChange={(event) => {
+                  void onImage(event.target.files?.[0])
+                  event.target.value = ''
+                }}
+              />
+            </label>
+            <label className="min-w-0 flex-1">
+              <span className="sr-only">Message</span>
+              <textarea
+                ref={box}
+                className="max-h-32 min-h-11 w-full resize-none bg-transparent px-1 py-2.5 text-sm leading-5 text-paper outline-none placeholder:text-mist/70"
+                rows={1}
+                maxLength={4000}
+                value={draft}
+                placeholder={`Message @${peerName}`}
+                onChange={(event) => {
+                  noteTyping(event.target.value)
+                  grow(event.target)
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault()
+                    void submitText()
+                  }
+                }}
+              />
+            </label>
+          </>
+        )}
+        <button
+          type="button"
+          data-testid="voice-action"
+          className={tapButtonClass}
+          style={{ touchAction: 'manipulation' }}
+          aria-label={actionLabel}
+          aria-busy={arming || phase === 'sending'}
+          onPointerDown={voiceTap.onPointerDown}
+          onPointerUp={voiceTap.onPointerUp}
+          onClick={voiceTap.onClick}
+        >
+          {phase === 'idle' && !draft.trim() ? <MicIcon className="pointer-events-none h-5 w-5" /> : <SendIcon className="pointer-events-none h-5 w-5" />}
+        </button>
+      </form>
       {error ? <p className="px-1 pt-2 text-sm text-danger" role="alert">{error}</p> : null}
     </div>
   )

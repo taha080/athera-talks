@@ -4,7 +4,7 @@ import { messageKind, messagePreview } from './messages'
 import { isOnline, presenceLabel } from './presence'
 import { receiptTick } from './receipts'
 import { baseMime } from './media'
-import { collectRecording, createAudioRecorder, encodeWaveform, extensionForMime, mediaSendError, parseWaveform, pickAudioMime } from './voice'
+import { collectRecording, createAudioRecorder, encodeWaveform, extensionForMime, mediaSendError, nextVoiceTap, parseWaveform, pickAudioMime } from './voice'
 
 describe('appearance', () => {
   it('keeps known wallpapers and falls back to plain', () => {
@@ -95,6 +95,15 @@ describe('voice helpers', () => {
     const blob = await collectRecording(media as unknown as MediaRecorder, chunks, 'audio/webm;codecs=opus')
     expect(blob.type).toBe('audio/webm')
     expect(blob.size).toBe(10)
+  })
+
+  it('keeps the same voice button from recording through the extra click', () => {
+    expect(nextVoiceTap('idle', false, false)).toBe('record')
+    expect(nextVoiceTap('idle', true, false)).toBe('send-text')
+    expect(nextVoiceTap('recording', false, false)).toBe('send-voice')
+    expect(nextVoiceTap('sending', false, false)).toBe('ignore')
+    expect(nextVoiceTap('recording', false, true)).toBe('ignore')
+    expect(nextVoiceTap('idle', false, true)).toBe('ignore')
   })
 })
 
