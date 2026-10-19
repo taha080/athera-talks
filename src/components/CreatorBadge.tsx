@@ -12,26 +12,40 @@ export function CreatorBadge({ className, size = 18 }: { className?: string; siz
   const blue = `creator-blue-${raw}`
   const gold = `creator-gold-${raw}`
   const mask = `creator-mask-${raw}`
+  const tickMask = `creator-tick-mask-${raw}`
   const px = `${size}px`
   return (
     <span title={LABEL} role="img" aria-label={LABEL} className={cn('inline-flex shrink-0 items-center gap-1', className)}>
-      <svg viewBox="0 0 32 32" className="overflow-visible" style={{ width: px, height: px }} aria-hidden="true">
-        <defs>
-          <linearGradient id={blue} x1="16" y1="2" x2="16" y2="30" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stopColor="#4cc3ff" />
-            <stop offset="1" stopColor="#0a7cff" />
-          </linearGradient>
-        </defs>
-        <path d={SCALLOP} fill={`url(#${blue})`} />
-        <path
-          d="M10.4 16.5 14.1 20.3 21.8 11.8"
-          fill="none"
-          stroke="#ffffff"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <span
+        className="verified-tick"
+        style={{
+          width: px,
+          height: px,
+          mask: `url(#${tickMask}) center / 100% 100% no-repeat`,
+          WebkitMask: `url(#${tickMask}) center / 100% 100% no-repeat`,
+        }}
+      >
+        <svg viewBox="0 0 32 32" className="h-full w-full" aria-hidden="true">
+          <defs>
+            <linearGradient id={blue} x1="16" y1="2" x2="16" y2="30" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stopColor="#4cc3ff" />
+              <stop offset="1" stopColor="#0a7cff" />
+            </linearGradient>
+            <mask id={tickMask} maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">
+              <path d={SCALLOP} fill="#ffffff" transform="scale(0.03125)" />
+            </mask>
+          </defs>
+          <path d={SCALLOP} fill={`url(#${blue})`} />
+          <path
+            d="M10.4 16.5 14.1 20.3 21.8 11.8"
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
       <span className="relative inline-flex" style={{ width: px, height: px, filter: 'drop-shadow(0 0 3px #f7c94899)' }}>
         <svg viewBox="0 0 32 32" className="h-full w-full overflow-visible" aria-hidden="true">
           <defs>
@@ -47,9 +61,10 @@ export function CreatorBadge({ className, size = 18 }: { className?: string; siz
           </defs>
           <path d={SCALLOP} fill={`url(#${gold})`} />
           <text
-            x="16"
-            y="17.4"
+            x="50%"
+            y="50%"
             textAnchor="middle"
+            dominantBaseline="central"
             fill="#6b4300"
             fontFamily="Georgia, 'Times New Roman', serif"
             fontSize="16"
