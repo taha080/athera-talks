@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { callHeadline, callReducer, initialCallState, type CallState } from './callMachine'
+import { callHeadline, callReducer, CONNECT_TIMEOUT_MESSAGE, initialCallState, RELAY_RETRY_STATUS, type CallState } from './callMachine'
 import type { Profile } from '../types'
 
 const peer: Profile = {
@@ -58,6 +58,8 @@ describe('callReducer', () => {
     const connecting = callReducer(incoming, { type: 'accept' })
     expect(connecting.connectedAt).toBeNull()
     expect(callHeadline(connecting.phase, connecting.connectedAt, 5_000)).toBe('Connecting…')
+    expect(callHeadline(connecting.phase, connecting.connectedAt, 5_000, true)).toBe(RELAY_RETRY_STATUS)
+    expect(CONNECT_TIMEOUT_MESSAGE).toMatch(/25 seconds/)
     const connected = callReducer(connecting, { type: 'connected', at: 1_000 })
     expect(callHeadline(connected.phase, connected.connectedAt, 1_000)).toBe('00:00')
     expect(callHeadline(connected.phase, connected.connectedAt, 66_000)).toBe('01:05')

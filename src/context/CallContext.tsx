@@ -9,14 +9,21 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import { callReducer, initialCallState } from '../lib/callMachine'
+import {
+  callReducer,
+  CONNECT_TIMEOUT_MESSAGE,
+  CONNECT_TIMEOUT_MS,
+  initialCallState,
+  RELAY_RETRY_MS,
+} from '../lib/callMachine'
 import { rememberCandidate, takeCandidates, type IceQueue } from '../lib/iceQueue'
 import {
+  candidateType,
   createPeerConnection,
   formatCallLink,
+  formatCandidateTypes,
   hasLiveAudioSender,
   mediaError,
-  networkFailure,
   pickRemoteStream,
   readIcePolicy,
   SILENT_WAV,
@@ -37,6 +44,7 @@ type CallValue = {
   banner: string | null
   demo: boolean
   debug: string
+  relaying: boolean
   startCall: (peer: Profile, conversationId: string) => Promise<void>
   accept: () => Promise<void>
   reject: () => Promise<void>
@@ -55,6 +63,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(callReducer, initialCallState)
   const [banner, setBanner] = useState<string | null>(null)
   const [debug, setDebug] = useState('')
+  const [relaying, setRelaying] = useState(false)
   const [speakerOn, setSpeakerOn] = useState(true)
   const speakerRef = useRef(true)
   const stateRef = useRef(state)
@@ -69,6 +78,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const roleRef = useRef<'caller' | 'callee' | null>(null)
   const policyRef = useRef<IcePolicy>('all')
   const relayTriedRef = useRef(false)
+  const relayingRef = useRef(false)
+  const candidatesRef = useRef<Set<string>>(new Set())
   const waitRef = useRef<number | null>(null)
   const demoTimer = useRef<number | null>(null)
   const restartRelayRef = useRef<() => Promise<void>>(async () => {})
@@ -89,6 +100,19 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const playRemote = useCallback(() => {
     applyOutput()
   }, [applyOutput])
+
+  const noteRelay = useCallback(() => {
+    relayingRef.current = true
+    setRelaying(true)
+  }, [])
+
+  const publishLinkRef = useRef<() => Promise<void>>(async () => {})
+  const noteCandidate = useCallback((candidate: string | null | undefined) => {
+    const type = candidateType(candidate)
+    if (!type || candidatesRef.current.has(type)) return
+    candidatesRef.current.add(type)
+    void publishLinkRef.current()
+  }, [])
 
   // Must run synchronously inside the Start / Accept click, before any await.
   const primePlayback = useCallback(() => {
@@ -118,6 +142,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
     roleRef.current = null
     policyRef.current = 'all'
     relayTriedRef.current = false
+    relayingRef.current = false
+    setRelaying(false)
+    candidatesRef.current = new Set()
     if (audioRef.current) {
       audioRef.current.srcObject = null
       audioRef.current.removeAttribute('src')
@@ -145,6 +172,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     iceQueueRef.current = taken.queue
     for (const candidate of taken.candidates) {
       try {
+        noteCandidate(candidate.candidate)
         await pc.addIceCandidate({
           candidate: candidate.candidate,
           sdpMid: candidate.sdpMid,
@@ -154,7 +182,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         // A late candidate can arrive after the call ends.
       }
     }
-  }, [])
+  }, [noteCandidate])
 
   const failFinal = useCallback(
     (message: string) => {
@@ -181,6 +209,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
         const kind = 'kind' in report ? report.kind : undefined
         if (report.type === 'inbound-rtp' && kind !== 'video') inbound += Number('bytesReceived' in report ? report.bytesReceived : 0)
         if (report.type === 'outbound-rtp' && kind !== 'video') outbound += Number('bytesSent' in report ? report.bytesSent : 0)
+        if (report.type === 'local-candidate' || report.type === 'remote-candidate') {
+          if ('candidateType' in report && report.candidateType) candidatesRef.current.add(String(report.candidateType))
+        }
         if (report.type === 'transport' && 'selectedCandidatePairId' in report && report.selectedCandidatePairId) {
           const pair = stats.get(String(report.selectedCandidatePairId))
           const localId = pair && 'localCandidateId' in pair ? pair.localCandidateId : undefined
@@ -194,8 +225,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
     const audio = audioRef.current
     const playback = audio && !audio.paused && !audio.muted && audio.srcObject ? 'playing' : 'silent'
     if (inbound > 0) playRemote()
-    setDebug(formatCallLink(pc.iceConnectionState, path, inbound, outbound, playback))
+    setDebug(formatCallLink(pc.iceConnectionState, path, inbound, outbound, playback, formatCandidateTypes(candidatesRef.current)))
   }, [playRemote])
+  publishLinkRef.current = publishLink
 
   const openPeer = useCallback(
     async (peer: Profile, conversationId: string, me: Profile, policy: IcePolicy) => {
@@ -218,6 +250,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       }
       pc.onicecandidate = (event) => {
         if (pcRef.current !== pc || !event.candidate) return
+        noteCandidate(event.candidate.candidate)
         void deliver(peer, {
           kind: 'ice',
           conversationId,
@@ -246,17 +279,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
       const giveUp = () => {
         if (pcRef.current !== pc) return
         if (!relayTriedRef.current && policyRef.current === 'all' && roleRef.current === 'caller') {
+          noteRelay()
           void restartRelayRef.current()
           return
         }
         if (!relayTriedRef.current && roleRef.current === 'callee') {
-          if (waitRef.current) window.clearTimeout(waitRef.current)
-          waitRef.current = window.setTimeout(() => {
-            if (pcRef.current === pc) failFinal(networkFailure())
-          }, 8000)
+          noteRelay()
           return
         }
-        failFinal(networkFailure())
+        failFinal(CONNECT_TIMEOUT_MESSAGE)
       }
       pc.oniceconnectionstatechange = () => {
         if (pc.iceConnectionState === 'failed') giveUp()
@@ -266,10 +297,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
         if (pc.connectionState === 'failed') giveUp()
         else markConnected()
       }
-      setDebug(formatCallLink(pc.iceConnectionState, 'none', 0, 0, 'silent'))
+      setDebug(formatCallLink(pc.iceConnectionState, 'none', 0, 0, 'silent', formatCandidateTypes(candidatesRef.current)))
       return pc
     },
-    [deliver, failFinal, playRemote, publishLink],
+    [deliver, failFinal, noteCandidate, noteRelay, playRemote, publishLink],
   )
 
   const restartRelay = useCallback(async () => {
@@ -279,8 +310,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
     const me = profileRef.current
     if (!peer || !conversationId || !me) return
     relayTriedRef.current = true
-    pcRef.current?.close()
+    noteRelay()
+    const previous = pcRef.current
     pcRef.current = null
+    previous?.close()
     remoteReadyRef.current = false
     iceQueueRef.current = new Map()
     try {
@@ -295,15 +328,17 @@ export function CallProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       failFinal(mediaError(error))
     }
-  }, [deliver, failFinal, openPeer])
+  }, [deliver, failFinal, noteRelay, openPeer])
   restartRelayRef.current = restartRelay
 
   const answerOffer = useCallback(
     async (from: Profile, conversationId: string, sdp: RTCSessionDescriptionInit, me: Profile, restart: boolean) => {
       if (restart) {
         relayTriedRef.current = true
-        pcRef.current?.close()
+        noteRelay()
+        const previous = pcRef.current
         pcRef.current = null
+        previous?.close()
         remoteReadyRef.current = false
         iceQueueRef.current = new Map()
       }
@@ -321,7 +356,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       if (!local) throw new Error('Could not start the voice call.')
       await deliver(from, { kind: 'answer', conversationId, from: me, sdp: local.toJSON() })
     },
-    [deliver, flushIce, openPeer],
+    [deliver, flushIce, noteRelay, openPeer],
   )
 
   const onSignal = useCallback(
@@ -429,6 +464,25 @@ export function CallProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(timer)
   }, [mode, publishLink, state.phase])
 
+  useEffect(() => {
+    if (mode !== 'live' || state.phase !== 'connecting') return
+    const deadline = window.setTimeout(() => {
+      const phase = stateRef.current.phase
+      if (phase === 'connecting' || phase === 'outgoing' || phase === 'ringing') failFinal(CONNECT_TIMEOUT_MESSAGE)
+    }, CONNECT_TIMEOUT_MS)
+    const relay = window.setTimeout(() => {
+      if (stateRef.current.phase !== 'connecting') return
+      noteRelay()
+      if (!relayTriedRef.current && policyRef.current !== 'relay' && roleRef.current === 'caller') {
+        void restartRelayRef.current()
+      }
+    }, RELAY_RETRY_MS)
+    return () => {
+      window.clearTimeout(deadline)
+      window.clearTimeout(relay)
+    }
+  }, [failFinal, mode, noteRelay, state.phase])
+
   const startCall = useCallback(
     async (peer: Profile, conversationId: string) => {
       primePlayback()
@@ -440,6 +494,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'start', conversationId, peer })
       setBanner(null)
       if (mode === 'demo') {
+        if (sessionStorage.getItem('athera:call-preview') === 'relay') {
+          dispatch({ type: 'remote-joined' })
+          noteRelay()
+          candidatesRef.current = new Set(['host', 'srflx'])
+          setDebug(formatCallLink('checking', 'none', 0, 0, 'silent', 'host, srflx'))
+          demoTimer.current = window.setTimeout(() => failFinal(CONNECT_TIMEOUT_MESSAGE), CONNECT_TIMEOUT_MS)
+          return
+        }
         demoTimer.current = window.setTimeout(() => {
           dispatch({ type: 'connected', at: Date.now() })
         }, 1400)
@@ -464,7 +526,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         pcRef.current = null
       }
     },
-    [deliver, mode, openPeer, primePlayback],
+    [deliver, failFinal, mode, noteRelay, openPeer, primePlayback],
   )
 
   const accept = useCallback(async () => {
@@ -542,6 +604,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     banner,
     demo: mode === 'demo',
     debug,
+    relaying,
     startCall,
     accept,
     reject,
