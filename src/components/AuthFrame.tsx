@@ -7,11 +7,13 @@ export function AuthFrame({
   subtitle = 'Private messages and voice calls.',
   children,
   wide = false,
+  privacy = false,
 }: {
   title?: string
   subtitle?: string
   children: ReactNode
   wide?: boolean
+  privacy?: boolean
 }) {
   return (
     <div className="auth-canvas flex min-h-dvh flex-col px-4">
@@ -36,6 +38,14 @@ export function AuthFrame({
         >
           Taha Ahsan
         </a>
+        {privacy ? (
+          <>
+            <span aria-hidden="true"> · </span>
+            <a href={`${import.meta.env.BASE_URL}privacy.html`} className="text-mist underline-offset-2 hover:underline">
+              Privacy Policy
+            </a>
+          </>
+        ) : null}
       </footer>
     </div>
   )
