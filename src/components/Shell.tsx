@@ -22,19 +22,24 @@ export function Shell() {
   return (
     <ChatProvider>
       <CallProvider>
-        <div className="app-canvas flex h-dvh overflow-hidden text-paper">
-          <NavRail />
-          <aside
-            className={cn(
-              'min-h-0 w-full flex-col border-line bg-panel md:flex md:w-[360px] md:shrink-0 md:border-r',
-              showList ? 'flex' : 'hidden',
-            )}
-          >
-            <Sidebar />
-          </aside>
-          <section className={cn('min-h-0 min-w-0 flex-1 flex-col', showList ? 'hidden md:flex' : 'flex')}>
-            <Outlet />
-          </section>
+        <div className="app-canvas flex h-dvh flex-col overflow-hidden text-paper">
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <NavRail />
+            <aside
+              className={cn(
+                'min-h-0 w-full flex-col border-line bg-panel md:flex md:w-[360px] md:shrink-0 md:border-r',
+                showList ? 'flex' : 'hidden',
+              )}
+            >
+              <Sidebar />
+            </aside>
+            <section className={cn('min-h-0 min-w-0 flex-1 flex-col', showList ? 'hidden md:flex' : 'flex')}>
+              <Outlet />
+            </section>
+          </div>
+          <footer className="shrink-0 border-t border-line bg-panel pb-[env(safe-area-inset-bottom)]">
+            <Credit className="flex h-6 items-center justify-center leading-none" />
+          </footer>
           <CallScreen />
           <Toasts />
         </div>
@@ -117,7 +122,7 @@ function Toasts() {
   const { toasts, dismissToast } = useChat()
   if (toasts.length === 0) return null
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-full max-w-sm flex-col gap-2 px-4" aria-live="polite">
+    <div className="pointer-events-none fixed bottom-10 right-4 z-50 flex w-full max-w-sm flex-col gap-2 px-4" aria-live="polite">
       {toasts.map((toast) => (
         <button
           key={toast.id}

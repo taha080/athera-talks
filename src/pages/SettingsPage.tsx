@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
-import { Credit } from '../components/Credit'
 import { BackIcon } from '../components/Icons'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
@@ -173,7 +172,6 @@ function ProfileSection() {
         </button>
       ) : null}
       <p className="text-center text-sm leading-6 text-mist">Messages stay between you and the people you write to.</p>
-      <Credit />
     </form>
   )
 }
