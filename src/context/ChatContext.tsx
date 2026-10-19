@@ -225,10 +225,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setActiveId(id)
   }, [])
 
-  const loadRequests = useCallback(async () => {
-    const rows = await chat.listRequests()
+  const applyRequests = useCallback((rows: ContactRequest[], announce: boolean) => {
     const me = profileRef.current?.id
-    if (requestsReady.current && me) {
+    if (announce && me) {
       for (const request of rows) {
         if (request.status === 'pending' && request.toId === me && !seenRequests.current.has(request.id)) {
           pushToast(`Contact request from @${request.peer.username}`)
@@ -241,17 +240,35 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     rows.forEach((request) => seenRequests.current.add(request.id))
     requestsReady.current = true
     setRequests(rows)
-  }, [chat, pushToast])
+  }, [pushToast])
+
+  const loadRequests = useCallback(async () => {
+    const rows = await chat.listRequests()
+    applyRequests(rows, requestsReady.current)
+  }, [applyRequests, chat])
 
   useEffect(() => {
     if (!profile) return
-    void loadRequests().catch(() => undefined)
-    return chat.subscribeRequests(() => {
-      void loadRequests()
-        .then(() => refresh())
-        .catch(() => undefined)
-    })
-  }, [chat, loadRequests, profile, refresh])
+    let stop = () => {}
+    let cancelled = false
+    void chat.listRequests().then((rows) => {
+      if (cancelled) return
+      applyRequests(rows, false)
+      stop = chat.subscribeRequests(() => {
+        void chat.listRequests().then((next) => {
+          applyRequests(next, true)
+          void refresh()
+        }).catch(() => undefined)
+      })
+      void chat.listRequests().then((next) => {
+        if (!cancelled) applyRequests(next, true)
+      }).catch(() => undefined)
+    }).catch(() => undefined)
+    return () => {
+      cancelled = true
+      stop()
+    }
+  }, [applyRequests, chat, profile, refresh])
 
   const requestContact = useCallback(
     async (userId: string) => {
