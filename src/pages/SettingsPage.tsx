@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
-import { Credit } from '../components/Credit'
+import { DisplayName } from '../components/CreatorBadge'
 import { BackIcon } from '../components/Icons'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
@@ -123,6 +123,7 @@ function ProfileSection() {
     <form onSubmit={save} className="mx-auto max-w-lg space-y-6 px-5 py-8">
       <div className="flex flex-col items-center gap-3">
         <Avatar name={profile.username} url={profile.avatarUrl} size="xl" />
+        <DisplayName name={`@${profile.username}`} creator={profile.isCreator} className="text-base font-semibold" />
         <label className={`${ghostButton} cursor-pointer`}>
           Upload avatar
           <input
@@ -173,7 +174,6 @@ function ProfileSection() {
         </button>
       ) : null}
       <p className="text-center text-sm leading-6 text-mist">Messages stay between you and the people you write to.</p>
-      <Credit />
     </form>
   )
 }

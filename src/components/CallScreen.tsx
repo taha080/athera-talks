@@ -2,26 +2,40 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useCall } from '../context/CallContext'
 import { callHeadline } from '../lib/callMachine'
 import { cn } from '../lib/cn'
+import { useCallClock } from '../lib/useCallClock'
 import { Avatar } from './Avatar'
+import { DisplayName } from './CreatorBadge'
 import { EndIcon, MicIcon, PhoneIcon, VolumeIcon } from './Icons'
+
+export function ReturnToCallBar() {
+  const call = useCall()
+  const timing = call.phase === 'connected' && call.connectedAt != null
+  const now = useCallClock(!call.expanded && timing, call.connectedAt)
+  if (call.phase === 'idle' || call.expanded) return null
+  const headline = callHeadline(call.phase, call.connectedAt, now)
+  return (
+    <div className="shrink-0 border-b border-line bg-panel">
+      <button
+        type="button"
+        onClick={call.expand}
+        data-testid="return-to-call"
+        className="flex h-8 w-full items-center justify-center gap-2 text-[13px] text-paper"
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-foam" aria-hidden="true" />
+        <span className="font-medium">Return to call</span>
+        <span className="tabular-nums text-mist" data-testid="return-call-clock">
+          {headline}
+        </span>
+      </button>
+    </div>
+  )
+}
 
 export function CallScreen() {
   const call = useCall()
-  const [now, setNow] = useState(() => Date.now())
+  const timing = call.phase === 'connected' && call.connectedAt != null
+  const now = useCallClock(call.expanded && timing, call.connectedAt)
   const [details, setDetails] = useState(false)
-
-  useEffect(() => {
-    if (call.phase !== 'connected' || !call.connectedAt) return
-    const connectedAt = call.connectedAt
-    let timer = 0
-    const tick = () => {
-      const elapsed = Date.now() - connectedAt
-      setNow(Date.now())
-      timer = window.setTimeout(tick, 1000 - (elapsed % 1000))
-    }
-    tick()
-    return () => window.clearTimeout(timer)
-  }, [call.connectedAt, call.phase])
 
   useEffect(() => {
     setDetails(false)
@@ -35,20 +49,34 @@ export function CallScreen() {
     ) : null
   }
 
+  if (!call.expanded) return null
+
   const peer = call.peer
   const headline = callHeadline(call.phase, call.connectedAt, now)
-  const timing = call.phase === 'connected'
+  const showClock = call.phase === 'connected'
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-between bg-ink px-6 py-10 text-center" role="dialog" aria-modal="true" aria-label="Voice call">
-      <p
-        className={cn(
-          timing ? 'text-3xl font-semibold tabular-nums tracking-normal text-paper' : 'text-xs font-medium uppercase tracking-[0.16em] text-mist',
-        )}
-        data-testid="call-status"
-      >
-        {headline}
-      </p>
+      <div className="flex w-full flex-col items-center gap-3">
+        {call.phase !== 'incoming' ? (
+          <button
+            type="button"
+            onClick={call.minimize}
+            data-testid="leave-call-screen"
+            className="self-start text-xs font-medium text-mist"
+          >
+            Back to chats
+          </button>
+        ) : null}
+        <p
+          className={cn(
+            showClock ? 'text-3xl font-semibold tabular-nums tracking-normal text-paper' : 'text-xs font-medium uppercase tracking-[0.16em] text-mist',
+          )}
+          data-testid="call-status"
+        >
+          {headline}
+        </p>
+      </div>
       <div>
         <div className="relative mx-auto grid h-44 w-44 place-items-center">
           {call.phase !== 'connected' && call.phase !== 'failed' ? (
@@ -56,7 +84,9 @@ export function CallScreen() {
           ) : null}
           <Avatar name={peer?.username ?? 'caller'} url={peer?.avatarUrl} size="xl" />
         </div>
-        <h2 className="mt-6 text-3xl font-semibold tracking-tight">@{peer?.username}</h2>
+        <h2 className="mt-6 flex items-center justify-center gap-1.5 text-3xl font-semibold tracking-tight">
+          <DisplayName name={`@${peer?.username ?? 'caller'}`} creator={peer?.isCreator} />
+        </h2>
         {call.error ? <p className="mx-auto mt-4 max-w-sm text-sm text-danger">{call.error}</p> : null}
         {call.demo && call.phase === 'connected' ? (
           <p className="mt-3 text-xs text-mist">Preview only. Your microphone stays off.</p>

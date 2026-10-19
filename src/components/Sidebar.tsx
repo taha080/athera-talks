@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
@@ -10,7 +10,8 @@ import { isOnline } from '../lib/presence'
 import { receiptTick } from '../lib/receipts'
 import type { SearchPerson } from '../types'
 import { Avatar } from './Avatar'
-import { CheckIcon, GearIcon, PhoneIcon, PlusIcon, SearchIcon, MoreIcon } from './Icons'
+import { DisplayName } from './CreatorBadge'
+import { CheckIcon, GearIcon, PhoneIcon, PinIcon, PlusIcon, SearchIcon, MoreIcon } from './Icons'
 
 export function Sidebar() {
   const { mode, profile } = useSession()
@@ -21,7 +22,7 @@ export function Sidebar() {
   const showRequests = params.get('requests') === '1'
   const searchRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<SearchPerson[] | null>(null)
+  const [lookup, setLookup] = useState<SearchPerson[] | null>(null)
   const [searchError, setSearchError] = useState('')
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -52,17 +53,24 @@ export function Sidebar() {
     }
   }, [ids])
 
-  async function onSearch(value: string) {
+  function onQueryChange(value: string) {
     setQuery(value)
-    if (!value.trim()) {
-      setResults(null)
-      setSearchError('')
+    setLookup(null)
+    setSearchError('')
+  }
+
+  async function onFind(event: FormEvent) {
+    event.preventDefault()
+    const needle = query.trim()
+    if (!needle) {
+      setLookup(null)
       return
     }
     try {
-      setResults(await chat.search(value))
+      setLookup(await chat.search(needle))
       setSearchError('')
     } catch (error) {
+      setLookup([])
       setSearchError(error instanceof Error ? error.message : 'Search failed.')
     }
   }
@@ -71,14 +79,14 @@ export function Sidebar() {
     const id = await chat.startChat(userId)
     await chat.refresh()
     setQuery('')
-    setResults(null)
+    setLookup(null)
     navigate(`/c/${id}`)
   }
 
   async function addContact(userId: string) {
     try {
       await chat.requestContact(userId)
-      setResults(await chat.search(query))
+      setLookup(await chat.search(query))
       setSearchError('')
       chat.pushToast('Contact request sent')
     } catch (error) {
@@ -86,7 +94,13 @@ export function Sidebar() {
     }
   }
 
-  const visible = chat.conversations.filter((item) => filter === 'all' || item.unread > 0)
+  const needle = query.trim().toLowerCase()
+  const exactLocal = needle.length > 0 && chat.conversations.some((item) => item.peer.username.toLowerCase() === needle)
+  const visible = chat.conversations.filter((item) => {
+    if (filter === 'unread' && item.unread === 0) return false
+    if (!needle) return true
+    return item.peer.username.toLowerCase().includes(needle)
+  })
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-panel">
@@ -141,17 +155,20 @@ export function Sidebar() {
       ) : null}
 
       <div className="px-3">
-        <label className="relative block">
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-mist" />
-          <input
-            ref={searchRef}
-            className="h-10 w-full rounded-lg border border-line bg-elevated pl-9 pr-3 text-sm text-paper outline-none transition placeholder:text-mist/70 focus:border-sakura focus:ring-2 focus:ring-sakura/30"
-            value={query}
-            onChange={(event) => void onSearch(event.target.value)}
-            placeholder="Search username"
-            aria-label="Search username"
-          />
-        </label>
+        <form onSubmit={(event) => void onFind(event)}>
+          <label className="relative block">
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-mist" />
+            <input
+              ref={searchRef}
+              className="h-10 w-full rounded-lg border border-line bg-elevated pl-9 pr-3 text-sm text-paper outline-none transition placeholder:text-mist/70 focus:border-sakura focus:ring-2 focus:ring-sakura/30"
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              placeholder="Search username"
+              aria-label="Search username"
+              autoComplete="off"
+            />
+          </label>
+        </form>
         <div className="mt-2 flex gap-1 rounded-lg bg-elevated p-1" role="tablist" aria-label="Chat filters">
           {(['all', 'unread'] as const).map((item) => (
             <button
@@ -172,26 +189,21 @@ export function Sidebar() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {showRequests ? (
-          <RequestsPanel
-            meId={profile?.id ?? ''}
-            onAccept={async (id) => {
-              const conversationId = await chat.acceptRequest(id)
-              navigate(`/c/${conversationId}`)
-            }}
-            onDecline={(id) => chat.declineRequest(id)}
-            onCancel={(id) => chat.cancelRequest(id)}
-          />
-        ) : results ? (
-          <div>
-            {searchError ? <p className="px-4 py-3 text-sm text-danger">{searchError}</p> : null}
-            {results.length === 0 && !searchError ? <p className="px-4 py-8 text-center text-sm text-mist">No one with that username.</p> : null}
-            {results.map((person) => (
+        {needle && lookup === null && !exactLocal ? (
+          <p className="px-4 pt-4 text-center text-sm text-mist" data-testid="username-hint">
+            Type the exact username to find someone
+          </p>
+        ) : null}
+        {searchError ? <p className="px-4 py-3 text-sm text-danger">{searchError}</p> : null}
+        {lookup && lookup.length === 0 && !searchError ? (
+          <p className="px-4 py-8 text-center text-sm text-mist">No one with that username.</p>
+        ) : null}
+        {lookup?.map((person) => (
               <article key={person.id} className="mx-3 my-2 rounded-xl border border-line bg-panel p-3 shadow-sm">
                 <div className="flex items-center gap-3">
                   <Avatar name={person.username} url={person.avatarUrl} size="sm" />
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold">{person.username}</span>
+                    <DisplayName name={person.username} creator={person.isCreator} className="text-sm font-semibold" />
                     {person.favouriteAnime ? <span className="block truncate text-xs text-mist">{person.favouriteAnime}</span> : null}
                   </span>
                 </div>
@@ -205,30 +217,41 @@ export function Sidebar() {
                       if (!person.requestId) return
                       const conversationId = await chat.acceptRequest(person.requestId)
                       setQuery('')
-                      setResults(null)
+                      setLookup(null)
                       navigate(`/c/${conversationId}`)
                     }}
                     onDecline={async () => {
                       if (!person.requestId) return
                       await chat.declineRequest(person.requestId)
-                      setResults(await chat.search(query))
+                      setLookup(await chat.search(query))
                     }}
                     onCancel={async () => {
                       if (!person.requestId) return
                       await chat.cancelRequest(person.requestId)
-                      setResults(await chat.search(query))
+                      setLookup(await chat.search(query))
                     }}
                   />
                 </div>
               </article>
-            ))}
-          </div>
+        ))}
+        {showRequests ? (
+          <RequestsPanel
+            meId={profile?.id ?? ''}
+            onAccept={async (id) => {
+              const conversationId = await chat.acceptRequest(id)
+              navigate(`/c/${conversationId}`)
+            }}
+            onDecline={(id) => chat.declineRequest(id)}
+            onCancel={(id) => chat.cancelRequest(id)}
+          />
         ) : chat.loading ? (
           <ListSkeleton />
         ) : visible.length === 0 ? (
-          <p className="px-4 py-10 text-center text-sm leading-6 text-mist">
-            {filter === 'unread' ? 'No unread chats.' : 'No chats yet. Search a username to send a contact request.'}
-          </p>
+          needle ? null : (
+            <p className="px-4 py-10 text-center text-sm leading-6 text-mist">
+              {filter === 'unread' ? 'No unread chats.' : 'No chats yet. Search a username to send a contact request.'}
+            </p>
+          )
         ) : (
           <ul>
             {visible.map((conversation) => {
@@ -238,19 +261,36 @@ export function Sidebar() {
               const preview = typing[conversation.id] ? 'typing…' : conversation.lastMessage?.body ?? 'No messages yet'
               return (
                 <li key={conversation.id}>
-                  <Link
-                    to={`/c/${conversation.id}`}
-                    aria-current={active ? 'page' : undefined}
+                  <div
                     className={cn(
                       'flex items-center gap-3 border-b border-line/70 px-3 py-2.5 transition',
                       active ? 'bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]' : 'hover-wash',
                     )}
                   >
-                    <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} online={isOnline(conversation.peer.lastSeenAt)} />
+                    <Link to={`/c/${conversation.id}`} aria-current={active ? 'page' : undefined} className="shrink-0">
+                      <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} online={isOnline(conversation.peer.lastSeenAt)} />
+                    </Link>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-2">
-                        <span className={cn('truncate text-sm', conversation.unread > 0 ? 'font-semibold' : 'font-medium')}>
-                          {conversation.peer.username}
+                        <span className="flex min-w-0 items-center gap-1">
+                          {conversation.pinned ? (
+                            <button
+                              type="button"
+                              aria-label="Unpin chat"
+                              title="Unpin"
+                              className="shrink-0 text-sakura"
+                              onClick={() => void chat.setChatPin(conversation.id, false)}
+                            >
+                              <PinIcon className="h-3.5 w-3.5 fill-current" />
+                            </button>
+                          ) : null}
+                          <Link to={`/c/${conversation.id}`} className="min-w-0">
+                            <DisplayName
+                              name={conversation.peer.username}
+                              creator={conversation.peer.isCreator}
+                              className={cn('text-sm', conversation.unread > 0 ? 'font-semibold' : 'font-medium')}
+                            />
+                          </Link>
                         </span>
                         {conversation.lastMessage ? (
                           <time className={cn('shrink-0 text-[11px]', conversation.unread > 0 ? 'text-sakura' : 'text-mist')} dateTime={conversation.lastMessage.createdAt}>
@@ -258,7 +298,7 @@ export function Sidebar() {
                           </time>
                         ) : null}
                       </span>
-                      <span className="mt-0.5 flex items-center justify-between gap-2">
+                      <Link to={`/c/${conversation.id}`} className="mt-0.5 flex items-center justify-between gap-2">
                         <span className={cn('flex min-w-0 items-center gap-1 text-sm', typing[conversation.id] ? 'text-foam' : 'text-mist')}>
                           {tick ? (
                             <CheckIcon className={cn('h-3.5 w-3.5 shrink-0', tick === 'seen' ? 'text-sakura' : '')} double={tick !== 'sent'} />
@@ -270,9 +310,9 @@ export function Sidebar() {
                             {conversation.unread}
                           </span>
                         ) : null}
-                      </span>
+                      </Link>
                     </span>
-                  </Link>
+                  </div>
                 </li>
               )
             })}
@@ -360,7 +400,7 @@ function RequestsPanel({
             <li key={request.id} className="rounded-xl border border-line bg-panel p-3 shadow-sm">
               <div className="flex items-center gap-3">
                 <Avatar name={request.peer.username} url={request.peer.avatarUrl} size="sm" />
-                <span className="min-w-0 truncate text-sm font-semibold">{request.peer.username}</span>
+                <DisplayName name={request.peer.username} creator={request.peer.isCreator} className="text-sm font-semibold" />
               </div>
               <div className="mt-3 flex gap-2">
                 <button type="button" className={`${primaryButton} h-9 px-3 text-xs`} onClick={() => void onAccept(request.id)}>
@@ -382,7 +422,7 @@ function RequestsPanel({
             <li key={request.id} className="flex items-center gap-3 rounded-xl border border-line bg-panel p-3 shadow-sm">
               <Avatar name={request.peer.username} url={request.peer.avatarUrl} size="sm" />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{request.peer.username}</span>
+                <DisplayName name={request.peer.username} creator={request.peer.isCreator} className="text-sm font-semibold" />
                 <span className="text-xs text-mist">Pending</span>
               </span>
               <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium" onClick={() => void onCancel(request.id)}>

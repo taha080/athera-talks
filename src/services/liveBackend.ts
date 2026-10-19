@@ -8,7 +8,7 @@ import { getSupabase } from '../lib/supabase'
 import type { ContactRequest, ContactStatus, Conversation, Message, MessageListener, OutgoingMedia, Profile, Reaction, ReactionChange, ReplyTarget, SearchPerson } from '../types'
 
 const PROFILE_COLUMNS =
-  'id, username, avatar_url, favourite_anime, theme, wallpaper, wallpaper_path, last_seen_at, show_last_seen, show_read_receipts, notify_sound, notify_desktop'
+  'id, username, avatar_url, favourite_anime, theme, wallpaper, wallpaper_path, last_seen_at, show_last_seen, show_read_receipts, notify_sound, notify_desktop, is_creator'
 
 const MESSAGE_COLUMNS =
   'id, conversation_id, sender_id, body, created_at, read_at, kind, media_path, media_mime, media_seconds, waveform, reply_to, reply_preview, deleted_at, delivered_at'
@@ -26,6 +26,7 @@ type ProfileRow = {
   show_read_receipts?: boolean | null
   notify_sound?: boolean | null
   notify_desktop?: boolean | null
+  is_creator?: boolean | null
 }
 
 type MessageRow = {
@@ -53,6 +54,7 @@ type ConversationRow = {
   peer_username: string
   peer_avatar_url: string | null
   peer_favourite_anime: string | null
+  peer_is_creator?: boolean | null
   peer_last_seen?: string | null
   peer_receipts?: boolean | null
   last_body: string | null
@@ -62,6 +64,7 @@ type ConversationRow = {
   unread: number | string
   last_read_at?: string | null
   last_delivered_at?: string | null
+  pinned?: boolean | null
 }
 
 export type PreferencePatch = {
@@ -98,6 +101,7 @@ export function mapProfile(row: ProfileRow): Profile {
     showReadReceipts: row.show_read_receipts ?? true,
     notifySound: row.notify_sound ?? true,
     notifyDesktop: row.notify_desktop ?? true,
+    isCreator: Boolean(row.is_creator),
   }
 }
 
@@ -130,6 +134,7 @@ function mapConversation(row: ConversationRow): Conversation {
       username: row.peer_username,
       avatarUrl: row.peer_avatar_url,
       favouriteAnime: row.peer_favourite_anime,
+      isCreator: Boolean(row.peer_is_creator),
       lastSeenAt: row.peer_last_seen ?? null,
       showReadReceipts: row.peer_receipts ?? true,
     },
@@ -144,6 +149,7 @@ function mapConversation(row: ConversationRow): Conversation {
           }
         : null,
     unread: Number(row.unread) || 0,
+    pinned: Boolean(row.pinned),
   }
 }
 
@@ -193,6 +199,12 @@ async function signMessages(messages: Message[]): Promise<Message[]> {
     })
   }
   return next
+}
+
+export async function profileIsCreator(userId: string): Promise<boolean> {
+  const { data, error } = await client().from('profiles').select('is_creator').eq('id', userId).maybeSingle()
+  if (error || !data) return false
+  return Boolean((data as { is_creator?: boolean }).is_creator)
 }
 
 export async function fetchProfile(userId: string): Promise<Profile | null> {
@@ -325,7 +337,7 @@ export const liveChat = {
   },
 
   async searchUsers(query: string): Promise<SearchPerson[]> {
-    const { data, error } = await client().rpc('search_profiles', { query })
+    const { data, error } = await client().rpc('find_user_by_username', { name: query })
     if (error) throw new Error(error.message)
     return ((data ?? []) as (ProfileRow & { request_id?: string | null; request_status?: string | null; request_from?: string | null })[]).map((row) => ({
       ...mapProfile(row),
@@ -349,6 +361,7 @@ export const liveChat = {
       peer_username: string
       peer_avatar_url: string | null
       peer_favourite_anime: string | null
+      peer_is_creator?: boolean | null
     }[]).map((row) => ({
       id: row.id,
       fromId: row.from_id,
@@ -361,6 +374,7 @@ export const liveChat = {
         username: row.peer_username,
         avatarUrl: row.peer_avatar_url,
         favouriteAnime: row.peer_favourite_anime,
+        isCreator: Boolean(row.peer_is_creator),
       },
     }))
   },
@@ -383,6 +397,11 @@ export const liveChat = {
 
   async cancelRequest(requestId: string): Promise<void> {
     const { error } = await client().rpc('cancel_contact', { request_id: requestId })
+    if (error) throw new Error(error.message)
+  },
+
+  async setChatPin(conversationId: string, pinned: boolean): Promise<void> {
+    const { error } = await client().rpc('set_chat_pin', { cid: conversationId, next_pin: pinned })
     if (error) throw new Error(error.message)
   },
 

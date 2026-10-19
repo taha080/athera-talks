@@ -9,7 +9,9 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import { callReducer, initialCallState } from '../lib/callMachine'
+import { APP_NAME } from '../lib/brand'
+import { callHeadline, callReducer, initialCallState } from '../lib/callMachine'
+import { callTabTitle, mediaSessionCopy, shouldResumeCallAudio } from '../lib/callPresence'
 import { rememberCandidate, takeCandidates, type IceQueue } from '../lib/iceQueue'
 import {
   createPeerConnection,
@@ -23,6 +25,7 @@ import {
   waitForIceCandidate,
   type IcePolicy,
 } from '../lib/webrtc'
+import { profileIsCreator } from '../services/liveBackend'
 import { closeOutbox, sendSignal, subscribeSignals } from '../services/signaling'
 import type { CallSignal, Profile } from '../types'
 import { useSession } from './SessionContext'
@@ -45,6 +48,9 @@ type CallValue = {
   toggleSpeaker: () => void
   simulateIncoming: (peer: Profile, conversationId: string) => void
   audioRef: RefObject<HTMLAudioElement | null>
+  expanded: boolean
+  minimize: () => void
+  expand: () => void
 }
 
 const CallContext = createContext<CallValue | null>(null)
@@ -55,6 +61,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [banner, setBanner] = useState<string | null>(null)
   const [debug, setDebug] = useState('')
   const [speakerOn, setSpeakerOn] = useState(true)
+  const [expanded, setExpanded] = useState(true)
   const speakerRef = useRef(true)
   const stateRef = useRef(state)
   const profileRef = useRef(profile)
@@ -104,6 +111,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
     waitRef.current = null
   }, [])
 
+  // Hangup and failure only. Hiding the tab, blurring the window, or leaving
+  // the call screen must not stop tracks, close the peer connection, or pause audio.
   const cleanupMedia = useCallback(() => {
     clearTimers()
     localRef.current?.getTracks().forEach((track) => track.stop())
@@ -348,7 +357,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
         if (signal.sdp) pendingOfferRef.current = signal.sdp
         if (phase === 'idle' && !activeCallRef.current) {
           activeCallRef.current = signal.conversationId
-          dispatch({ type: 'incoming', conversationId: signal.conversationId, peer: signal.from })
+          const peer = mode === 'live'
+            ? { ...signal.from, isCreator: await profileIsCreator(signal.from.id) }
+            : signal.from
+          dispatch({ type: 'incoming', conversationId: signal.conversationId, peer })
           return
         }
         if ((currentId ?? activeCallRef.current) === signal.conversationId) return
@@ -399,7 +411,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         setBanner(signal.kind === 'reject' ? 'Call declined' : 'Call ended')
       }
     },
-    [answerOffer, cleanupMedia, deliver, failFinal, flushIce],
+    [answerOffer, cleanupMedia, deliver, failFinal, flushIce, mode],
   )
 
   const onSignalRef = useRef(onSignal)
@@ -424,6 +436,96 @@ export function CallProvider({ children }: { children: ReactNode }) {
     const timer = window.setInterval(() => void publishLink(), 500)
     return () => window.clearInterval(timer)
   }, [mode, publishLink, state.phase])
+
+  useEffect(() => {
+    if (state.phase === 'idle') setExpanded(true)
+  }, [state.phase])
+
+  const minimize = useCallback(() => setExpanded(false), [])
+  const expand = useCallback(() => setExpanded(true), [])
+
+  useEffect(() => {
+    const live = state.phase !== 'idle' && state.phase !== 'failed'
+    if (!live) return
+
+    const write = () => {
+      const snap = stateRef.current
+      const headline = callHeadline(snap.phase, snap.connectedAt, Date.now())
+      document.title = document.hidden && headline ? callTabTitle(headline) : APP_NAME
+      if (!('mediaSession' in navigator)) return
+      const copy = mediaSessionCopy(snap.phase, snap.peer?.username ?? null, snap.connectedAt, Date.now())
+      if (!copy) return
+      navigator.mediaSession.metadata = new MediaMetadata({ title: copy.title, artist: copy.artist })
+      navigator.mediaSession.playbackState = copy.playbackState
+    }
+
+    const keepPlaying = () => {
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'
+    }
+
+    if ('mediaSession' in navigator) {
+      for (const action of ['play', 'pause', 'stop'] as const) {
+        try {
+          navigator.mediaSession.setActionHandler(action, keepPlaying)
+        } catch {
+          // This browser does not support the action.
+        }
+      }
+    }
+
+    write()
+    const timer = window.setInterval(write, 1000)
+    document.addEventListener('visibilitychange', write)
+    window.addEventListener('pageshow', write)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', write)
+      window.removeEventListener('pageshow', write)
+    }
+  }, [state.phase, state.peer?.id])
+
+  useEffect(() => {
+    if (state.phase !== 'idle' && state.phase !== 'failed') return
+    document.title = APP_NAME
+    if (!('mediaSession' in navigator)) return
+    navigator.mediaSession.metadata = null
+    navigator.mediaSession.playbackState = 'none'
+    for (const action of ['play', 'pause', 'stop'] as const) {
+      try {
+        navigator.mediaSession.setActionHandler(action, null)
+      } catch {
+        // This browser does not support the action.
+      }
+    }
+  }, [state.phase])
+
+  useEffect(() => {
+    const live = state.phase !== 'idle' && state.phase !== 'failed'
+    if (!live) return
+    const hold = () => {
+      const audio = audioRef.current
+      const phase = stateRef.current.phase
+      if (!audio || phase === 'idle' || phase === 'failed') return
+      const hasSource = Boolean(audio.srcObject || audio.getAttribute('src'))
+      if (shouldResumeCallAudio(phase, { paused: audio.paused, hasSource })) {
+        audio.autoplay = true
+        void audio.play().catch(() => {})
+      }
+      if (!stateRef.current.muted) {
+        localRef.current?.getAudioTracks().forEach((track) => {
+          if (track.readyState === 'live') track.enabled = true
+        })
+      }
+    }
+    document.addEventListener('visibilitychange', hold)
+    window.addEventListener('focus', hold)
+    window.addEventListener('pageshow', hold)
+    return () => {
+      document.removeEventListener('visibilitychange', hold)
+      window.removeEventListener('focus', hold)
+      window.removeEventListener('pageshow', hold)
+    }
+  }, [state.phase])
 
   const startCall = useCallback(
     async (peer: Profile, conversationId: string) => {
@@ -547,6 +649,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
     toggleSpeaker,
     simulateIncoming,
     audioRef,
+    expanded,
+    minimize,
+    expand,
   }
 
   return (

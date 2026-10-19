@@ -12,6 +12,7 @@ import { receiptTick } from '../lib/receipts'
 import { iconButton } from '../lib/styles'
 import type { Conversation, Message, ReplyTarget } from '../types'
 import { Avatar } from './Avatar'
+import { DisplayName } from './CreatorBadge'
 import { Composer } from './Composer'
 import { VoiceBubble } from './VoiceBubble'
 import { BackIcon, CheckIcon, CloseIcon, CopyIcon, DownIcon, MoreIcon, PhoneIcon, ReplyIcon, SearchIcon, SmileIcon, TrashIcon } from './Icons'
@@ -193,7 +194,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
         </Link>
         <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} size="sm" online={online} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{conversation.peer.username}</p>
+          <DisplayName name={conversation.peer.username} creator={conversation.peer.isCreator} className="text-sm font-semibold" />
           <p className={`truncate text-xs ${typing || online ? 'text-foam' : 'text-mist'}`}>{status}</p>
         </div>
         <button type="button" className={iconButton} aria-label="Start voice call" onClick={() => void call.startCall(conversation.peer, conversation.id)}>
@@ -219,7 +220,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
           <div className="absolute right-2 top-14 z-20 w-64 rounded-xl border border-line bg-panel p-3 text-left shadow-md" role="dialog" aria-label="Conversation details">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{conversation.peer.username}</p>
+                <DisplayName name={conversation.peer.username} creator={conversation.peer.isCreator} className="text-sm font-semibold" />
                 <p className="mt-1 text-xs text-mist">{status}</p>
                 {conversation.peer.favouriteAnime ? <p className="mt-2 text-xs text-mist">{conversation.peer.favouriteAnime}</p> : null}
               </div>
@@ -281,6 +282,8 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
                 mine={mine}
                 pos={pos}
                 meId={profile?.id ?? ''}
+                senderName={mine ? profile?.username ?? '' : conversation.peer.username}
+                senderCreator={mine ? Boolean(profile?.isCreator) : Boolean(conversation.peer.isCreator)}
                 highlighted={hit}
                 receiptsShared={conversation.peer.showReadReceipts !== false}
                 menuOpen={menuId === message.id}
@@ -366,6 +369,8 @@ function MessageRow({
   mine,
   pos,
   meId,
+  senderName,
+  senderCreator,
   highlighted,
   receiptsShared,
   menuOpen,
@@ -383,6 +388,8 @@ function MessageRow({
   mine: boolean
   pos: GroupPos
   meId: string
+  senderName: string
+  senderCreator: boolean
   highlighted: boolean
   receiptsShared: boolean
   menuOpen: boolean
@@ -407,7 +414,10 @@ function MessageRow({
   const parts = linkParts(message.body)
   const firstLink = parts.find((part) => part.type === 'link')?.value
   return (
-    <div className={`msg-group relative flex max-w-[min(78%,26rem)] ${mine ? 'ml-auto justify-end' : 'mr-auto'}`}>
+    <div className={`msg-group relative flex max-w-[min(78%,26rem)] flex-col ${mine ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
+      {pos === 'start' || pos === 'single' ? (
+        <DisplayName name={senderName} creator={senderCreator} className="mb-0.5 px-1 text-[11px] font-medium text-mist" />
+      ) : null}
       {!deleted ? (
         <div className={`msg-actions absolute -top-8 z-10 flex gap-0.5 rounded-full border border-line bg-panel p-0.5 shadow-sm ${mine ? 'right-0' : 'left-0'}`}>
           <Tiny label="Reply" onClick={onReply}><ReplyIcon className="h-3.5 w-3.5" /></Tiny>

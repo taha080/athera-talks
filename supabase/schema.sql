@@ -18,6 +18,7 @@ create table if not exists public.profiles (
   favourite_anime text check (
     favourite_anime is null or char_length(btrim(favourite_anime)) between 1 and 60
   ),
+  is_creator boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -33,6 +34,7 @@ create table if not exists public.conversation_members (
   conversation_id uuid not null references public.conversations (id) on delete cascade,
   user_id uuid not null references public.profiles (id) on delete cascade,
   joined_at timestamptz not null default now(),
+  pinned boolean not null default false,
   primary key (conversation_id, user_id)
 );
 
@@ -219,7 +221,7 @@ begin
 end;
 $$;
 
--- Public fields for the "start a chat" search box.
+-- Replaced later in this file by find_user_by_username, which matches the whole name.
 create or replace function public.search_profiles(query text)
 returns table (
   id uuid,
@@ -742,6 +744,7 @@ returns table (
   peer_username text,
   peer_avatar_url text,
   peer_favourite_anime text,
+  peer_is_creator boolean,
   peer_last_seen timestamptz,
   peer_receipts boolean,
   last_body text,
@@ -770,6 +773,7 @@ begin
     peer.username,
     peer.avatar_url,
     peer.favourite_anime,
+    peer.is_creator,
     case when peer.show_last_seen then peer.last_seen_at else null end,
     peer.show_read_receipts,
     case
@@ -1279,7 +1283,9 @@ begin
 end;
 $$;
 
-create or replace function public.list_contact_requests()
+drop function if exists public.list_contact_requests();
+
+create function public.list_contact_requests()
 returns table (
   id uuid,
   from_id uuid,
@@ -1290,7 +1296,8 @@ returns table (
   peer_id uuid,
   peer_username text,
   peer_avatar_url text,
-  peer_favourite_anime text
+  peer_favourite_anime text,
+  peer_is_creator boolean
 )
 language plpgsql
 stable
@@ -1313,7 +1320,8 @@ begin
     peer.id,
     peer.username,
     peer.avatar_url,
-    peer.favourite_anime
+    peer.favourite_anime,
+    peer.is_creator
   from public.contact_requests r
   join public.profiles peer
     on peer.id = case when r.from_id = auth.uid() then r.to_id else r.from_id end
@@ -1365,36 +1373,68 @@ begin
 end;
 $$;
 
-drop function if exists public.search_profiles(text);
+create table if not exists public.username_lookups (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  looked_at timestamptz not null default now()
+);
 
-create function public.search_profiles(query text)
+create index if not exists username_lookups_user_idx
+  on public.username_lookups (user_id, looked_at desc);
+
+alter table public.username_lookups enable row level security;
+
+revoke all on table public.username_lookups from anon, authenticated;
+
+drop function if exists public.search_profiles(text);
+drop function if exists public.find_user_by_username(text);
+
+-- Exact username only. Partial input returns no rows. See the lookup migration
+-- for the rate limit and the profile read policy that this script also applies
+-- at the bottom.
+create function public.find_user_by_username(name text)
 returns table (
   id uuid,
   username text,
   avatar_url text,
   favourite_anime text,
+  is_creator boolean,
   request_id uuid,
   request_status text,
   request_from uuid
 )
 language plpgsql
-stable
+volatile
 security definer
 set search_path = public
 as $$
 declare
   cleaned text;
+  recent int;
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated';
   end if;
 
-  cleaned := lower(btrim(coalesce(query, '')));
-  if length(cleaned) = 0 then
+  cleaned := lower(btrim(coalesce(name, '')));
+  if cleaned !~ '^[a-z0-9_]{3,20}$' then
     return;
   end if;
 
-  cleaned := replace(replace(replace(cleaned, '\', '\\'), '%', '\%'), '_', '\_');
+  delete from public.username_lookups
+  where user_id = auth.uid()
+    and looked_at < now() - interval '1 hour';
+
+  select count(*) into recent
+  from public.username_lookups
+  where user_id = auth.uid()
+    and looked_at > now() - interval '1 minute';
+
+  if recent >= 20 then
+    raise exception 'Too many lookups. Wait a moment and try again.';
+  end if;
+
+  insert into public.username_lookups (user_id) values (auth.uid());
 
   return query
   select
@@ -1402,6 +1442,7 @@ begin
     p.username,
     p.avatar_url,
     p.favourite_anime,
+    p.is_creator,
     r.id,
     r.status,
     r.from_id
@@ -1410,11 +1451,13 @@ begin
     on least(r.from_id, r.to_id) = least(auth.uid(), p.id)
    and greatest(r.from_id, r.to_id) = greatest(auth.uid(), p.id)
   where p.id <> auth.uid()
-    and p.username ilike '%' || cleaned || '%' escape '\'
-  order by p.username
-  limit 20;
+    and p.username = cleaned
+  limit 1;
 end;
 $$;
+
+alter table public.conversation_members
+  add column if not exists pinned boolean not null default false;
 
 drop function if exists public.list_my_conversations();
 
@@ -1426,6 +1469,7 @@ returns table (
   peer_username text,
   peer_avatar_url text,
   peer_favourite_anime text,
+  peer_is_creator boolean,
   peer_last_seen timestamptz,
   peer_receipts boolean,
   last_body text,
@@ -1434,7 +1478,8 @@ returns table (
   last_created_at timestamptz,
   unread int,
   last_read_at timestamptz,
-  last_delivered_at timestamptz
+  last_delivered_at timestamptz,
+  pinned boolean
 )
 language plpgsql
 stable
@@ -1454,6 +1499,7 @@ begin
     peer.username,
     peer.avatar_url,
     peer.favourite_anime,
+    peer.is_creator,
     case when peer.show_last_seen then peer.last_seen_at else null end,
     peer.show_read_receipts,
     case
@@ -1478,7 +1524,8 @@ begin
         )
     ) as unread,
     lm.read_at,
-    lm.delivered_at
+    lm.delivered_at,
+    mine.pinned
   from public.conversations c
   join public.conversation_members mine
     on mine.conversation_id = c.id and mine.user_id = auth.uid()
@@ -1503,7 +1550,7 @@ begin
     limit 1
   ) lm on true
   where public.are_contacts(auth.uid(), peer.id)
-  order by c.updated_at desc;
+  order by mine.pinned desc, c.updated_at desc;
 end;
 $$;
 
@@ -1514,7 +1561,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if auth.uid() is null then
+  if auth.uid() is null and coalesce(current_setting('app.creator_attach', true), '') <> '1' then
     raise exception 'Not authenticated';
   end if;
   return new;
@@ -1736,7 +1783,7 @@ revoke all on function public.accept_contact(uuid) from public;
 revoke all on function public.decline_contact(uuid) from public;
 revoke all on function public.cancel_contact(uuid) from public;
 revoke all on function public.list_contact_requests() from public;
-revoke all on function public.search_profiles(text) from public;
+revoke all on function public.find_user_by_username(text) from public;
 revoke all on function public.start_direct_conversation(uuid) from public;
 revoke all on function public.list_my_conversations() from public;
 
@@ -1747,6 +1794,258 @@ grant execute on function public.accept_contact(uuid) to authenticated;
 grant execute on function public.decline_contact(uuid) to authenticated;
 grant execute on function public.cancel_contact(uuid) to authenticated;
 grant execute on function public.list_contact_requests() to authenticated;
-grant execute on function public.search_profiles(text) to authenticated;
+grant execute on function public.find_user_by_username(text) to authenticated;
 grant execute on function public.start_direct_conversation(uuid) to authenticated;
 grant execute on function public.list_my_conversations() to authenticated;
+
+-- A signed-in user can read their own profile, accepted contacts, people they
+-- have a pending request with, and members of their conversations. Not everyone.
+create or replace function public.can_read_profile(target uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    auth.uid() is not null
+    and (
+      target = auth.uid()
+      or public.are_contacts(auth.uid(), target)
+      or exists (
+        select 1
+        from public.contact_requests r
+        where r.status = 'pending'
+          and (
+            (r.from_id = auth.uid() and r.to_id = target)
+            or (r.to_id = auth.uid() and r.from_id = target)
+          )
+      )
+      or exists (
+        select 1
+        from public.conversation_members mine
+        join public.conversation_members theirs
+          on theirs.conversation_id = mine.conversation_id
+         and theirs.user_id = target
+        where mine.user_id = auth.uid()
+      )
+    );
+$$;
+
+revoke all on function public.can_read_profile(uuid) from public;
+grant execute on function public.can_read_profile(uuid) to authenticated;
+
+drop policy if exists "Read own profile" on public.profiles;
+drop policy if exists "Read visible profiles" on public.profiles;
+create policy "Read visible profiles"
+  on public.profiles for select
+  to authenticated
+  using (public.can_read_profile(id));
+
+-- Creator status is not a profile field people can edit. The service role and
+-- the database owner can set it. Everyone else is rejected.
+revoke update on table public.profiles from public, anon, authenticated;
+grant update (
+  username,
+  avatar_url,
+  favourite_anime,
+  theme,
+  wallpaper,
+  wallpaper_path,
+  last_seen_at,
+  show_last_seen,
+  show_read_receipts,
+  notify_sound,
+  notify_desktop,
+  updated_at
+) on public.profiles to authenticated;
+revoke insert (is_creator) on public.profiles from public, anon, authenticated;
+
+create or replace function public.protect_creator_flag()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  actor text;
+begin
+  actor := coalesce(auth.role(), '');
+  if tg_op = 'UPDATE' and new.is_creator is not distinct from old.is_creator then
+    return new;
+  end if;
+  if tg_op = 'INSERT' and new.is_creator = false then
+    return new;
+  end if;
+  if actor = 'service_role' or (actor = '' and current_user in ('postgres', 'supabase_admin', 'service_role')) then
+    return new;
+  end if;
+  raise exception 'Creator status cannot be changed';
+end;
+$$;
+
+drop trigger if exists profiles_protect_creator on public.profiles;
+create trigger profiles_protect_creator
+  before insert or update on public.profiles
+  for each row execute function public.protect_creator_flag();
+
+update public.profiles
+set is_creator = true
+where username = 'taha'
+  and id in (
+    select id from auth.users where email = 'ahsantaha16@gmail.com'
+  );
+
+-- Accepted contact and chat with the creator, pinned for the new person only.
+create or replace function public.attach_creator_contact(fan uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  creator uuid;
+  cid uuid;
+  pair public.contact_requests%rowtype;
+begin
+  select id into creator
+  from public.profiles
+  where is_creator
+    and username = 'taha'
+  limit 1;
+
+  if creator is null or creator = fan then
+    return;
+  end if;
+
+  select * into pair
+  from public.contact_requests
+  where least(from_id, to_id) = least(fan, creator)
+    and greatest(from_id, to_id) = greatest(fan, creator);
+
+  if pair.id is null then
+    insert into public.contact_requests (from_id, to_id, status)
+    values (creator, fan, 'accepted');
+  elsif pair.status <> 'accepted' then
+    return;
+  end if;
+
+  select c.id into cid
+  from public.conversations c
+  join public.conversation_members a
+    on a.conversation_id = c.id and a.user_id = fan
+  join public.conversation_members b
+    on b.conversation_id = c.id and b.user_id = creator
+  where (
+    select count(*) from public.conversation_members m where m.conversation_id = c.id
+  ) = 2
+  limit 1;
+
+  perform set_config('app.creator_attach', '1', true);
+
+  if cid is null then
+    insert into public.conversations default values returning id into cid;
+    insert into public.conversation_members (conversation_id, user_id, pinned)
+    values (cid, fan, true), (cid, creator, false);
+    return;
+  end if;
+
+  insert into public.conversation_members (conversation_id, user_id, pinned)
+  values (cid, creator, false)
+  on conflict (conversation_id, user_id) do nothing;
+
+  insert into public.conversation_members (conversation_id, user_id, pinned)
+  values (cid, fan, true)
+  on conflict (conversation_id, user_id) do update
+    set pinned = true;
+end;
+$$;
+
+create or replace function public.add_creator_on_profile()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.attach_creator_contact(new.id);
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_attach_creator on public.profiles;
+create trigger profiles_attach_creator
+  after insert on public.profiles
+  for each row execute function public.add_creator_on_profile();
+
+create or replace function public.protect_creator_contact()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- Account deletion and maintenance run without a user JWT. A signed-in user cannot drop the creator.
+  if auth.uid() is null then
+    if tg_op = 'DELETE' then
+      return old;
+    end if;
+    return new;
+  end if;
+
+  if (tg_op = 'DELETE' or (tg_op = 'UPDATE' and old.status = 'accepted' and new.status is distinct from 'accepted'))
+    and exists (
+      select 1
+      from public.profiles p
+      where p.is_creator
+        and p.id in (old.from_id, old.to_id)
+    ) then
+    raise exception 'The creator stays in your contacts';
+  end if;
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists contact_requests_keep_creator on public.contact_requests;
+create trigger contact_requests_keep_creator
+  before update or delete on public.contact_requests
+  for each row execute function public.protect_creator_contact();
+
+create or replace function public.set_chat_pin(cid uuid, next_pin boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
+  if not exists (
+    select 1
+    from public.conversation_members mine
+    join public.conversation_members other
+      on other.conversation_id = mine.conversation_id
+     and other.user_id <> mine.user_id
+    join public.profiles peer on peer.id = other.user_id
+    where mine.conversation_id = cid
+      and mine.user_id = auth.uid()
+      and peer.is_creator
+  ) then
+    raise exception 'Only the creator chat can be pinned';
+  end if;
+  update public.conversation_members
+    set pinned = coalesce(next_pin, false)
+    where conversation_id = cid
+      and user_id = auth.uid();
+end;
+$$;
+
+revoke all on function public.attach_creator_contact(uuid) from public, anon, authenticated;
+revoke all on function public.add_creator_on_profile() from public, anon, authenticated;
+revoke all on function public.set_chat_pin(uuid, boolean) from public;
+grant execute on function public.set_chat_pin(uuid, boolean) to authenticated;
+
+select public.attach_creator_contact(id) from public.profiles;

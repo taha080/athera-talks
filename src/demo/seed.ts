@@ -24,6 +24,7 @@ export type DemoConversation = {
   id: string
   memberIds: [string, string]
   updatedAt: string
+  pinnedFor?: string[]
 }
 
 export type DemoHide = {
@@ -58,7 +59,7 @@ export function buildSeed(now = Date.now()): DemoData {
   const at = (msAgo: number) => new Date(now - msAgo).toISOString()
 
   const profiles: Profile[] = [
-    { id: TAHA_ID, username: 'taha', avatarUrl: null, favouriteAnime: 'Attack on Titan', theme: 'light', wallpaper: 'plain', lastSeenAt: at(15_000), showLastSeen: true, showReadReceipts: true, notifySound: true, notifyDesktop: true },
+    { id: TAHA_ID, username: 'taha', avatarUrl: null, favouriteAnime: 'Attack on Titan', theme: 'light', wallpaper: 'plain', lastSeenAt: at(15_000), showLastSeen: true, showReadReceipts: true, notifySound: true, notifyDesktop: true, isCreator: true },
     { id: SAKURA_ID, username: 'sakura', avatarUrl: null, favouriteAnime: 'Demon Slayer', lastSeenAt: at(20_000), showReadReceipts: true },
     { id: KENJI_ID, username: 'kenji', avatarUrl: null, favouriteAnime: 'One Piece', lastSeenAt: at(2 * hour), showReadReceipts: true },
     { id: MIRA_ID, username: 'mira', avatarUrl: null, favouriteAnime: 'Spy x Family', lastSeenAt: at(5 * hour), showReadReceipts: false },
