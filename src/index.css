@@ -29,22 +29,79 @@
   --pattern: none;
 }
 
-/* Orange, black, and a leaf-village blue. Art is original CSS and SVG. */
+/* Night navy and lantern orange, so the chat matches the village landing. */
 [data-theme='naruto'] {
-  --ink: #120d09;
-  --panel: #1c140e;
-  --elevated: #2c1d13;
-  --line: #4a3424;
-  --accent: #ff7a18;
-  --accent-2: #2f6f9a;
-  --mist: #cbbba8;
-  --foam: #7dce82;
-  --paper: #fff6ec;
-  --scrollbar: #5c4030;
-  --pattern:
-    radial-gradient(circle at 0% 0%, color-mix(in oklab, var(--accent) 18%, transparent), transparent 36%),
-    radial-gradient(circle at 100% 100%, color-mix(in oklab, var(--accent-2) 22%, transparent), transparent 40%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' fill='none'%3E%3Cpath d='M36 22c10 12 15 22 15 32 0 9-6 16-15 18-9-2-15-9-15-18 0-10 5-20 15-32z' fill='%23ff7a18' fill-opacity='.08'/%3E%3Ccircle cx='128' cy='118' r='22' stroke='%232f6f9a' stroke-opacity='.2' stroke-width='2'/%3E%3Ccircle cx='128' cy='118' r='10' stroke='%232f6f9a' stroke-opacity='.2' stroke-width='2'/%3E%3C/svg%3E");
+  --ink: #070d18;
+  --panel: #101a2c;
+  --elevated: #17263f;
+  --line: #2a4466;
+  --accent: #ff8a1a;
+  --accent-2: #3d7eb8;
+  --mist: #a9bdd4;
+  --foam: #8fd18a;
+  --paper: #f3f7fc;
+  --scrollbar: #2a3f5c;
+  --pattern: none;
+}
+
+.font-display {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+}
+
+.night-card {
+  background: rgba(10, 18, 34, 0.72);
+  border: 1px solid rgba(255, 138, 26, 0.75);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(18px);
+}
+
+.night-field {
+  width: 100%;
+  border-radius: 0.65rem;
+  border: 1px solid #3d6d99;
+  background: #0c1b33;
+  color: #f3f7fc;
+  padding: 0.72rem 0.9rem 0.72rem 2.4rem;
+  font-size: 0.92rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.night-field::placeholder {
+  color: #8ea4bf;
+}
+
+.night-field:focus {
+  border-color: #ff8a1a;
+  box-shadow: 0 0 0 1px rgba(255, 138, 26, 0.45);
+}
+
+.night-button {
+  display: inline-flex;
+  width: 100%;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.7rem;
+  border: 1px solid #ff8a1a;
+  background: #0d1a2e;
+  color: #f7fbff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.night-button:hover:not(:disabled) {
+  background: #142844;
+  box-shadow: 0 0 24px rgba(255, 138, 26, 0.28);
+}
+
+.night-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 html,
