@@ -1,6 +1,6 @@
 import type { Profile } from '../types'
 
-export type CallPhase = 'idle' | 'outgoing' | 'incoming' | 'connecting' | 'connected'
+export type CallPhase = 'idle' | 'outgoing' | 'ringing' | 'incoming' | 'connecting' | 'connected' | 'failed'
 
 export type CallState = {
   phase: CallPhase
@@ -13,6 +13,7 @@ export type CallState = {
 
 export type CallAction =
   | { type: 'start'; conversationId: string; peer: Profile }
+  | { type: 'ringing' }
   | { type: 'incoming'; conversationId: string; peer: Profile }
   | { type: 'accept' }
   | { type: 'remote-joined' }
@@ -41,6 +42,9 @@ export function callReducer(state: CallState, action: CallAction): CallState {
         conversationId: action.conversationId,
         peer: action.peer,
       }
+    case 'ringing':
+      if (state.phase !== 'outgoing') return state
+      return { ...state, phase: 'ringing' }
     case 'incoming':
       if (state.phase !== 'idle') return state
       return {
@@ -53,10 +57,10 @@ export function callReducer(state: CallState, action: CallAction): CallState {
       if (state.phase !== 'incoming') return state
       return { ...state, phase: 'connecting', error: null }
     case 'remote-joined':
-      if (state.phase !== 'outgoing' && state.phase !== 'connecting') return state
+      if (state.phase !== 'outgoing' && state.phase !== 'ringing' && state.phase !== 'connecting') return state
       return { ...state, phase: 'connecting', error: null }
     case 'connected':
-      if (state.phase !== 'outgoing' && state.phase !== 'connecting') return state
+      if (state.phase !== 'outgoing' && state.phase !== 'ringing' && state.phase !== 'connecting') return state
       return {
         ...state,
         phase: 'connected',
@@ -64,11 +68,11 @@ export function callReducer(state: CallState, action: CallAction): CallState {
         error: null,
       }
     case 'toggle-mute':
-      if (state.phase === 'idle') return state
+      if (state.phase === 'idle' || state.phase === 'failed' || state.phase === 'incoming') return state
       return { ...state, muted: !state.muted }
     case 'fail':
-      if (state.phase === 'idle') return state
-      return { ...state, error: action.error }
+      if (state.phase === 'idle' || state.phase === 'failed') return state
+      return { ...state, phase: 'failed', error: action.error }
     case 'reject':
     case 'hangup':
       return initialCallState
