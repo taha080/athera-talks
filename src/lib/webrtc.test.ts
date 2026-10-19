@@ -7,7 +7,11 @@ import {
   formatCandidateTypes,
   googleStunServers,
   hasLiveAudioSender,
+  iceServersOrFallback,
   mediaError,
+  meteredFallbackServers,
+  METERED_FALLBACK_CREDENTIAL,
+  METERED_FALLBACK_USERNAME,
   turnRestCredential,
   usableTurnUrl,
 } from './webrtc'
@@ -33,29 +37,53 @@ describe('buildIceServers', () => {
   })
 
   it('drops the browser-blocked port 53 URL and keeps turns on 443', () => {
-    expect(usableTurnUrl('turns:turn.cloudflare.com:443?transport=tcp')).toBe(true)
-    expect(usableTurnUrl('turns:turn.cloudflare.com:5349?transport=tcp')).toBe(true)
-    expect(usableTurnUrl('turn:turn.cloudflare.com:53?transport=udp')).toBe(false)
+    expect(usableTurnUrl('turns:turn.example.com:443?transport=tcp')).toBe(true)
+    expect(usableTurnUrl('turns:turn.example.com:5349?transport=tcp')).toBe(true)
+    expect(usableTurnUrl('turn:turn.example.com:53?transport=udp')).toBe(false)
     const filtered = filterBrowserIceServers([
-      { urls: ['stun:stun.cloudflare.com:3478'] },
+      { urls: ['stun:stun.example.com:3478'] },
       {
         urls: [
-          'turn:turn.cloudflare.com:3478?transport=udp',
-          'turn:turn.cloudflare.com:443?transport=udp',
-          'turn:turn.cloudflare.com:3478?transport=tcp',
-          'turn:turn.cloudflare.com:80?transport=tcp',
-          'turns:turn.cloudflare.com:5349?transport=tcp',
-          'turns:turn.cloudflare.com:443?transport=tcp',
-          'turn:turn.cloudflare.com:53?transport=udp',
+          'turn:turn.example.com:3478?transport=udp',
+          'turn:turn.example.com:443?transport=udp',
+          'turn:turn.example.com:3478?transport=tcp',
+          'turn:turn.example.com:80?transport=tcp',
+          'turns:turn.example.com:5349?transport=tcp',
+          'turns:turn.example.com:443?transport=tcp',
+          'turn:turn.example.com:53?transport=udp',
         ],
         username: 'short',
         credential: 'lived',
       },
     ])
     const urls = filtered[1]?.urls
-    expect(urls).toContain('turns:turn.cloudflare.com:443?transport=tcp')
-    expect(urls).toContain('turn:turn.cloudflare.com:3478?transport=tcp')
-    expect(urls).not.toContain('turn:turn.cloudflare.com:53?transport=udp')
+    expect(urls).toContain('turns:turn.example.com:443?transport=tcp')
+    expect(urls).toContain('turn:turn.example.com:3478?transport=tcp')
+    expect(urls).not.toContain('turn:turn.example.com:53?transport=udp')
+  })
+
+  it('falls back to the static Metered relay when the credential fetch fails', () => {
+    const servers = meteredFallbackServers()
+    expect(servers.map((server) => server.urls)).toEqual([
+      'stun:stun.relay.metered.ca:80',
+      'turn:global.relay.metered.ca:80',
+      'turn:global.relay.metered.ca:80?transport=tcp',
+      'turn:global.relay.metered.ca:443',
+      'turns:global.relay.metered.ca:443?transport=tcp',
+    ])
+    expect(servers[0]?.username).toBeUndefined()
+    expect(servers[1]).toMatchObject({
+      username: METERED_FALLBACK_USERNAME,
+      credential: METERED_FALLBACK_CREDENTIAL,
+    })
+    expect(servers[4]).toMatchObject({
+      username: METERED_FALLBACK_USERNAME,
+      credential: METERED_FALLBACK_CREDENTIAL,
+    })
+    const fetched = [{ urls: 'turn:fresh.example.com:443', username: 'short', credential: 'lived' }]
+    expect(iceServersOrFallback(fetched)).toBe(fetched)
+    expect(iceServersOrFallback(null)).toEqual(servers)
+    expect(iceServersOrFallback([])).toEqual(servers)
   })
 })
 

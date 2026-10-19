@@ -1,7 +1,7 @@
-// Google STUN discovers a public address. A TURN relay is added only when this
-// browser has credentials: short-lived ones from the turn-credentials function,
-// or an explicit VITE_TURN_* override. A blank config stays on STUN. The old
-// public Open Relay host answers HTTP on port 443 and does not allocate a relay.
+// Each call asks the turn-credentials Edge Function for Metered iceServers.
+// The Metered API key stays in the function secret METERED_API_KEY. If that
+// fetch fails, the call uses the static Metered relay below. An explicit
+// VITE_TURN_* override still wins. VITE_TURN_URLS=none stays on Google STUN.
 
 import { CONNECT_TIMEOUT_MESSAGE } from './callMachine'
 import { getSupabase } from './supabase'
@@ -34,7 +34,30 @@ export async function turnRestCredential(
   return { username, credential }
 }
 
-// Port 53 is an alternate Cloudflare TURN port that browsers time out on.
+// Some relays advertise port 53. Browsers time out on it.
+export const METERED_FALLBACK_USERNAME = '8c806b1e87da68a6d13d1051'
+export const METERED_FALLBACK_CREDENTIAL = 'CWOTQy7sg1frPlo+'
+
+export const METERED_FALLBACK_URLS = [
+  'stun:stun.relay.metered.ca:80',
+  'turn:global.relay.metered.ca:80',
+  'turn:global.relay.metered.ca:80?transport=tcp',
+  'turn:global.relay.metered.ca:443',
+  'turns:global.relay.metered.ca:443?transport=tcp',
+] as const
+
+export function meteredFallbackServers(): RTCIceServer[] {
+  return METERED_FALLBACK_URLS.map((urls) =>
+    urls.startsWith('turn')
+      ? { urls, username: METERED_FALLBACK_USERNAME, credential: METERED_FALLBACK_CREDENTIAL }
+      : { urls },
+  )
+}
+
+export function iceServersOrFallback(fetched: RTCIceServer[] | null): RTCIceServer[] {
+  return fetched?.length ? fetched : meteredFallbackServers()
+}
+
 export function usableTurnUrl(url: string): boolean {
   return !/:53(?:\?|$)/.test(url)
 }
@@ -90,7 +113,7 @@ export async function resolveIceServers(env: TurnEnv = {}): Promise<RTCIceServer
   const secret = (env.secret ?? '').trim()
   const manual = Boolean(raw || ((env.username ?? '').trim() && (env.credential ?? '').trim()) || secret)
   if (manual) return buildIceServers(env)
-  return (await fetchTurnIceServers()) ?? googleStunServers()
+  return iceServersOrFallback(await fetchTurnIceServers())
 }
 
 export function turnEnvFromImport(): TurnEnv {
