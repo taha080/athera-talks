@@ -5,13 +5,15 @@ import { messageKind } from '../lib/messages'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform, extensionForMime, parseWaveform } from '../lib/voice'
 import { getSupabase } from '../lib/supabase'
-import type { ContactRequest, ContactStatus, Conversation, Message, MessageListener, OutgoingMedia, Profile, Reaction, ReactionChange, ReplyTarget, SearchPerson } from '../types'
+import type { ContactRequest, ContactStatus, Conversation, Message, MessageListener, MessageReceipt, OutgoingMedia, Profile, Reaction, ReactionChange, ReplyTarget, SearchPerson } from '../types'
 
 const PROFILE_COLUMNS =
   'id, username, avatar_url, favourite_anime, theme, wallpaper, wallpaper_path, last_seen_at, show_last_seen, show_read_receipts, notify_sound, notify_desktop, is_creator'
 
+// read_at and delivered_at stay off this list. The API role cannot select
+// them; visible copies come from message_receipts.
 const MESSAGE_COLUMNS =
-  'id, conversation_id, sender_id, body, created_at, read_at, kind, media_path, media_mime, media_seconds, waveform, reply_to, reply_preview, deleted_at, delivered_at'
+  'id, conversation_id, sender_id, body, created_at, kind, media_path, media_mime, media_seconds, waveform, reply_to, reply_preview, deleted_at'
 
 type ProfileRow = {
   id: string
@@ -111,7 +113,7 @@ export function mapMessage(row: MessageRow): Message {
     senderId: row.sender_id,
     body: row.body ?? '',
     createdAt: row.created_at,
-    readAt: row.read_at,
+    readAt: row.read_at ?? null,
     kind: messageKind(row.kind),
     deliveredAt: row.delivered_at ?? null,
     mediaPath: row.media_path ?? null,
@@ -316,6 +318,56 @@ async function currentUserId(): Promise<string> {
   return data.user.id
 }
 
+function receiptsTableMissing(error: { code?: string; message: string }): boolean {
+  if (error.code === 'PGRST205' || error.code === '42P01') return true
+  return /message_receipts/i.test(error.message) && /schema cache|does not exist|could not find/i.test(error.message)
+}
+
+function receiptFromPayload(value: unknown): MessageReceipt | null {
+  if (!value || typeof value !== 'object') return null
+  const row = value as { message_id?: string; conversation_id?: string; read_at?: string | null; delivered_at?: string | null }
+  if (!row.message_id || !row.conversation_id) return null
+  return {
+    messageId: row.message_id,
+    conversationId: row.conversation_id,
+    readAt: row.read_at ?? null,
+    deliveredAt: row.delivered_at ?? null,
+  }
+}
+
+// Visible receipts only. message_receipts is filtered by RLS. The legacy
+// select runs only when that table has not been created yet.
+async function attachReceipts(conversationId: string, messages: Message[]): Promise<Message[]> {
+  if (messages.length === 0) return messages
+  const receipts = await client()
+    .from('message_receipts')
+    .select('message_id, read_at, delivered_at')
+    .eq('conversation_id', conversationId)
+  if (receipts.error) {
+    if (!receiptsTableMissing(receipts.error)) throw new Error(receipts.error.message)
+    const legacy = await client().from('messages').select('id, read_at, delivered_at').eq('conversation_id', conversationId)
+    if (legacy.error) throw new Error(legacy.error.message)
+    const byId = new Map(
+      ((legacy.data ?? []) as { id: string; read_at: string | null; delivered_at: string | null }[]).map((row) => [row.id, row]),
+    )
+    return messages.map((message) => {
+      const row = byId.get(message.id)
+      return { ...message, readAt: row?.read_at ?? null, deliveredAt: row?.delivered_at ?? null }
+    })
+  }
+  const byId = new Map(
+    ((receipts.data ?? []) as { message_id: string; read_at: string | null; delivered_at: string | null }[]).map((row) => [
+      row.message_id,
+      row,
+    ]),
+  )
+  return messages.map((message) => {
+    const row = byId.get(message.id)
+    if (!row) return { ...message, readAt: null, deliveredAt: null }
+    return { ...message, readAt: row.read_at, deliveredAt: row.delivered_at }
+  })
+}
+
 export const liveChat = {
   async listConversations(): Promise<Conversation[]> {
     const { data, error } = await client().rpc('list_my_conversations')
@@ -331,7 +383,8 @@ export const liveChat = {
       .order('created_at', { ascending: true })
       .limit(200)
     if (error) throw new Error(error.message)
-    return withReactions(await signMessages(((data ?? []) as MessageRow[]).map(mapMessage)))
+    const messages = await attachReceipts(conversationId, ((data ?? []) as MessageRow[]).map(mapMessage))
+    return withReactions(await signMessages(messages))
   },
 
   async searchUsers(query: string): Promise<SearchPerson[]> {
@@ -554,6 +607,14 @@ export const liveChat = {
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
         listener.onUpdate(mapMessage(payload.new as MessageRow))
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_receipts' }, (payload) => {
+        const receipt = receiptFromPayload(payload.new)
+        if (receipt) listener.onReceipt?.(receipt)
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'message_receipts' }, (payload) => {
+        const receipt = receiptFromPayload(payload.new)
+        if (receipt) listener.onReceipt?.(receipt)
       })
       .subscribe()
     return () => {
