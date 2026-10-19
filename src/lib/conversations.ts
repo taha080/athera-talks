@@ -1,3 +1,4 @@
+import { messagePreview } from './messages'
 import type { Conversation, Message } from '../types'
 
 export function appendMessage(list: Message[], message: Message): Message[] {
@@ -20,17 +21,17 @@ export function foldConversation(
   if (!list.some((item) => item.id === message.conversationId)) return null
   const next = list.map((item) => {
     if (item.id !== message.conversationId) return item
-    const mine = message.senderId === meId
+    const incoming = message.senderId !== meId && !message.deletedAt
     const viewing = activeId === item.id
     return {
       ...item,
       updatedAt: message.createdAt,
       lastMessage: {
-        body: message.body,
+        body: messagePreview(message),
         createdAt: message.createdAt,
         senderId: message.senderId,
       },
-      unread: viewing || mine ? item.unread : item.unread + 1,
+      unread: viewing || !incoming ? item.unread : item.unread + 1,
     }
   })
   return next.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))

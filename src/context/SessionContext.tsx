@@ -20,10 +20,20 @@ import {
 } from '../lib/auth'
 import { readSupabaseEnv } from '../lib/config'
 import { startMode } from '../lib/mode'
-import { blobToDataUrl, squareAvatar } from '../lib/image'
+import { blobToDataUrl, fitImage, squareAvatar } from '../lib/image'
 import { getSupabase } from '../lib/supabase'
 import { appUrl } from '../lib/url'
-import { fetchProfile, liveChat, saveProfile, uploadAvatar, usernameAvailable } from '../services/liveBackend'
+import {
+  clearWallpaper,
+  fetchProfile,
+  liveChat,
+  savePreferences,
+  saveProfile,
+  uploadAvatar,
+  uploadWallpaper,
+  usernameAvailable,
+  type PreferencePatch,
+} from '../services/liveBackend'
 import type { Profile } from '../types'
 
 const DEMO_KEY = 'tatalk:demo'
@@ -51,6 +61,9 @@ type SessionValue = {
   signOut: () => Promise<void>
   updateProfile: (patch: { username: string; favouriteAnime: string | null }) => Promise<void>
   uploadAvatarFile: (file: File) => Promise<void>
+  saveAppearance: (patch: PreferencePatch) => Promise<void>
+  uploadWallpaperFile: (file: File) => Promise<void>
+  removeWallpaper: () => Promise<void>
   resetDemo: () => Profile | null
 }
 
@@ -253,6 +266,36 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [mode, profile],
   )
 
+  const saveAppearance = useCallback(
+    async (patch: PreferencePatch) => {
+      if (!profile) throw new Error('Sign in first.')
+      const next = mode === 'demo' ? await demoBackend.savePreferences(patch) : await savePreferences(profile.id, patch)
+      setProfile(next)
+    },
+    [mode, profile],
+  )
+
+  const uploadWallpaperFile = useCallback(
+    async (file: File) => {
+      if (!profile) throw new Error('Sign in first.')
+      if (!file.type.startsWith('image/')) throw new Error('Choose an image file.')
+      if (file.size > 6_000_000) throw new Error('Choose an image under 6 MB.')
+      const blob = await fitImage(file, 1600)
+      const next =
+        mode === 'demo'
+          ? await demoBackend.uploadWallpaper(await blobToDataUrl(blob))
+          : await uploadWallpaper(profile.id, blob)
+      setProfile(next)
+    },
+    [mode, profile],
+  )
+
+  const removeWallpaper = useCallback(async () => {
+    if (!profile) throw new Error('Sign in first.')
+    const next = mode === 'demo' ? await demoBackend.clearWallpaper() : await clearWallpaper(profile.id)
+    setProfile(next)
+  }, [mode, profile])
+
   const uploadAvatarFile = useCallback(
     async (file: File) => {
       if (!profile) throw new Error('Sign in first.')
@@ -314,6 +357,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signOut,
       updateProfile,
       uploadAvatarFile,
+      saveAppearance,
+      uploadWallpaperFile,
+      removeWallpaper,
       resetDemo,
     }),
     [
@@ -333,8 +379,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signOut,
       signUp,
       updatePassword,
+      removeWallpaper,
+      saveAppearance,
       updateProfile,
       uploadAvatarFile,
+      uploadWallpaperFile,
       usernameStatus,
     ],
   )

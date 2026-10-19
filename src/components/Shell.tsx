@@ -1,6 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { CallProvider } from '../context/CallContext'
-import { ChatProvider } from '../context/ChatContext'
+import { ChatProvider, useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
 import { cn } from '../lib/cn'
 import { dangerButton } from '../lib/styles'
@@ -11,8 +11,8 @@ import { Sidebar } from './Sidebar'
 export function Shell() {
   const location = useLocation()
   const chatOpen = location.pathname.startsWith('/c/')
-  const profileOpen = location.pathname.startsWith('/profile')
-  const showList = !chatOpen && !profileOpen
+  const settingsOpen = location.pathname.startsWith('/settings') || location.pathname.startsWith('/profile')
+  const showList = !chatOpen && !settingsOpen
 
   return (
     <ChatProvider>
@@ -30,9 +30,29 @@ export function Shell() {
             <Outlet />
           </section>
           <CallScreen />
+          <Toasts />
         </div>
       </CallProvider>
     </ChatProvider>
+  )
+}
+
+function Toasts() {
+  const { toasts, dismissToast } = useChat()
+  if (toasts.length === 0) return null
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex flex-col items-center gap-2 px-4">
+      {toasts.map((toast) => (
+        <button
+          key={toast.id}
+          type="button"
+          className="toast-in pointer-events-auto max-w-sm rounded-full bg-paper px-4 py-2 text-sm font-medium text-ink shadow-lg"
+          onClick={() => dismissToast(toast.id)}
+        >
+          {toast.text}
+        </button>
+      ))}
+    </div>
   )
 }
 

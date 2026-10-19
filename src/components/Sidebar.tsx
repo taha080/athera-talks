@@ -8,12 +8,12 @@ import { cn } from '../lib/cn'
 import { formatListTime } from '../lib/format'
 import { fieldClass } from '../lib/styles'
 import type { Profile } from '../types'
+import { isOnline } from '../lib/presence'
 import { useTheme } from '../context/ThemeContext'
 import { Avatar } from './Avatar'
 import { Credit } from './Credit'
-import { PhoneIcon, SearchIcon } from './Icons'
+import { GearIcon, PhoneIcon, SearchIcon } from './Icons'
 import { KunaiMark } from './KunaiMark'
-import { ThemeSwitcher } from './ThemeSwitcher'
 
 export function Sidebar() {
   const { profile, signOut, mode } = useSession()
@@ -58,8 +58,8 @@ export function Sidebar() {
             <p className="text-xs text-mist">@{profile?.username}</p>
           </div>
         </div>
-        <Link to="/profile" aria-label="Open profile" className="rounded-full ring-sakura/40 focus-visible:ring-2">
-          <Avatar name={profile?.username ?? 'you'} url={profile?.avatarUrl} size="sm" />
+        <Link to="/settings" aria-label="Open settings" className="rounded-full ring-sakura/40 focus-visible:ring-2">
+          <Avatar name={profile?.username ?? 'you'} url={profile?.avatarUrl} size="sm" online={isOnline(profile?.lastSeenAt)} />
         </Link>
       </header>
 
@@ -118,7 +118,7 @@ export function Sidebar() {
                       active ? 'bg-white/10' : 'hover:bg-white/5',
                     )}
                   >
-                    <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} />
+                    <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} online={isOnline(conversation.peer.lastSeenAt)} />
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-2">
                         <span className="truncate font-medium">@{conversation.peer.username}</span>
@@ -160,7 +160,10 @@ export function Sidebar() {
             Preview incoming call
           </button>
         ) : null}
-        <ThemeSwitcher className="justify-between" />
+        <Link to="/settings" className="flex w-full items-center justify-center gap-2 rounded-full bg-white/5 px-3 py-2 text-sm font-medium text-paper hover:bg-white/10">
+          <GearIcon className="h-4 w-4" />
+          Settings
+        </Link>
         <button type="button" onClick={() => void signOut().then(() => navigate('/login'))} className="w-full rounded-full bg-white/5 px-3 py-2 text-sm font-medium text-paper hover:bg-white/10">
           Sign out
         </button>

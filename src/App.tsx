@@ -1,16 +1,17 @@
-import { Component, type ReactNode } from 'react'
+import { Component, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { Credit } from './components/Credit'
 import { MissingProfile, Shell } from './components/Shell'
 import { SetupScreen, Splash } from './components/SetupScreen'
 import { SessionProvider, useSession } from './context/SessionContext'
-import { ThemeProvider } from './context/ThemeContext'
+import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { APP_NAME } from './lib/brand'
+import { parseTheme } from './lib/theme'
 import { routerBasename } from './lib/url'
 import { AuthScreen } from './pages/AuthScreen'
 import { HomePage } from './pages/HomePage'
-import { ProfilePage } from './pages/ProfilePage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
+import { SettingsPage } from './pages/SettingsPage'
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
       <ThemeProvider>
         <BrowserRouter basename={routerBasename(import.meta.env.BASE_URL)}>
           <SessionProvider>
+            <ThemeSync />
             <Gate />
           </SessionProvider>
         </BrowserRouter>
@@ -40,12 +42,23 @@ function Gate() {
         <Route element={<Shell />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/c/:conversationId" element={<HomePage />} />
-          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/profile" element={<Navigate to="/settings" replace />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings/:section" element={<SettingsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
+}
+
+function ThemeSync() {
+  const { profile } = useSession()
+  const { setTheme } = useTheme()
+  useEffect(() => {
+    if (profile?.theme) setTheme(parseTheme(profile.theme))
+  }, [profile?.theme, profile?.id, setTheme])
+  return null
 }
 
 function RequireAuth() {

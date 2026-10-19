@@ -44,6 +44,90 @@
   --pattern: none;
 }
 
+[data-theme='midnight'] {
+  --ink: #070b16;
+  --panel: #10182b;
+  --elevated: #18233c;
+  --line: #2c3b5c;
+  --accent: #7aa2ff;
+  --accent-2: #9b7bff;
+  --mist: #a9b4cc;
+  --foam: #5ee0b5;
+  --paper: #f4f7ff;
+  --scrollbar: #31425f;
+  --pattern: none;
+}
+
+[data-theme='sakura'] {
+  --ink: #1a0d14;
+  --panel: #2a1520;
+  --elevated: #3a1d2c;
+  --line: #5c3144;
+  --accent: #ff7aa2;
+  --accent-2: #c9a0ff;
+  --mist: #d7aebc;
+  --foam: #7dce82;
+  --paper: #fff5f8;
+  --scrollbar: #6a3b4e;
+  --pattern: none;
+}
+
+[data-theme='ocean'] {
+  --ink: #04161a;
+  --panel: #0b242b;
+  --elevated: #12343d;
+  --line: #1f5560;
+  --accent: #2ec4b6;
+  --accent-2: #3d8bfd;
+  --mist: #9ec9cf;
+  --foam: #8fd18a;
+  --paper: #f2fffc;
+  --scrollbar: #1d4c56;
+  --pattern: none;
+}
+
+[data-theme='forest'] {
+  --ink: #0c1410;
+  --panel: #14201a;
+  --elevated: #1c2e24;
+  --line: #2f4a3a;
+  --accent: #7dce82;
+  --accent-2: #d4a24c;
+  --mist: #b7cbb8;
+  --foam: #b6e3a8;
+  --paper: #f4fff6;
+  --scrollbar: #355443;
+  --pattern: none;
+}
+
+[data-theme='light'] {
+  --ink: #f6f3ee;
+  --panel: #fffdf9;
+  --elevated: #ffffff;
+  --line: #e6dcd0;
+  --accent: #c43d6c;
+  --accent-2: #6d5efc;
+  --mist: #6f6574;
+  --foam: #0f8f62;
+  --paper: #1b1522;
+  --scrollbar: #d9cfc4;
+  --pattern: none;
+}
+
+[data-theme='amoled'] {
+  --ink: #000000;
+  --panel: #000000;
+  --elevated: #111111;
+  --line: #2a2a2a;
+  --accent: #ff4f8b;
+  --accent-2: #8d6bff;
+  --mist: #9a9a9a;
+  --foam: #3ddc97;
+  --paper: #ffffff;
+  --scrollbar: #333333;
+  --pattern: none;
+}
+
 .font-display {
   font-family: 'Cormorant Garamond', Georgia, serif;
 }
@@ -148,6 +232,127 @@ textarea:-webkit-autofill {
 
 [data-theme='naruto'] .bubble-other {
   box-shadow: inset 3px 0 0 #2f6f9a;
+}
+
+.chat-wallpaper {
+  background-color: color-mix(in oklab, var(--ink) 92%, var(--panel));
+}
+
+.wallpaper-plain {
+  background-image: none;
+}
+
+.wallpaper-ink {
+  background-color: var(--ink);
+}
+
+.wallpaper-paper {
+  background-color: color-mix(in oklab, var(--paper) 12%, var(--ink));
+}
+
+.wallpaper-accent {
+  background-color: color-mix(in oklab, var(--accent) 18%, var(--ink));
+}
+
+.wallpaper-waves {
+  background-image:
+    radial-gradient(120% 70% at 0% 100%, color-mix(in oklab, var(--accent) 28%, transparent), transparent 58%),
+    radial-gradient(90% 60% at 100% 0%, color-mix(in oklab, var(--accent-2) 24%, transparent), transparent 52%);
+}
+
+.wallpaper-hemp {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 10px,
+    color-mix(in oklab, var(--paper) 7%, transparent) 10px 11px
+  );
+}
+
+.wallpaper-diamonds {
+  background-image:
+    linear-gradient(45deg, color-mix(in oklab, var(--accent) 16%, transparent) 25%, transparent 25%),
+    linear-gradient(-45deg, color-mix(in oklab, var(--accent) 16%, transparent) 25%, transparent 25%);
+  background-size: 28px 28px;
+  background-position: 0 0, 14px 0;
+}
+
+.wallpaper-stripes {
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0 18px,
+    color-mix(in oklab, var(--accent-2) 14%, transparent) 18px 20px
+  );
+}
+
+.wallpaper-dots {
+  background-image: radial-gradient(circle, color-mix(in oklab, var(--accent) 45%, transparent) 1.2px, transparent 1.4px);
+  background-size: 18px 18px;
+}
+
+.wallpaper-petals {
+  background-image:
+    radial-gradient(circle at 20% 30%, color-mix(in oklab, var(--accent) 28%, transparent) 0 18px, transparent 19px),
+    radial-gradient(circle at 70% 60%, color-mix(in oklab, var(--accent-2) 22%, transparent) 0 26px, transparent 27px),
+    radial-gradient(circle at 40% 80%, color-mix(in oklab, var(--accent) 16%, transparent) 0 14px, transparent 15px);
+  background-size: 180px 180px;
+}
+
+.wallpaper-mist {
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--accent-2) 18%, transparent),
+    transparent 45%,
+    color-mix(in oklab, var(--accent) 16%, transparent)
+  );
+}
+
+.wallpaper-grid {
+  background-image:
+    linear-gradient(color-mix(in oklab, var(--paper) 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--paper) 8%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.wallpaper-stars {
+  background-image:
+    radial-gradient(circle at 12% 20%, color-mix(in oklab, var(--paper) 70%, transparent) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 70% 30%, color-mix(in oklab, var(--paper) 55%, transparent) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 40% 70%, color-mix(in oklab, var(--accent) 70%, transparent) 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 84% 76%, color-mix(in oklab, var(--paper) 60%, transparent) 0 1px, transparent 1.5px);
+  background-size: 140px 160px;
+}
+
+.wallpaper-leaves {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cpath fill='white' fill-opacity='.14' d='M36 8c8 10 14 18 14 30 0 10-6 16-14 18-8-2-14-8-14-18 0-12 6-20 14-30z'/%3E%3C/svg%3E");
+  background-size: 72px 72px;
+}
+
+.wallpaper-custom {
+  background-size: cover;
+  background-position: center;
+}
+
+.bubble-in {
+  animation: bubble-in 180ms ease;
+}
+
+.toast-in {
+  animation: bubble-in 160ms ease;
+}
+
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+[data-theme='light'] .bubble-other {
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 
 @media (prefers-reduced-motion: reduce) {
