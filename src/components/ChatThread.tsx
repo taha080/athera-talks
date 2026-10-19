@@ -12,7 +12,7 @@ import { receiptTick } from '../lib/receipts'
 import { iconButton } from '../lib/styles'
 import type { Conversation, Message, ReplyTarget } from '../types'
 import { Avatar } from './Avatar'
-import { DisplayName } from './CreatorBadge'
+import { CreatorMessageHeader, DisplayName } from './CreatorBadge'
 import { Composer } from './Composer'
 import { VoiceBubble } from './VoiceBubble'
 import { BackIcon, CheckIcon, CloseIcon, CopyIcon, DownIcon, MoreIcon, PhoneIcon, ReplyIcon, SearchIcon, SmileIcon, TrashIcon } from './Icons'
@@ -410,12 +410,16 @@ function MessageRow({
     ? tailed ? 'rounded-[18px] rounded-br-[5px]' : 'rounded-[18px]'
     : tailed ? 'rounded-[18px] rounded-bl-[5px]' : 'rounded-[18px]'
   const image = !deleted && message.kind === 'image'
+  const creator = senderCreator && !deleted
+  const ownTone = mine && !creator
   const reactions = groupedReactions(message.reactions, meId)
   const parts = linkParts(message.body)
   const firstLink = parts.find((part) => part.type === 'link')?.value
+  const bubble = creator ? 'bubble-creator' : mine ? 'bubble-own' : 'bubble-other'
+  const tail = !creator && tailed ? (mine ? 'tail-own' : 'tail-other') : ''
   return (
     <div className={`msg-group relative flex max-w-[min(78%,26rem)] flex-col ${mine ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
-      {pos === 'start' || pos === 'single' ? (
+      {(pos === 'start' || pos === 'single') && !senderCreator ? (
         <DisplayName name={senderName} creator={senderCreator} className="mb-0.5 px-1 text-[11px] font-medium text-mist" />
       ) : null}
       {!deleted ? (
@@ -427,9 +431,10 @@ function MessageRow({
         </div>
       ) : null}
       <div className={`relative min-w-0 ${highlighted ? 'rounded-[18px] ring-2 ring-sakura/70' : ''}`}>
-        <div className={`${mine ? 'bubble-own' : 'bubble-other'} bubble-in relative text-left ${radius} ${image ? 'overflow-hidden p-1' : 'px-2.5 py-1.5'} ${tailed ? (mine ? 'tail-own' : 'tail-other') : ''}`}>
+        <div data-creator-bubble={creator ? 'true' : undefined} className={`${bubble} bubble-in relative text-left ${radius} ${image && !creator ? 'overflow-hidden p-1' : 'px-2.5 py-1.5'} ${tail}`}>
+          {creator ? <CreatorMessageHeader /> : null}
           {message.replyPreview && !deleted ? (
-            <p className={mine ? 'mb-1 truncate rounded-md border-l-2 border-white/70 bg-black/10 px-2 py-1 text-xs text-white/85' : 'mb-1 truncate rounded-md border-l-2 border-sakura bg-black/5 px-2 py-1 text-xs text-mist'}>
+            <p className={ownTone ? 'mb-1 truncate rounded-md border-l-2 border-white/70 bg-black/10 px-2 py-1 text-xs text-white/85' : 'mb-1 truncate rounded-md border-l-2 border-sakura bg-black/5 px-2 py-1 text-xs text-mist'}>
               {message.replyPreview}
             </p>
           ) : null}
@@ -444,31 +449,31 @@ function MessageRow({
             )
           ) : null}
           {!deleted && message.kind === 'voice' ? (
-            <VoiceBubble src={message.mediaUrl} seconds={message.mediaSeconds} waveform={message.waveform} mine={mine} />
+            <VoiceBubble src={message.mediaUrl} seconds={message.mediaSeconds} waveform={message.waveform} mine={ownTone} />
           ) : null}
           {!deleted && message.kind !== 'voice' && message.kind !== 'image' ? (
             <div>
               <p className="msg-copy whitespace-pre-wrap px-0.5 text-sm leading-5">
                 {parts.map((part, index) =>
                   part.type === 'link' ? (
-                    <a key={`${part.value}-${index}`} href={part.value} target="_blank" rel="noreferrer" className={mine ? 'underline decoration-white/70 underline-offset-2' : 'text-sakura underline underline-offset-2'}>
+                    <a key={`${part.value}-${index}`} href={part.value} target="_blank" rel="noreferrer" className={ownTone ? 'underline decoration-white/70 underline-offset-2' : 'text-sakura underline underline-offset-2'}>
                       {part.value}
                     </a>
                   ) : (
                     <span key={`${index}-${part.value.slice(0, 8)}`}>{part.value}</span>
                   ),
                 )}
-                <Meta mine={mine} createdAt={message.createdAt} tick={tick} showTick={mine && !deleted} floated />
+                <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine && !deleted} floated />
               </p>
               {firstLink ? (
-                <a href={firstLink} target="_blank" rel="noreferrer" className={mine ? 'mt-1 block rounded-lg bg-black/15 px-2 py-1.5 text-xs text-white/90' : 'mt-1 block rounded-lg bg-black/[0.04] px-2 py-1.5 text-xs text-mist'}>
+                <a href={firstLink} target="_blank" rel="noreferrer" className={ownTone ? 'mt-1 block rounded-lg bg-black/15 px-2 py-1.5 text-xs text-white/90' : 'mt-1 block rounded-lg bg-black/[0.04] px-2 py-1.5 text-xs text-mist'}>
                   <span className="block font-medium">{linkHost(firstLink)}</span>
                   <span className="block truncate opacity-80">{firstLink}</span>
                 </a>
               ) : null}
             </div>
           ) : (
-            <Meta mine={mine} createdAt={message.createdAt} tick={tick} showTick={mine && !deleted} />
+            <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine && !deleted} />
           )}
         </div>
         {reactions.length > 0 ? (
