@@ -1,3 +1,4 @@
+import { formatCallClock } from './format'
 import type { Profile } from '../types'
 
 export type CallPhase = 'idle' | 'outgoing' | 'ringing' | 'incoming' | 'connecting' | 'connected' | 'failed'
@@ -7,7 +8,7 @@ export type CallState = {
   conversationId: string | null
   peer: Profile | null
   muted: boolean
-  startedAt: number | null
+  connectedAt: number | null
   error: string | null
 }
 
@@ -28,7 +29,7 @@ export const initialCallState: CallState = {
   conversationId: null,
   peer: null,
   muted: false,
-  startedAt: null,
+  connectedAt: null,
   error: null,
 }
 
@@ -60,11 +61,12 @@ export function callReducer(state: CallState, action: CallAction): CallState {
       if (state.phase !== 'outgoing' && state.phase !== 'ringing' && state.phase !== 'connecting') return state
       return { ...state, phase: 'connecting', error: null }
     case 'connected':
+      if (state.phase === 'connected') return state.connectedAt ? state : { ...state, connectedAt: action.at }
       if (state.phase !== 'outgoing' && state.phase !== 'ringing' && state.phase !== 'connecting') return state
       return {
         ...state,
         phase: 'connected',
-        startedAt: state.startedAt ?? action.at,
+        connectedAt: state.connectedAt ?? action.at,
         error: null,
       }
     case 'toggle-mute':
@@ -79,4 +81,16 @@ export function callReducer(state: CallState, action: CallAction): CallState {
     default:
       return state
   }
+}
+
+export function callHeadline(phase: CallPhase, connectedAt: number | null, now: number): string {
+  if (phase === 'connected' && connectedAt) {
+    const elapsed = Math.max(0, Math.floor((now - connectedAt) / 1000))
+    return formatCallClock(elapsed)
+  }
+  if (phase === 'incoming') return 'Ringing…'
+  if (phase === 'outgoing' || phase === 'ringing') return 'Calling…'
+  if (phase === 'connecting') return 'Connecting…'
+  if (phase === 'failed') return 'Call failed'
+  return ''
 }

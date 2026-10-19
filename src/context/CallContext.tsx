@@ -31,7 +31,7 @@ type CallValue = {
   phase: typeof initialCallState.phase
   peer: Profile | null
   muted: boolean
-  startedAt: number | null
+  connectedAt: number | null
   error: string | null
   banner: string | null
   demo: boolean
@@ -521,7 +521,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     phase: state.phase,
     peer: state.peer,
     muted: state.muted,
-    startedAt: state.startedAt,
+    connectedAt: state.connectedAt,
     error: state.error,
     banner,
     demo: mode === 'demo',
