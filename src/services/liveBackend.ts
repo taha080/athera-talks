@@ -5,7 +5,7 @@ import { messageKind } from '../lib/messages'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform, extensionForMime, parseWaveform } from '../lib/voice'
 import { getSupabase } from '../lib/supabase'
-import type { ContactRequest, ContactStatus, Conversation, Message, MessageListener, MessageReceipt, OutgoingMedia, Profile, Reaction, ReactionChange, ReplyTarget, SearchPerson } from '../types'
+import type { BlockedPerson, ChatPrefPatch, ContactRequest, ContactStatus, Conversation, GroupMember, MemberRole, Message, MessageListener, MessageReceipt, OutgoingMedia, Profile, Reaction, ReactionChange, ReplyTarget, SearchPerson, UserReport } from '../types'
 
 const PROFILE_COLUMNS =
   'id, username, avatar_url, favourite_anime, theme, wallpaper, wallpaper_path, last_seen_at, show_last_seen, show_read_receipts, notify_sound, notify_desktop, is_creator'
@@ -13,7 +13,7 @@ const PROFILE_COLUMNS =
 // read_at and delivered_at stay off this list. The API role cannot select
 // them; visible copies come from message_receipts.
 const MESSAGE_COLUMNS =
-  'id, conversation_id, sender_id, body, created_at, kind, media_path, media_mime, media_seconds, waveform, reply_to, reply_preview, deleted_at'
+  'id, conversation_id, sender_id, body, created_at, kind, media_path, media_mime, media_seconds, waveform, reply_to, reply_preview, deleted_at, edited_at'
 
 type ProfileRow = {
   id: string
@@ -47,6 +47,7 @@ type MessageRow = {
   reply_preview?: string | null
   deleted_at?: string | null
   delivered_at?: string | null
+  edited_at?: string | null
 }
 
 type ConversationRow = {
@@ -66,6 +67,16 @@ type ConversationRow = {
   unread: number | string
   last_read_at?: string | null
   last_delivered_at?: string | null
+  kind?: string | null
+  title?: string | null
+  photo_path?: string | null
+  member_count?: number | string | null
+  my_role?: string | null
+  pinned?: boolean | null
+  muted?: boolean | null
+  archived?: boolean | null
+  blocked?: boolean | null
+  blocked_by_me?: boolean | null
 }
 
 export type PreferencePatch = {
@@ -123,22 +134,55 @@ export function mapMessage(row: MessageRow): Message {
     replyTo: row.reply_to ?? null,
     replyPreview: row.reply_preview ?? null,
     deletedAt: row.deleted_at ?? null,
+    editedAt: row.edited_at ?? null,
   }
 }
 
+function memberRole(value: string | null | undefined): MemberRole {
+  return value === 'admin' ? 'admin' : 'member'
+}
+
+function groupPhotoUrl(path: string | null | undefined, version: string): string | null {
+  if (!path) return null
+  const { data } = client().storage.from('group-photos').getPublicUrl(path)
+  if (!data?.publicUrl) return null
+  return `${data.publicUrl}?v=${encodeURIComponent(version)}`
+}
+
 function mapConversation(row: ConversationRow): Conversation {
+  const group = row.kind === 'group'
+  const photoUrl = group ? groupPhotoUrl(row.photo_path, row.updated_at) : null
   return {
     id: row.id,
     updatedAt: row.updated_at,
-    peer: {
-      id: row.peer_id,
-      username: row.peer_username,
-      avatarUrl: row.peer_avatar_url,
-      favouriteAnime: row.peer_favourite_anime,
-      isCreator: Boolean(row.peer_is_creator),
-      lastSeenAt: row.peer_last_seen ?? null,
-      showReadReceipts: row.peer_receipts ?? true,
-    },
+    kind: group ? 'group' : 'direct',
+    title: group ? row.title ?? 'Group' : null,
+    photoUrl,
+    memberCount: Number(row.member_count) || undefined,
+    myRole: memberRole(row.my_role),
+    pinned: Boolean(row.pinned),
+    muted: Boolean(row.muted),
+    archived: Boolean(row.archived),
+    blocked: Boolean(row.blocked),
+    blockedByMe: Boolean(row.blocked_by_me),
+    peer: group
+      ? {
+          id: row.id,
+          username: row.title ?? 'Group',
+          avatarUrl: photoUrl,
+          favouriteAnime: null,
+          isCreator: false,
+          showReadReceipts: true,
+        }
+      : {
+          id: row.peer_id,
+          username: row.peer_username,
+          avatarUrl: row.peer_avatar_url,
+          favouriteAnime: row.peer_favourite_anime,
+          isCreator: Boolean(row.peer_is_creator),
+          lastSeenAt: row.peer_last_seen ?? null,
+          showReadReceipts: row.peer_receipts ?? true,
+        },
     lastMessage:
       row.last_body && row.last_sender_id && row.last_created_at
         ? {
@@ -526,6 +570,158 @@ export const liveChat = {
 
   async hideMessage(messageId: string): Promise<void> {
     const { error } = await client().rpc('hide_message', { mid: messageId })
+    if (error) throw new Error(error.message)
+  },
+
+  async editMessage(messageId: string, body: string): Promise<void> {
+    const { error } = await client().rpc('edit_message', { mid: messageId, new_body: body })
+    if (error) throw new Error(error.message)
+  },
+
+  async blockUser(userId: string): Promise<void> {
+    const { error } = await client().rpc('block_user', { other_id: userId })
+    if (error) throw new Error(error.message)
+  },
+
+  async unblockUser(userId: string): Promise<void> {
+    const { error } = await client().rpc('unblock_user', { other_id: userId })
+    if (error) throw new Error(error.message)
+  },
+
+  async listBlocked(): Promise<BlockedPerson[]> {
+    const { data, error } = await client().rpc('list_blocked')
+    if (error) throw new Error(error.message)
+    return ((data ?? []) as { id: string; username: string; avatar_url: string | null; is_creator?: boolean | null; blocked_at: string }[]).map((row) => ({
+      id: row.id,
+      username: row.username,
+      avatarUrl: row.avatar_url,
+      isCreator: Boolean(row.is_creator),
+      blockedAt: row.blocked_at,
+    }))
+  },
+
+  async reportUser(userId: string, reason: string, details: string, conversationId?: string | null): Promise<void> {
+    const { error } = await client().rpc('report_user', {
+      other_id: userId,
+      reason,
+      details,
+      cid: conversationId ?? null,
+    })
+    if (error) throw new Error(error.message)
+  },
+
+  async listReports(): Promise<UserReport[]> {
+    const { data, error } = await client().rpc('list_reports')
+    if (error) throw new Error(error.message)
+    return ((data ?? []) as {
+      id: string
+      reporter_id: string
+      reporter_username: string
+      reported_id: string
+      reported_username: string
+      conversation_id: string | null
+      reason: string
+      details: string | null
+      created_at: string
+    }[]).map((row) => ({
+      id: row.id,
+      reporterId: row.reporter_id,
+      reporterUsername: row.reporter_username,
+      reportedId: row.reported_id,
+      reportedUsername: row.reported_username,
+      conversationId: row.conversation_id,
+      reason: row.reason,
+      details: row.details,
+      createdAt: row.created_at,
+    }))
+  },
+
+  async setChatPref(conversationId: string, patch: ChatPrefPatch): Promise<void> {
+    const userId = await currentUserId()
+    const current = await client()
+      .from('chat_prefs')
+      .select('pinned, muted, archived')
+      .eq('user_id', userId)
+      .eq('conversation_id', conversationId)
+      .maybeSingle()
+    if (current.error) throw new Error(current.error.message)
+    const { error } = await client().from('chat_prefs').upsert(
+      {
+        user_id: userId,
+        conversation_id: conversationId,
+        pinned: patch.pinned ?? current.data?.pinned ?? false,
+        muted: patch.muted ?? current.data?.muted ?? false,
+        archived: patch.archived ?? current.data?.archived ?? false,
+      },
+      { onConflict: 'user_id,conversation_id' },
+    )
+    if (error) throw new Error(error.message)
+  },
+
+  async createGroup(title: string, memberIds: string[]): Promise<string> {
+    const { data, error } = await client().rpc('create_group', { title, member_ids: memberIds })
+    if (error) throw new Error(error.message)
+    return String(data)
+  },
+
+  async listMembers(conversationId: string): Promise<GroupMember[]> {
+    const { data, error } = await client().rpc('list_group_members', { cid: conversationId })
+    if (error) throw new Error(error.message)
+    return ((data ?? []) as {
+      id: string
+      username: string
+      avatar_url: string | null
+      favourite_anime: string | null
+      is_creator?: boolean | null
+      role: string
+    }[]).map((row) => ({
+      id: row.id,
+      username: row.username,
+      avatarUrl: row.avatar_url,
+      favouriteAnime: row.favourite_anime,
+      isCreator: Boolean(row.is_creator),
+      role: memberRole(row.role),
+    }))
+  },
+
+  async addMember(conversationId: string, userId: string): Promise<void> {
+    const { error } = await client().rpc('add_group_member', { cid: conversationId, member_id: userId })
+    if (error) throw new Error(error.message)
+  },
+
+  async removeMember(conversationId: string, userId: string): Promise<void> {
+    const { error } = await client().rpc('remove_group_member', { cid: conversationId, member_id: userId })
+    if (error) throw new Error(error.message)
+  },
+
+  async setMemberRole(conversationId: string, userId: string, role: MemberRole): Promise<void> {
+    const { error } = await client().rpc('set_group_role', { cid: conversationId, member_id: userId, next_role: role })
+    if (error) throw new Error(error.message)
+  },
+
+  async renameGroup(conversationId: string, title: string): Promise<void> {
+    const { error } = await client().rpc('rename_group', { cid: conversationId, next_title: title })
+    if (error) throw new Error(error.message)
+  },
+
+  async setGroupPhoto(conversationId: string, file: Blob): Promise<void> {
+    const path = `${conversationId}/photo.jpg`
+    const { error: uploadError } = await client().storage.from('group-photos').upload(path, file, {
+      contentType: 'image/jpeg',
+      upsert: true,
+    })
+    if (uploadError) throw new Error(uploadError.message)
+    const { error } = await client().rpc('set_group_photo', { cid: conversationId, path })
+    if (error) throw new Error(error.message)
+  },
+
+  async leaveGroup(conversationId: string): Promise<void> {
+    const { error } = await client().rpc('leave_group', { cid: conversationId })
+    if (error) throw new Error(error.message)
+  },
+
+  async deleteGroup(conversationId: string): Promise<void> {
+    const { error } = await client().rpc('delete_group', { cid: conversationId })
     if (error) throw new Error(error.message)
   },
 

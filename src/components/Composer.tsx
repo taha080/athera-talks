@@ -15,6 +15,8 @@ export function Composer({
   onSendText,
   onSendFile,
   onTyping,
+  editing = null,
+  onCancelEdit,
 }: {
   peerName: string
   reply: ReplyTarget | null
@@ -22,6 +24,8 @@ export function Composer({
   onSendText: (body: string) => Promise<void>
   onSendFile: (file: Blob, mime: string, kind: 'voice' | 'image', seconds?: number, waveform?: number[]) => Promise<void>
   onTyping: () => void
+  editing?: { id: string; body: string } | null
+  onCancelEdit?: () => void
 }) {
   const [draft, setDraft] = useState('')
   const [emojiOpen, setEmojiOpen] = useState(false)
@@ -38,6 +42,12 @@ export function Composer({
   const peakTimer = useRef<number | null>(null)
   const audioContext = useRef<AudioContext | null>(null)
   const finishing = useRef(false)
+  const editingId = editing?.id
+
+  useEffect(() => {
+    if (!editingId) return
+    setDraft(editing?.body ?? '')
+  }, [editing?.body, editingId])
   const starting = useRef(false)
   const lastType = useRef(0)
   const box = useRef<HTMLTextAreaElement>(null)
@@ -203,7 +213,15 @@ export function Composer({
 
   return (
     <div className="composer-shell rounded-xl border border-line bg-panel px-2 py-1.5 shadow-md">
-      {reply ? (
+      {editing ? (
+        <div className="mb-2 flex items-center gap-2 rounded-lg border-l-4 border-sakura bg-elevated px-3 py-2 text-sm">
+          <p className="min-w-0 flex-1 truncate text-mist">Editing message</p>
+          <button type="button" aria-label="Cancel edit" onClick={onCancelEdit}>
+            <CloseIcon className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
+      {reply && !editing ? (
         <div className="mb-2 flex items-center gap-2 rounded-lg border-l-4 border-sakura bg-elevated px-3 py-2 text-sm">
           <p className="min-w-0 flex-1 truncate text-mist">{reply.preview}</p>
           <button type="button" aria-label="Cancel reply" onClick={onClearReply}>
@@ -251,6 +269,7 @@ export function Composer({
           <button type="button" className="hover-wash grid h-10 w-10 shrink-0 place-items-center rounded-full text-mist hover:text-paper" aria-label="Emoji" aria-expanded={emojiOpen} onClick={() => setEmojiOpen((open) => !open)}>
             <SmileIcon className="h-5 w-5" />
           </button>
+          {editing ? null : (
           <label className="hover-wash grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full text-mist hover:text-paper" aria-label="Attach a photo">
             <ImageIcon className="h-5 w-5" />
             <input
@@ -263,6 +282,7 @@ export function Composer({
               }}
             />
           </label>
+          )}
           <label className="min-w-0 flex-1">
             <span className="sr-only">Message</span>
             <textarea
@@ -271,7 +291,7 @@ export function Composer({
               rows={1}
               maxLength={4000}
               value={draft}
-              placeholder={`Message @${peerName}`}
+              placeholder={editing ? 'Edit message' : `Message ${peerName}`}
               onChange={(event) => {
                 noteTyping(event.target.value)
                 grow(event.target)
@@ -284,8 +304,8 @@ export function Composer({
               }}
             />
           </label>
-          {draft.trim() ? (
-            <button type="submit" className="send-button grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label="Send message">
+          {draft.trim() || editing ? (
+            <button type="submit" className="send-button grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label={editing ? 'Save edit' : 'Send message'}>
               <SendIcon className="h-5 w-5" />
             </button>
           ) : (

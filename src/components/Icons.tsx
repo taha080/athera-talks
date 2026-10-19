@@ -14,6 +14,11 @@ import {
   MoreHorizontal,
   MoreVertical,
   Pause,
+  Pencil,
+  Pin,
+  Flag,
+  Archive,
+  Ban,
   Phone,
   PhoneOff,
   Play,
@@ -137,4 +142,24 @@ export function ReplyIcon({ className }: IconProps) {
 
 export function DownIcon({ className }: IconProps) {
   return glyph(ChevronDown, className)
+}
+
+export function PinIcon({ className }: IconProps) {
+  return glyph(Pin, className)
+}
+
+export function ArchiveIcon({ className }: IconProps) {
+  return glyph(Archive, className)
+}
+
+export function FlagIcon({ className }: IconProps) {
+  return glyph(Flag, className)
+}
+
+export function BlockIcon({ className }: IconProps) {
+  return glyph(Ban, className)
+}
+
+export function PencilIcon({ className }: IconProps) {
+  return glyph(Pencil, className)
 }

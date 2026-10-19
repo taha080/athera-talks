@@ -1,3 +1,4 @@
+import { byChatOrder } from './chatList'
 import { messagePreview } from './messages'
 import type { Conversation, Message } from '../types'
 
@@ -26,6 +27,7 @@ export function foldConversation(
     return {
       ...item,
       updatedAt: message.createdAt,
+      archived: Boolean(item.archived && item.muted),
       lastMessage: {
         body: messagePreview(message),
         createdAt: message.createdAt,
@@ -36,5 +38,5 @@ export function foldConversation(
       unread: viewing || !incoming ? item.unread : item.unread + 1,
     }
   })
-  return next.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
+  return next.sort(byChatOrder)
 }

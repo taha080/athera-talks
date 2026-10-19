@@ -10,6 +10,7 @@ export const SAKURA_CHAT = 'c1000000-0000-4000-8000-000000000001'
 export const KENJI_CHAT = 'c1000000-0000-4000-8000-000000000002'
 export const MIRA_CHAT = 'c1000000-0000-4000-8000-000000000003'
 export const REN_CHAT = 'c1000000-0000-4000-8000-000000000004'
+export const GROUP_CHAT = 'c1000000-0000-4000-8000-000000000005'
 
 export const DEMO_EMAIL = 'taha@tatalk.app'
 export const DEMO_PASSWORD = 'tatalk1'
@@ -22,8 +23,37 @@ export type DemoAccount = {
 
 export type DemoConversation = {
   id: string
-  memberIds: [string, string]
+  memberIds: string[]
   updatedAt: string
+  kind?: 'direct' | 'group'
+  title?: string | null
+  photoUrl?: string | null
+  createdBy?: string | null
+  roles?: Record<string, 'admin' | 'member'>
+}
+
+export type DemoBlock = {
+  blockerId: string
+  blockedId: string
+  createdAt: string
+}
+
+export type DemoReport = {
+  id: string
+  reporterId: string
+  reportedId: string
+  conversationId: string | null
+  reason: string
+  details: string | null
+  createdAt: string
+}
+
+export type DemoPref = {
+  userId: string
+  conversationId: string
+  pinned: boolean
+  muted: boolean
+  archived: boolean
 }
 
 export type DemoHide = {
@@ -49,6 +79,9 @@ export type DemoData = {
   messages: Message[]
   hides: DemoHide[]
   requests?: DemoRequest[]
+  blocks?: DemoBlock[]
+  reports?: DemoReport[]
+  prefs?: DemoPref[]
 }
 
 const hour = 60 * 60 * 1000
@@ -77,6 +110,9 @@ export function buildSeed(now = Date.now()): DemoData {
     msg('m9', MIRA_CHAT, MIRA_ID, 'Spy x Family movie night this weekend?', at(3 * day), at(3 * day - 10 * 60 * 1000)),
     msg('m10', MIRA_CHAT, TAHA_ID, 'Anya would approve.', at(3 * day - 20 * 60 * 1000), at(3 * day - 30 * 60 * 1000)),
     msg('m11', REN_CHAT, REN_ID, 'Frieren had no business being that quiet and that good.', at(30 * 60 * 1000), null),
+    msg('g1', GROUP_CHAT, SAKURA_ID, 'Did anyone else cry at the ending?', at(50 * 60 * 1000), at(40 * 60 * 1000)),
+    msg('g2', GROUP_CHAT, KENJI_ID, 'I did. Quietly.', at(45 * 60 * 1000), at(40 * 60 * 1000)),
+    msg('g3', GROUP_CHAT, TAHA_ID, 'Same. Rewind it.', at(42 * 60 * 1000), at(40 * 60 * 1000)),
   ]
 
   return {
@@ -89,6 +125,16 @@ export function buildSeed(now = Date.now()): DemoData {
       { id: KENJI_CHAT, memberIds: [TAHA_ID, KENJI_ID], updatedAt: at(day + 3 * hour) },
       { id: MIRA_CHAT, memberIds: [TAHA_ID, MIRA_ID], updatedAt: at(3 * day - 20 * 60 * 1000) },
       { id: REN_CHAT, memberIds: [TAHA_ID, REN_ID], updatedAt: at(30 * 60 * 1000) },
+      {
+        id: GROUP_CHAT,
+        memberIds: [TAHA_ID, SAKURA_ID, KENJI_ID, MIRA_ID],
+        updatedAt: at(42 * 60 * 1000),
+        kind: 'group',
+        title: 'Night watch',
+        photoUrl: null,
+        createdBy: TAHA_ID,
+        roles: { [TAHA_ID]: 'admin', [SAKURA_ID]: 'member', [KENJI_ID]: 'member', [MIRA_ID]: 'member' },
+      },
     ],
     messages,
     hides: [],

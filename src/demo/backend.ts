@@ -3,7 +3,8 @@ import { parseWallpaper } from '../lib/appearance'
 import { messagePreview } from '../lib/messages'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform } from '../lib/voice'
-import type { ContactRequest, Conversation, Message, MessageListener, OutgoingMedia, Profile, ReactionChange, ReplyTarget, SearchPerson } from '../types'
+import { byChatOrder, REPORT_REASONS } from '../lib/chatList'
+import type { BlockedPerson, ChatPrefPatch, ContactRequest, Conversation, GroupMember, Message, MessageListener, OutgoingMedia, Profile, ReactionChange, ReplyTarget, SearchPerson, UserReport } from '../types'
 import {
   DEMO_EMAIL,
   TAHA_ID,
@@ -11,6 +12,7 @@ import {
   type DemoAccount,
   type DemoConversation,
   type DemoData,
+  type DemoPref,
   type DemoRequest,
 } from './seed'
 
@@ -18,7 +20,7 @@ const STORAGE_KEY = 'tatalk:demo-data-v1'
 
 function grandfatherRequests(data: DemoData): DemoRequest[] {
   return data.conversations.flatMap((conversation) => {
-    if (conversation.memberIds.length !== 2) return []
+    if ((conversation.kind ?? 'direct') !== 'direct' || conversation.memberIds.length !== 2) return []
     const [left, right] = conversation.memberIds
     const fromId = left < right ? left : right
     const toId = left < right ? right : left
@@ -62,8 +64,11 @@ export function createDemoBackend(options: Options = {}) {
   const reactionListeners = new Set<(change: ReactionChange) => void>()
   const requestListeners = new Set<() => void>()
   data.requests = data.requests ?? grandfatherRequests(data)
-  const typingListeners = new Map<string, Set<(userId: string) => void>>()
   data.hides = data.hides ?? []
+  data.blocks = data.blocks ?? []
+  data.reports = data.reports ?? []
+  data.prefs = data.prefs ?? []
+  const typingListeners = new Map<string, Set<(userId: string) => void>>()
 
   function emitInsert(message: Message) {
     listeners.forEach((listener) => listener.onInsert(message))
@@ -105,6 +110,47 @@ export function createDemoBackend(options: Options = {}) {
     return requestBetween(a, b)?.status === 'accepted'
   }
 
+  function isBlocked(a: string, b: string): boolean {
+    return (data.blocks ?? []).some(
+      (block) =>
+        (block.blockerId === a && block.blockedId === b) || (block.blockerId === b && block.blockedId === a),
+    )
+  }
+
+  function blockedByMe(me: string, other: string): boolean {
+    return (data.blocks ?? []).some((block) => block.blockerId === me && block.blockedId === other)
+  }
+
+  function prefFor(userId: string, conversationId: string): DemoPref | undefined {
+    return (data.prefs ?? []).find((pref) => pref.userId === userId && pref.conversationId === conversationId)
+  }
+
+  function unarchiveOnMessage(conversationId: string) {
+    for (const pref of data.prefs ?? []) {
+      if (pref.conversationId === conversationId && pref.archived && !pref.muted) pref.archived = false
+    }
+  }
+
+  function assertCanSend(conversation: DemoConversation, me: string) {
+    if (!conversation.memberIds.includes(me)) throw new Error('That chat is not yours.')
+    if ((conversation.kind ?? 'direct') === 'group') return
+    const peerId = conversation.memberIds.find((id) => id !== me)
+    if (!peerId || !areContacts(me, peerId)) throw new Error('You can only message an accepted contact.')
+    if (isBlocked(me, peerId)) throw new Error('This chat is blocked.')
+  }
+
+  function requireGroup(conversationId: string, me: string): DemoConversation {
+    const conversation = data.conversations.find((item) => item.id === conversationId)
+    if (!conversation || (conversation.kind ?? 'direct') !== 'group' || !conversation.memberIds.includes(me)) {
+      throw new Error('That group was not found.')
+    }
+    return conversation
+  }
+
+  function requireAdmin(conversation: DemoConversation, me: string) {
+    if ((conversation.roles?.[me] ?? 'member') !== 'admin') throw new Error('Only an admin can do that.')
+  }
+
   function toContactRequest(request: DemoRequest, me: string): ContactRequest {
     const peerId = request.fromId === me ? request.toId : request.fromId
     const peer = profileById(peerId) ?? { id: peerId, username: 'fan', avatarUrl: null, favouriteAnime: null }
@@ -128,14 +174,16 @@ export function createDemoBackend(options: Options = {}) {
     return data.conversations
       .filter((conversation) => {
         if (!conversation.memberIds.includes(me)) return false
+        if ((conversation.kind ?? 'direct') === 'group') return true
         const peerId = conversation.memberIds.find((id) => id !== me)
         return Boolean(peerId && areContacts(me, peerId))
       })
       .map((conversation) => toConversation(conversation, me))
-      .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
+      .sort(byChatOrder)
   }
 
   function receiptsVisible(me: string, conversation: DemoConversation): boolean {
+    if ((conversation.kind ?? 'direct') === 'group') return true
     if (profileById(me)?.isCreator) return true
     const peerId = conversation.memberIds.find((id) => id !== me)
     const peer = peerId ? profileById(peerId) : undefined
@@ -159,16 +207,37 @@ export function createDemoBackend(options: Options = {}) {
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     const last = thread.at(-1) ?? null
     const unread = thread.filter((message) => message.senderId !== me && !message.readAt && !message.deletedAt).length
+    const group = (conversation.kind ?? 'direct') === 'group'
     const seeReceipts = receiptsVisible(me, conversation)
     const seePresence = profileById(me)?.isCreator === true || peer.showLastSeen !== false
+    const pref = prefFor(me, conversation.id)
     return {
       id: conversation.id,
       updatedAt: conversation.updatedAt,
-      peer: {
-        ...peer,
-        lastSeenAt: seePresence ? peer.lastSeenAt ?? null : null,
-        showReadReceipts: seeReceipts,
-      },
+      kind: group ? 'group' : 'direct',
+      title: group ? conversation.title ?? 'Group' : null,
+      photoUrl: group ? conversation.photoUrl ?? null : null,
+      memberCount: conversation.memberIds.length,
+      myRole: conversation.roles?.[me] ?? 'member',
+      pinned: pref?.pinned ?? false,
+      muted: pref?.muted ?? false,
+      archived: pref?.archived ?? false,
+      blocked: !group && Boolean(peerId && isBlocked(me, peerId)),
+      blockedByMe: !group && Boolean(peerId && blockedByMe(me, peerId)),
+      peer: group
+        ? {
+            id: conversation.id,
+            username: conversation.title ?? 'Group',
+            avatarUrl: conversation.photoUrl ?? null,
+            favouriteAnime: null,
+            isCreator: false,
+            showReadReceipts: true,
+          }
+        : {
+            ...peer,
+            lastSeenAt: seePresence ? peer.lastSeenAt ?? null : null,
+            showReadReceipts: seeReceipts,
+          },
       lastMessage: last
         ? {
             body: messagePreview(last),
@@ -432,9 +501,10 @@ export function createDemoBackend(options: Options = {}) {
       if (otherUserId === me) throw new Error('You cannot start a chat with yourself.')
       if (!profileById(otherUserId)) throw new Error('User not found.')
       if (!areContacts(me, otherUserId)) throw new Error('Contacts must accept a request before a chat can start.')
+      if (isBlocked(me, otherUserId)) throw new Error('This chat is blocked.')
       const existing = data.conversations.find((conversation) => {
         const members = conversation.memberIds
-        return members.includes(me) && members.includes(otherUserId) && members.length === 2
+        return (conversation.kind ?? 'direct') === 'direct' && members.includes(me) && members.includes(otherUserId) && members.length === 2
       })
       if (existing) return existing.id
       const id = newId('chat')
@@ -442,6 +512,7 @@ export function createDemoBackend(options: Options = {}) {
         id,
         memberIds: [me, otherUserId],
         updatedAt: new Date().toISOString(),
+        kind: 'direct',
       })
       save()
       return id
@@ -450,11 +521,8 @@ export function createDemoBackend(options: Options = {}) {
     async sendMessage(conversationId: string, body: string, reply?: ReplyTarget | null): Promise<Message> {
       const me = requireUser()
       const conversation = data.conversations.find((item) => item.id === conversationId)
-      if (!conversation || !conversation.memberIds.includes(me)) {
-        throw new Error('That chat is not yours.')
-      }
-      const peerId = conversation.memberIds.find((id) => id !== me)
-      if (!peerId || !areContacts(me, peerId)) throw new Error('You can only message an accepted contact.')
+      if (!conversation) throw new Error('That chat is not yours.')
+      assertCanSend(conversation, me)
       const text = body.trim()
       if (!text) throw new Error('Write a message first.')
       const message: Message = {
@@ -472,6 +540,7 @@ export function createDemoBackend(options: Options = {}) {
       }
       data.messages.push(message)
       conversation.updatedAt = message.createdAt
+      unarchiveOnMessage(conversation.id)
       save()
       emitInsert(message)
       return message
@@ -480,11 +549,8 @@ export function createDemoBackend(options: Options = {}) {
     async sendMedia(input: OutgoingMedia): Promise<Message> {
       const me = requireUser()
       const conversation = data.conversations.find((item) => item.id === input.conversationId)
-      if (!conversation || !conversation.memberIds.includes(me)) {
-        throw new Error('That chat is not yours.')
-      }
-      const peerId = conversation.memberIds.find((id) => id !== me)
-      if (!peerId || !areContacts(me, peerId)) throw new Error('You can only message an accepted contact.')
+      if (!conversation) throw new Error('That chat is not yours.')
+      assertCanSend(conversation, me)
       let mediaUrl: string | null = null
       if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
         mediaUrl = URL.createObjectURL(input.file)
@@ -509,9 +575,251 @@ export function createDemoBackend(options: Options = {}) {
       }
       data.messages.push(message)
       conversation.updatedAt = message.createdAt
+      unarchiveOnMessage(conversation.id)
       save()
       emitInsert({ ...message, waveform: message.waveform ? encodeWaveform(message.waveform).split(',').map(Number) : null })
       return message
+    },
+
+    async editMessage(messageId: string, body: string): Promise<void> {
+      const me = requireUser()
+      const text = body.trim()
+      if (!text || text.length > 4000) throw new Error('Write a message first.')
+      const stored = data.messages.find((item) => item.id === messageId && item.senderId === me)
+      if (!stored || stored.deletedAt || (stored.kind && stored.kind !== 'text')) {
+        throw new Error('That message cannot be edited.')
+      }
+      stored.body = text
+      stored.editedAt = new Date().toISOString()
+      save()
+      emitUpdate({ ...stored })
+    },
+
+    async blockUser(userId: string): Promise<void> {
+      const me = requireUser()
+      if (userId === me) throw new Error('You cannot block yourself.')
+      if (!profileById(userId)) throw new Error('User not found.')
+      if (!blockedByMe(me, userId)) {
+        data.blocks = data.blocks ?? []
+        data.blocks.push({ blockerId: me, blockedId: userId, createdAt: new Date().toISOString() })
+        save()
+      }
+    },
+
+    async unblockUser(userId: string): Promise<void> {
+      const me = requireUser()
+      data.blocks = (data.blocks ?? []).filter((block) => !(block.blockerId === me && block.blockedId === userId))
+      save()
+    },
+
+    async listBlocked(): Promise<BlockedPerson[]> {
+      const me = requireUser()
+      return (data.blocks ?? [])
+        .filter((block) => block.blockerId === me)
+        .map((block) => {
+          const profile = profileById(block.blockedId)
+          return {
+            id: block.blockedId,
+            username: profile?.username ?? 'fan',
+            avatarUrl: profile?.avatarUrl ?? null,
+            isCreator: Boolean(profile?.isCreator),
+            blockedAt: block.createdAt,
+          }
+        })
+    },
+
+    async reportUser(userId: string, reason: string, details: string, conversationId?: string | null): Promise<void> {
+      const me = requireUser()
+      if (userId === me) throw new Error('You cannot report yourself.')
+      if (!profileById(userId)) throw new Error('User not found.')
+      if (!REPORT_REASONS.includes(reason as (typeof REPORT_REASONS)[number])) throw new Error('Choose a reason.')
+      const note = details.trim()
+      if (note.length > 1000) throw new Error('Keep the details under 1000 characters.')
+      if (conversationId) {
+        const conversation = data.conversations.find((item) => item.id === conversationId)
+        if (!conversation?.memberIds.includes(me)) throw new Error('That chat is not yours.')
+      }
+      data.reports = data.reports ?? []
+      data.reports.unshift({
+        id: newId('report'),
+        reporterId: me,
+        reportedId: userId,
+        conversationId: conversationId ?? null,
+        reason,
+        details: note || null,
+        createdAt: new Date().toISOString(),
+      })
+      save()
+    },
+
+    async listReports(): Promise<UserReport[]> {
+      const me = requireUser()
+      if (!profileById(me)?.isCreator) throw new Error('Reports are visible to the creator only.')
+      return (data.reports ?? []).map((report) => ({
+        id: report.id,
+        reporterId: report.reporterId,
+        reporterUsername: profileById(report.reporterId)?.username ?? 'fan',
+        reportedId: report.reportedId,
+        reportedUsername: profileById(report.reportedId)?.username ?? 'fan',
+        conversationId: report.conversationId,
+        reason: report.reason,
+        details: report.details,
+        createdAt: report.createdAt,
+      }))
+    },
+
+    async setChatPref(conversationId: string, patch: ChatPrefPatch): Promise<void> {
+      const me = requireUser()
+      const conversation = data.conversations.find((item) => item.id === conversationId && item.memberIds.includes(me))
+      if (!conversation) throw new Error('That chat is not yours.')
+      data.prefs = data.prefs ?? []
+      let pref = prefFor(me, conversationId)
+      if (!pref) {
+        pref = { userId: me, conversationId, pinned: false, muted: false, archived: false }
+        data.prefs.push(pref)
+      }
+      const nextPinned = patch.pinned ?? pref.pinned
+      if (nextPinned && !pref.pinned) {
+        const count = data.prefs.filter((item) => item.userId === me && item.pinned && item.conversationId !== conversationId).length
+        if (count >= 3) throw new Error('You can pin up to 3 chats')
+      }
+      if (patch.pinned !== undefined) pref.pinned = patch.pinned
+      if (patch.muted !== undefined) pref.muted = patch.muted
+      if (patch.archived !== undefined) pref.archived = patch.archived
+      save()
+    },
+
+    async createGroup(title: string, memberIds: string[]): Promise<string> {
+      const me = requireUser()
+      const name = title.trim()
+      if (!name || name.length > 80) throw new Error('Give the group a name.')
+      const chosen = [...new Set(memberIds.filter((id) => id && id !== me))]
+      if (chosen.length < 1) throw new Error('Add at least one person.')
+      for (const id of chosen) {
+        if (!profileById(id) || !areContacts(me, id) || isBlocked(me, id)) {
+          throw new Error('Groups can only include accepted contacts.')
+        }
+      }
+      const id = newId('grp')
+      const roles: Record<string, 'admin' | 'member'> = { [me]: 'admin' }
+      chosen.forEach((memberId) => {
+        roles[memberId] = 'member'
+      })
+      data.conversations.unshift({
+        id,
+        memberIds: [me, ...chosen],
+        updatedAt: new Date().toISOString(),
+        kind: 'group',
+        title: name,
+        photoUrl: null,
+        createdBy: me,
+        roles,
+      })
+      save()
+      return id
+    },
+
+    async listMembers(conversationId: string): Promise<GroupMember[]> {
+      const me = requireUser()
+      const conversation = data.conversations.find((item) => item.id === conversationId)
+      if (!conversation?.memberIds.includes(me)) throw new Error('That chat is not yours.')
+      return conversation.memberIds.map((id) => {
+        const profile = profileById(id)
+        return {
+          id,
+          username: profile?.username ?? 'fan',
+          avatarUrl: profile?.avatarUrl ?? null,
+          favouriteAnime: profile?.favouriteAnime ?? null,
+          isCreator: Boolean(profile?.isCreator),
+          role: conversation.roles?.[id] ?? 'member',
+        }
+      })
+    },
+
+    async addMember(conversationId: string, userId: string): Promise<void> {
+      const me = requireUser()
+      const conversation = requireGroup(conversationId, me)
+      requireAdmin(conversation, me)
+      if (!profileById(userId) || !areContacts(me, userId) || isBlocked(me, userId)) {
+        throw new Error('Groups can only include accepted contacts.')
+      }
+      if (!conversation.memberIds.includes(userId)) conversation.memberIds.push(userId)
+      conversation.roles = conversation.roles ?? {}
+      conversation.roles[userId] = conversation.roles[userId] ?? 'member'
+      save()
+    },
+
+    async removeMember(conversationId: string, userId: string): Promise<void> {
+      const me = requireUser()
+      const conversation = requireGroup(conversationId, me)
+      requireAdmin(conversation, me)
+      if (userId === me) throw new Error('Use leave to exit the group.')
+      conversation.memberIds = conversation.memberIds.filter((id) => id !== userId)
+      if (conversation.roles) delete conversation.roles[userId]
+      save()
+    },
+
+    async setMemberRole(conversationId: string, userId: string, role: 'admin' | 'member'): Promise<void> {
+      const me = requireUser()
+      const conversation = requireGroup(conversationId, me)
+      requireAdmin(conversation, me)
+      if (!conversation.memberIds.includes(userId)) throw new Error('That person is not in the group.')
+      const others = conversation.memberIds.filter((id) => id !== userId && conversation.roles?.[id] === 'admin')
+      if (role === 'member' && others.length === 0) throw new Error('The group needs an admin.')
+      conversation.roles = conversation.roles ?? {}
+      conversation.roles[userId] = role
+      save()
+    },
+
+    async renameGroup(conversationId: string, title: string): Promise<void> {
+      const me = requireUser()
+      const conversation = requireGroup(conversationId, me)
+      requireAdmin(conversation, me)
+      const name = title.trim()
+      if (!name || name.length > 80) throw new Error('Give the group a name.')
+      conversation.title = name
+      save()
+    },
+
+    async setGroupPhoto(conversationId: string, file: Blob): Promise<void> {
+      const me = requireUser()
+      const conversation = requireGroup(conversationId, me)
+      requireAdmin(conversation, me)
+      if (typeof FileReader === 'undefined') {
+        conversation.photoUrl = 'demo-group-photo'
+      } else {
+        conversation.photoUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(String(reader.result))
+          reader.onerror = () => reject(new Error('Could not read that image.'))
+          reader.readAsDataURL(file)
+        })
+      }
+      save()
+    },
+
+    async leaveGroup(conversationId: string): Promise<void> {
+      const me = requireUser()
+      const conversation = requireGroup(conversationId, me)
+      conversation.memberIds = conversation.memberIds.filter((id) => id !== me)
+      if (conversation.roles) delete conversation.roles[me]
+      if (conversation.memberIds.length === 0) {
+        data.conversations = data.conversations.filter((item) => item.id !== conversation.id)
+        data.messages = data.messages.filter((message) => message.conversationId !== conversation.id)
+      } else if (!conversation.memberIds.some((id) => conversation.roles?.[id] === 'admin')) {
+        conversation.roles = conversation.roles ?? {}
+        conversation.roles[conversation.memberIds[0]] = 'admin'
+      }
+      save()
+    },
+
+    async deleteGroup(conversationId: string): Promise<void> {
+      const me = requireUser()
+      const conversation = requireGroup(conversationId, me)
+      requireAdmin(conversation, me)
+      data.conversations = data.conversations.filter((item) => item.id !== conversation.id)
+      data.messages = data.messages.filter((message) => message.conversationId !== conversation.id)
+      save()
     },
 
     async hideMessage(messageId: string): Promise<void> {
@@ -633,6 +941,9 @@ function load(storage: MemoryStorage | undefined): DemoData | null {
     const parsed = JSON.parse(raw) as DemoData
     if (parsed.version !== 1 || !Array.isArray(parsed.profiles)) return null
     parsed.hides = parsed.hides ?? []
+    parsed.blocks = parsed.blocks ?? []
+    parsed.reports = parsed.reports ?? []
+    parsed.prefs = parsed.prefs ?? []
     return parsed
   } catch {
     return null

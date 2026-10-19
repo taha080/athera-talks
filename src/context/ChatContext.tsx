@@ -10,7 +10,7 @@ import {
 import { appendMessage, foldConversation } from '../lib/conversations'
 import { messagePreview } from '../lib/messages'
 import { desktopNotice, playMessageTone } from '../lib/notify'
-import type { ContactRequest, Conversation, Message, OutgoingMedia, ReactionChange, ReplyTarget, SearchPerson } from '../types'
+import type { BlockedPerson, ChatPrefPatch, ContactRequest, Conversation, GroupMember, MemberRole, Message, OutgoingMedia, ReactionChange, ReplyTarget, SearchPerson, UserReport } from '../types'
 import { useSession } from './SessionContext'
 
 type Toast = { id: string; text: string }
@@ -39,6 +39,22 @@ type ChatValue = {
   sendMedia: (input: OutgoingMedia) => Promise<void>
   hideMessage: (messageId: string) => Promise<void>
   deleteForEveryone: (message: Message) => Promise<void>
+  editMessage: (messageId: string, body: string) => Promise<void>
+  blockUser: (userId: string) => Promise<void>
+  unblockUser: (userId: string) => Promise<void>
+  listBlocked: () => Promise<BlockedPerson[]>
+  reportUser: (userId: string, reason: string, details: string, conversationId?: string | null) => Promise<void>
+  listReports: () => Promise<UserReport[]>
+  setChatPref: (conversationId: string, patch: ChatPrefPatch) => Promise<void>
+  createGroup: (title: string, memberIds: string[]) => Promise<string>
+  listMembers: (conversationId: string) => Promise<GroupMember[]>
+  addMember: (conversationId: string, userId: string) => Promise<void>
+  removeMember: (conversationId: string, userId: string) => Promise<void>
+  setMemberRole: (conversationId: string, userId: string, role: MemberRole) => Promise<void>
+  renameGroup: (conversationId: string, title: string) => Promise<void>
+  setGroupPhoto: (conversationId: string, file: Blob) => Promise<void>
+  leaveGroup: (conversationId: string) => Promise<void>
+  deleteGroup: (conversationId: string) => Promise<void>
   broadcastTyping: (conversationId: string) => void
   subscribeTyping: (conversationId: string, onTyping: (userId: string) => void) => () => void
   react: (messageId: string, emoji: string) => Promise<void>
@@ -145,12 +161,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         })
       }
       if (!mine && !viewing && !ready.deletedAt) {
-        const prefs = profileRef.current
-        const peer = conversationsRef.current.find((item) => item.id === ready.conversationId)?.peer.username
-        const preview = messagePreview(ready)
-        if (prefs?.notifySound !== false) playMessageTone()
-        if (prefs?.notifyDesktop !== false) void desktopNotice(peer ? `@${peer}` : 'Athera Talks', preview)
-        pushToast(peer ? `New message from @${peer}` : 'New message')
+        const convo = conversationsRef.current.find((item) => item.id === ready.conversationId)
+        if (!convo?.muted) {
+          const prefs = profileRef.current
+          const peer = convo?.kind === 'group' ? convo.title || 'Group' : convo?.peer.username
+          const preview = messagePreview(ready)
+          if (prefs?.notifySound !== false) playMessageTone()
+          if (prefs?.notifyDesktop !== false) void desktopNotice(peer ? (convo?.kind === 'group' ? peer : `@${peer}`) : 'Athera Talks', preview)
+          pushToast(peer ? `New message from ${convo?.kind === 'group' ? peer : `@${peer}`}` : 'New message')
+        }
       }
     },
     [applyUpdate, chat, me, pushToast, refresh],
@@ -352,6 +371,65 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     [chat, refresh],
   )
 
+  const editMessage = useCallback(
+    async (messageId: string, body: string) => {
+      await chat.editMessage(messageId, body)
+      const text = body.trim()
+      setMessages((prev) =>
+        prev.map((item) => (item.id === messageId ? { ...item, body: text, editedAt: new Date().toISOString() } : item)),
+      )
+      await refresh()
+    },
+    [chat, refresh],
+  )
+
+  const blockUser = useCallback(
+    async (userId: string) => {
+      await chat.blockUser(userId)
+      setConversations((prev) =>
+        prev.map((item) => (item.kind !== 'group' && item.peer.id === userId ? { ...item, blocked: true, blockedByMe: true } : item)),
+      )
+      await refresh()
+    },
+    [chat, refresh],
+  )
+
+  const unblockUser = useCallback(
+    async (userId: string) => {
+      await chat.unblockUser(userId)
+      setConversations((prev) =>
+        prev.map((item) => (item.kind !== 'group' && item.peer.id === userId ? { ...item, blocked: false, blockedByMe: false } : item)),
+      )
+      await refresh()
+    },
+    [chat, refresh],
+  )
+
+  const setChatPref = useCallback(
+    async (conversationId: string, patch: ChatPrefPatch) => {
+      await chat.setChatPref(conversationId, patch)
+      setConversations((prev) => prev.map((item) => (item.id === conversationId ? { ...item, ...patch } : item)))
+    },
+    [chat],
+  )
+
+  const createGroup = useCallback(
+    async (title: string, memberIds: string[]) => {
+      const id = await chat.createGroup(title, memberIds)
+      await refresh()
+      return id
+    },
+    [chat, refresh],
+  )
+
+  const afterGroupChange = useCallback(
+    async (task: Promise<void>) => {
+      await task
+      await refresh()
+    },
+    [refresh],
+  )
+
   const deleteForEveryone = useCallback(
     async (message: Message) => {
       await chat.deleteForEveryone(message)
@@ -425,6 +503,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     sendMedia,
     hideMessage,
     deleteForEveryone,
+    editMessage,
+    blockUser,
+    unblockUser,
+    listBlocked: chat.listBlocked,
+    reportUser: chat.reportUser,
+    listReports: chat.listReports,
+    setChatPref,
+    createGroup,
+    listMembers: chat.listMembers,
+    addMember: (conversationId, userId) => afterGroupChange(chat.addMember(conversationId, userId)),
+    removeMember: (conversationId, userId) => afterGroupChange(chat.removeMember(conversationId, userId)),
+    setMemberRole: (conversationId, userId, role) => afterGroupChange(chat.setMemberRole(conversationId, userId, role)),
+    renameGroup: (conversationId, title) => afterGroupChange(chat.renameGroup(conversationId, title)),
+    setGroupPhoto: (conversationId, file) => afterGroupChange(chat.setGroupPhoto(conversationId, file)),
+    leaveGroup: (conversationId) => afterGroupChange(chat.leaveGroup(conversationId)),
+    deleteGroup: (conversationId) => afterGroupChange(chat.deleteGroup(conversationId)),
     broadcastTyping,
     subscribeTyping,
     react,
