@@ -56,7 +56,8 @@ describe('demo auth and chat', () => {
   it('searches, reuses a chat, sends a message, and clears unread', async () => {
     const demo = createDemoBackend()
     await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
-    const found = await demo.searchUsers('sak')
+    expect(await demo.searchUsers('sak')).toEqual([])
+    const found = await demo.searchUsers('Sakura')
     expect(found.map((profile) => profile.username)).toEqual(['sakura'])
     const existing = await demo.startConversation(SAKURA_ID)
     expect(existing).toBe(SAKURA_CHAT)
@@ -96,6 +97,7 @@ describe('demo auth and chat', () => {
     demo.signOut()
     await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
 
+    expect(await demo.searchUsers('han')).toEqual([])
     const found = await demo.searchUsers('hana')
     expect(found[0]?.requestStatus ?? null).toBeNull()
     await expect(demo.startConversation(hana.id)).rejects.toThrow(/accept/)

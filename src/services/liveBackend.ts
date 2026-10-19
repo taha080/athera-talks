@@ -325,7 +325,7 @@ export const liveChat = {
   },
 
   async searchUsers(query: string): Promise<SearchPerson[]> {
-    const { data, error } = await client().rpc('search_profiles', { query })
+    const { data, error } = await client().rpc('find_user_by_username', { name: query })
     if (error) throw new Error(error.message)
     return ((data ?? []) as (ProfileRow & { request_id?: string | null; request_status?: string | null; request_from?: string | null })[]).map((row) => ({
       ...mapProfile(row),

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
@@ -21,7 +21,7 @@ export function Sidebar() {
   const showRequests = params.get('requests') === '1'
   const searchRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<SearchPerson[] | null>(null)
+  const [lookup, setLookup] = useState<SearchPerson[] | null>(null)
   const [searchError, setSearchError] = useState('')
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -52,17 +52,24 @@ export function Sidebar() {
     }
   }, [ids])
 
-  async function onSearch(value: string) {
+  function onQueryChange(value: string) {
     setQuery(value)
-    if (!value.trim()) {
-      setResults(null)
-      setSearchError('')
+    setLookup(null)
+    setSearchError('')
+  }
+
+  async function onFind(event: FormEvent) {
+    event.preventDefault()
+    const needle = query.trim()
+    if (!needle) {
+      setLookup(null)
       return
     }
     try {
-      setResults(await chat.search(value))
+      setLookup(await chat.search(needle))
       setSearchError('')
     } catch (error) {
+      setLookup([])
       setSearchError(error instanceof Error ? error.message : 'Search failed.')
     }
   }
@@ -71,14 +78,14 @@ export function Sidebar() {
     const id = await chat.startChat(userId)
     await chat.refresh()
     setQuery('')
-    setResults(null)
+    setLookup(null)
     navigate(`/c/${id}`)
   }
 
   async function addContact(userId: string) {
     try {
       await chat.requestContact(userId)
-      setResults(await chat.search(query))
+      setLookup(await chat.search(query))
       setSearchError('')
       chat.pushToast('Contact request sent')
     } catch (error) {
@@ -86,7 +93,13 @@ export function Sidebar() {
     }
   }
 
-  const visible = chat.conversations.filter((item) => filter === 'all' || item.unread > 0)
+  const needle = query.trim().toLowerCase()
+  const exactLocal = needle.length > 0 && chat.conversations.some((item) => item.peer.username.toLowerCase() === needle)
+  const visible = chat.conversations.filter((item) => {
+    if (filter === 'unread' && item.unread === 0) return false
+    if (!needle) return true
+    return item.peer.username.toLowerCase().includes(needle)
+  })
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-panel">
@@ -141,17 +154,20 @@ export function Sidebar() {
       ) : null}
 
       <div className="px-3">
-        <label className="relative block">
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-mist" />
-          <input
-            ref={searchRef}
-            className="h-10 w-full rounded-lg border border-line bg-elevated pl-9 pr-3 text-sm text-paper outline-none transition placeholder:text-mist/70 focus:border-sakura focus:ring-2 focus:ring-sakura/30"
-            value={query}
-            onChange={(event) => void onSearch(event.target.value)}
-            placeholder="Search username"
-            aria-label="Search username"
-          />
-        </label>
+        <form onSubmit={(event) => void onFind(event)}>
+          <label className="relative block">
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-mist" />
+            <input
+              ref={searchRef}
+              className="h-10 w-full rounded-lg border border-line bg-elevated pl-9 pr-3 text-sm text-paper outline-none transition placeholder:text-mist/70 focus:border-sakura focus:ring-2 focus:ring-sakura/30"
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              placeholder="Search username"
+              aria-label="Search username"
+              autoComplete="off"
+            />
+          </label>
+        </form>
         <div className="mt-2 flex gap-1 rounded-lg bg-elevated p-1" role="tablist" aria-label="Chat filters">
           {(['all', 'unread'] as const).map((item) => (
             <button
@@ -172,21 +188,16 @@ export function Sidebar() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {showRequests ? (
-          <RequestsPanel
-            meId={profile?.id ?? ''}
-            onAccept={async (id) => {
-              const conversationId = await chat.acceptRequest(id)
-              navigate(`/c/${conversationId}`)
-            }}
-            onDecline={(id) => chat.declineRequest(id)}
-            onCancel={(id) => chat.cancelRequest(id)}
-          />
-        ) : results ? (
-          <div>
-            {searchError ? <p className="px-4 py-3 text-sm text-danger">{searchError}</p> : null}
-            {results.length === 0 && !searchError ? <p className="px-4 py-8 text-center text-sm text-mist">No one with that username.</p> : null}
-            {results.map((person) => (
+        {needle && lookup === null && !exactLocal ? (
+          <p className="px-4 pt-4 text-center text-sm text-mist" data-testid="username-hint">
+            Type the exact username to find someone
+          </p>
+        ) : null}
+        {searchError ? <p className="px-4 py-3 text-sm text-danger">{searchError}</p> : null}
+        {lookup && lookup.length === 0 && !searchError ? (
+          <p className="px-4 py-8 text-center text-sm text-mist">No one with that username.</p>
+        ) : null}
+        {lookup?.map((person) => (
               <article key={person.id} className="mx-3 my-2 rounded-xl border border-line bg-panel p-3 shadow-sm">
                 <div className="flex items-center gap-3">
                   <Avatar name={person.username} url={person.avatarUrl} size="sm" />
@@ -205,30 +216,41 @@ export function Sidebar() {
                       if (!person.requestId) return
                       const conversationId = await chat.acceptRequest(person.requestId)
                       setQuery('')
-                      setResults(null)
+                      setLookup(null)
                       navigate(`/c/${conversationId}`)
                     }}
                     onDecline={async () => {
                       if (!person.requestId) return
                       await chat.declineRequest(person.requestId)
-                      setResults(await chat.search(query))
+                      setLookup(await chat.search(query))
                     }}
                     onCancel={async () => {
                       if (!person.requestId) return
                       await chat.cancelRequest(person.requestId)
-                      setResults(await chat.search(query))
+                      setLookup(await chat.search(query))
                     }}
                   />
                 </div>
               </article>
-            ))}
-          </div>
+        ))}
+        {showRequests ? (
+          <RequestsPanel
+            meId={profile?.id ?? ''}
+            onAccept={async (id) => {
+              const conversationId = await chat.acceptRequest(id)
+              navigate(`/c/${conversationId}`)
+            }}
+            onDecline={(id) => chat.declineRequest(id)}
+            onCancel={(id) => chat.cancelRequest(id)}
+          />
         ) : chat.loading ? (
           <ListSkeleton />
         ) : visible.length === 0 ? (
-          <p className="px-4 py-10 text-center text-sm leading-6 text-mist">
-            {filter === 'unread' ? 'No unread chats.' : 'No chats yet. Search a username to send a contact request.'}
-          </p>
+          needle ? null : (
+            <p className="px-4 py-10 text-center text-sm leading-6 text-mist">
+              {filter === 'unread' ? 'No unread chats.' : 'No chats yet. Search a username to send a contact request.'}
+            </p>
+          )
         ) : (
           <ul>
             {visible.map((conversation) => {
