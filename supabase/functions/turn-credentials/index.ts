@@ -6,7 +6,7 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const TTL_SECONDS = 14_400
+const TTL_SECONDS = 86_400
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -33,8 +33,8 @@ Deno.serve(async (req) => {
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError || !userData.user) return json({ error: 'Sign in required.' }, 401)
 
-  const keyId = Deno.env.get('CLOUDFLARE_TURN_KEY_ID') ?? ''
-  const token = Deno.env.get('CLOUDFLARE_TURN_API_TOKEN') ?? ''
+  const keyId = Deno.env.get('CF_TURN_KEY_ID') ?? ''
+  const token = Deno.env.get('CF_TURN_API_TOKEN') ?? ''
   if (!keyId || !token) return json({ error: 'TURN relay is not configured.' }, 503)
 
   const response = await fetch(
