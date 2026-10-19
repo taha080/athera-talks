@@ -1,13 +1,13 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { CallProvider } from '../context/CallContext'
+import { CallProvider, useCall } from '../context/CallContext'
 import { ChatProvider, useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
 import { cn } from '../lib/cn'
 import { dangerButton, iconButton } from '../lib/styles'
 import { isOnline } from '../lib/presence'
 import { Avatar } from './Avatar'
-import { CallScreen } from './CallScreen'
+import { CallScreen, ReturnToCallBar } from './CallScreen'
 import { AddContactIcon, ChatsIcon, GearIcon, SignOutIcon } from './Icons'
 import { Credit } from './Credit'
 import { Logo } from './Logo'
@@ -22,7 +22,9 @@ export function Shell() {
   return (
     <ChatProvider>
       <CallProvider>
+        <CallNavigation />
         <div className="app-canvas flex h-dvh flex-col overflow-hidden text-paper">
+          <ReturnToCallBar />
           <div className="flex min-h-0 flex-1 overflow-hidden">
             <NavRail />
             <aside
@@ -46,6 +48,18 @@ export function Shell() {
       </CallProvider>
     </ChatProvider>
   )
+}
+
+function CallNavigation() {
+  const location = useLocation()
+  const { phase, minimize } = useCall()
+  const path = `${location.pathname}${location.search}`
+  const previous = useRef(path)
+  useEffect(() => {
+    if (previous.current !== path && phase !== 'idle' && phase !== 'incoming') minimize()
+    previous.current = path
+  }, [path, phase, minimize])
+  return null
 }
 
 function NavRail() {
