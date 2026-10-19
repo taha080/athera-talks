@@ -1,8 +1,34 @@
+export type MessageKind = 'text' | 'voice' | 'image'
+
 export type Profile = {
   id: string
   username: string
   avatarUrl: string | null
   favouriteAnime: string | null
+  theme?: string
+  wallpaper?: string
+  wallpaperPath?: string | null
+  wallpaperUrl?: string | null
+  lastSeenAt?: string | null
+  showLastSeen?: boolean
+  showReadReceipts?: boolean
+  notifySound?: boolean
+  notifyDesktop?: boolean
+}
+
+export type ReplyTarget = {
+  id: string
+  preview: string
+}
+
+export type OutgoingMedia = {
+  conversationId: string
+  kind: 'voice' | 'image'
+  file: Blob
+  mime: string
+  seconds?: number
+  waveform?: number[]
+  reply?: ReplyTarget | null
 }
 
 export type Message = {
@@ -12,6 +38,16 @@ export type Message = {
   body: string
   createdAt: string
   readAt: string | null
+  kind?: MessageKind
+  deliveredAt?: string | null
+  mediaPath?: string | null
+  mediaUrl?: string | null
+  mediaMime?: string | null
+  mediaSeconds?: number | null
+  waveform?: number[] | null
+  replyTo?: string | null
+  replyPreview?: string | null
+  deletedAt?: string | null
 }
 
 export type Conversation = {

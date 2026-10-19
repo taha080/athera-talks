@@ -4,8 +4,12 @@ import { parseTheme, readStoredTheme, THEME_KEY } from './theme'
 describe('parseTheme', () => {
   it('defaults to dark and accepts naruto', () => {
     expect(parseTheme(null)).toBe('dark')
-    expect(parseTheme('light')).toBe('dark')
+    expect(parseTheme('nope')).toBe('dark')
+    expect(parseTheme('light')).toBe('light')
     expect(parseTheme('naruto')).toBe('naruto')
+    expect(parseTheme('amoled')).toBe('amoled')
+    expect(parseTheme('coquette')).toBe('coquette')
+    expect(parseTheme('blossom')).toBe('blossom')
   })
 })
 

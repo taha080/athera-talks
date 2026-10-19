@@ -26,6 +26,11 @@ export type DemoConversation = {
   updatedAt: string
 }
 
+export type DemoHide = {
+  messageId: string
+  userId: string
+}
+
 export type DemoData = {
   version: 1
   currentUserId: string | null
@@ -33,6 +38,7 @@ export type DemoData = {
   accounts: DemoAccount[]
   conversations: DemoConversation[]
   messages: Message[]
+  hides: DemoHide[]
 }
 
 const hour = 60 * 60 * 1000
@@ -42,11 +48,11 @@ export function buildSeed(now = Date.now()): DemoData {
   const at = (msAgo: number) => new Date(now - msAgo).toISOString()
 
   const profiles: Profile[] = [
-    { id: TAHA_ID, username: 'taha', avatarUrl: null, favouriteAnime: 'Attack on Titan' },
-    { id: SAKURA_ID, username: 'sakura', avatarUrl: null, favouriteAnime: 'Demon Slayer' },
-    { id: KENJI_ID, username: 'kenji', avatarUrl: null, favouriteAnime: 'One Piece' },
-    { id: MIRA_ID, username: 'mira', avatarUrl: null, favouriteAnime: 'Spy x Family' },
-    { id: REN_ID, username: 'ren', avatarUrl: null, favouriteAnime: 'Frieren' },
+    { id: TAHA_ID, username: 'taha', avatarUrl: null, favouriteAnime: 'Attack on Titan', theme: 'dark', wallpaper: 'waves', lastSeenAt: at(15_000), showLastSeen: true, showReadReceipts: true, notifySound: true, notifyDesktop: true },
+    { id: SAKURA_ID, username: 'sakura', avatarUrl: null, favouriteAnime: 'Demon Slayer', lastSeenAt: at(20_000), showReadReceipts: true },
+    { id: KENJI_ID, username: 'kenji', avatarUrl: null, favouriteAnime: 'One Piece', lastSeenAt: at(2 * hour), showReadReceipts: true },
+    { id: MIRA_ID, username: 'mira', avatarUrl: null, favouriteAnime: 'Spy x Family', lastSeenAt: at(5 * hour), showReadReceipts: false },
+    { id: REN_ID, username: 'ren', avatarUrl: null, favouriteAnime: 'Frieren', lastSeenAt: at(10 * 60_000), showReadReceipts: true },
   ]
 
   const messages: Message[] = [
@@ -75,6 +81,7 @@ export function buildSeed(now = Date.now()): DemoData {
       { id: REN_CHAT, memberIds: [TAHA_ID, REN_ID], updatedAt: at(30 * 60 * 1000) },
     ],
     messages,
+    hides: [],
   }
 }
 

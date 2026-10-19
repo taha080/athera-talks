@@ -1,5 +1,9 @@
 import { normalizeUsername, passwordIssue, usernameIssue } from '../lib/auth'
-import type { Conversation, Message, MessageListener, Profile } from '../types'
+import { parseWallpaper } from '../lib/appearance'
+import { messagePreview } from '../lib/messages'
+import { parseTheme } from '../lib/theme'
+import { encodeWaveform } from '../lib/voice'
+import type { Conversation, Message, MessageListener, OutgoingMedia, Profile, ReplyTarget } from '../types'
 import {
   DEMO_EMAIL,
   TAHA_ID,
@@ -37,9 +41,19 @@ export function createDemoBackend(options: Options = {}) {
   const storage = options.storage
   let data: DemoData = options.initial ?? load(storage) ?? buildSeed(options.now)
   const listeners = new Set<MessageListener>()
+  const typingListeners = new Map<string, Set<(userId: string) => void>>()
+  data.hides = data.hides ?? []
 
   function emitInsert(message: Message) {
     listeners.forEach((listener) => listener.onInsert(message))
+  }
+
+  function emitUpdate(message: Message) {
+    listeners.forEach((listener) => listener.onUpdate(message))
+  }
+
+  function hidden(messageId: string, userId: string): boolean {
+    return data.hides.some((hide) => hide.messageId === messageId && hide.userId === userId)
   }
 
   function save() {
@@ -72,16 +86,16 @@ export function createDemoBackend(options: Options = {}) {
     const peerId = conversation.memberIds.find((id) => id !== me) ?? conversation.memberIds[0]
     const peer = profileById(peerId)
     const thread = data.messages
-      .filter((message) => message.conversationId === conversation.id)
+      .filter((message) => message.conversationId === conversation.id && !hidden(message.id, me))
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     const last = thread.at(-1) ?? null
-    const unread = thread.filter((message) => message.senderId !== me && !message.readAt).length
+    const unread = thread.filter((message) => message.senderId !== me && !message.readAt && !message.deletedAt).length
     return {
       id: conversation.id,
       updatedAt: conversation.updatedAt,
       peer: peer ?? { id: peerId, username: 'fan', avatarUrl: null, favouriteAnime: null },
       lastMessage: last
-        ? { body: last.body, createdAt: last.createdAt, senderId: last.senderId }
+        ? { body: messagePreview(last), createdAt: last.createdAt, senderId: last.senderId }
         : null,
       unread,
     }
@@ -184,11 +198,54 @@ export function createDemoBackend(options: Options = {}) {
       return { ...profile }
     },
 
+    async savePreferences(patch: {
+      theme?: string
+      wallpaper?: string
+      showLastSeen?: boolean
+      showReadReceipts?: boolean
+      notifySound?: boolean
+      notifyDesktop?: boolean
+    }): Promise<Profile> {
+      const me = requireUser()
+      const profile = profileById(me)
+      if (!profile) throw new Error('Profile missing.')
+      if (patch.theme) profile.theme = parseTheme(patch.theme)
+      if (patch.wallpaper) profile.wallpaper = parseWallpaper(patch.wallpaper)
+      if (patch.showLastSeen !== undefined) profile.showLastSeen = patch.showLastSeen
+      if (patch.showReadReceipts !== undefined) profile.showReadReceipts = patch.showReadReceipts
+      if (patch.notifySound !== undefined) profile.notifySound = patch.notifySound
+      if (patch.notifyDesktop !== undefined) profile.notifyDesktop = patch.notifyDesktop
+      save()
+      return { ...profile }
+    },
+
     async uploadAvatar(dataUrl: string): Promise<Profile> {
       const me = requireUser()
       const profile = profileById(me)
       if (!profile) throw new Error('Profile missing.')
       profile.avatarUrl = dataUrl
+      save()
+      return { ...profile }
+    },
+
+    async uploadWallpaper(dataUrl: string): Promise<Profile> {
+      const me = requireUser()
+      const profile = profileById(me)
+      if (!profile) throw new Error('Profile missing.')
+      profile.wallpaper = 'custom'
+      profile.wallpaperUrl = dataUrl
+      profile.wallpaperPath = 'demo'
+      save()
+      return { ...profile }
+    },
+
+    async clearWallpaper(): Promise<Profile> {
+      const me = requireUser()
+      const profile = profileById(me)
+      if (!profile) throw new Error('Profile missing.')
+      profile.wallpaper = 'plain'
+      profile.wallpaperUrl = null
+      profile.wallpaperPath = null
       save()
       return { ...profile }
     },
@@ -204,7 +261,7 @@ export function createDemoBackend(options: Options = {}) {
         throw new Error('That chat is not yours.')
       }
       return data.messages
-        .filter((message) => message.conversationId === conversationId)
+        .filter((message) => message.conversationId === conversationId && !hidden(message.id, me))
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
         .map((message) => ({ ...message }))
     },
@@ -238,7 +295,7 @@ export function createDemoBackend(options: Options = {}) {
       return id
     },
 
-    async sendMessage(conversationId: string, body: string): Promise<Message> {
+    async sendMessage(conversationId: string, body: string, reply?: ReplyTarget | null): Promise<Message> {
       const me = requireUser()
       const conversation = data.conversations.find((item) => item.id === conversationId)
       if (!conversation || !conversation.memberIds.includes(me)) {
@@ -253,6 +310,11 @@ export function createDemoBackend(options: Options = {}) {
         body: text,
         createdAt: new Date().toISOString(),
         readAt: null,
+        kind: 'text',
+        deliveredAt: null,
+        replyTo: reply?.id ?? null,
+        replyPreview: reply?.preview ?? null,
+        deletedAt: null,
       }
       data.messages.push(message)
       conversation.updatedAt = message.createdAt
@@ -261,20 +323,114 @@ export function createDemoBackend(options: Options = {}) {
       return message
     },
 
+    async sendMedia(input: OutgoingMedia): Promise<Message> {
+      const me = requireUser()
+      const conversation = data.conversations.find((item) => item.id === input.conversationId)
+      if (!conversation || !conversation.memberIds.includes(me)) {
+        throw new Error('That chat is not yours.')
+      }
+      let mediaUrl: string | null = null
+      if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        mediaUrl = URL.createObjectURL(input.file)
+      }
+      const message: Message = {
+        id: newId('msg'),
+        conversationId: input.conversationId,
+        senderId: me,
+        body: input.kind === 'voice' ? 'Voice message' : 'Photo',
+        createdAt: new Date().toISOString(),
+        readAt: null,
+        kind: input.kind,
+        deliveredAt: null,
+        mediaPath: 'demo',
+        mediaUrl,
+        mediaMime: input.mime,
+        mediaSeconds: input.seconds ?? null,
+        waveform: input.waveform ?? null,
+        replyTo: input.reply?.id ?? null,
+        replyPreview: input.reply?.preview ?? null,
+        deletedAt: null,
+      }
+      data.messages.push(message)
+      conversation.updatedAt = message.createdAt
+      save()
+      emitInsert({ ...message, waveform: message.waveform ? encodeWaveform(message.waveform).split(',').map(Number) : null })
+      return message
+    },
+
+    async hideMessage(messageId: string): Promise<void> {
+      const me = requireUser()
+      if (!data.hides.some((hide) => hide.messageId === messageId && hide.userId === me)) {
+        data.hides.push({ messageId, userId: me })
+      }
+      save()
+    },
+
+    async deleteForEveryone(message: Pick<Message, 'id' | 'kind' | 'mediaPath'>): Promise<void> {
+      const me = requireUser()
+      const stored = data.messages.find((item) => item.id === message.id && item.senderId === me)
+      if (!stored || stored.deletedAt) throw new Error('Message not found')
+      stored.deletedAt = new Date().toISOString()
+      stored.body = ''
+      stored.mediaPath = null
+      stored.mediaUrl = null
+      stored.mediaMime = null
+      stored.waveform = null
+      save()
+      emitUpdate({ ...stored })
+    },
+
     async markRead(conversationId: string): Promise<void> {
       const me = requireUser()
       const stamp = new Date().toISOString()
       data.messages.forEach((message) => {
         if (message.conversationId === conversationId && message.senderId !== me && !message.readAt) {
           message.readAt = stamp
+          message.deliveredAt = message.deliveredAt ?? stamp
+          emitUpdate({ ...message })
         }
       })
       save()
     },
 
+    async markDelivered(): Promise<void> {
+      const me = requireUser()
+      const stamp = new Date().toISOString()
+      data.messages.forEach((message) => {
+        const conversation = data.conversations.find((item) => item.id === message.conversationId)
+        if (!conversation?.memberIds.includes(me) || message.senderId === me || message.deliveredAt) return
+        message.deliveredAt = stamp
+        emitUpdate({ ...message })
+      })
+      save()
+    },
+
+    async touchPresence(): Promise<void> {
+      const me = requireUser()
+      const profile = profileById(me)
+      if (profile) profile.lastSeenAt = new Date().toISOString()
+      save()
+    },
+
+    async attachMedia(message: Message): Promise<Message> {
+      return message
+    },
+
     subscribe(listener: MessageListener): () => void {
       listeners.add(listener)
       return () => listeners.delete(listener)
+    },
+
+    subscribeTyping(conversationId: string, onTyping: (userId: string) => void): () => void {
+      const set = typingListeners.get(conversationId) ?? new Set()
+      set.add(onTyping)
+      typingListeners.set(conversationId, set)
+      return () => set.delete(onTyping)
+    },
+
+    async broadcastTyping(conversationId: string): Promise<void> {
+      const me = requireUser()
+      typingListeners.get(conversationId)?.forEach((listener) => listener(me))
     },
 
     reset() {
@@ -299,6 +455,7 @@ function load(storage: MemoryStorage | undefined): DemoData | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as DemoData
     if (parsed.version !== 1 || !Array.isArray(parsed.profiles)) return null
+    parsed.hides = parsed.hides ?? []
     return parsed
   } catch {
     return null
