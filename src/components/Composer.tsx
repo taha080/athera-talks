@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
 import { EMOJI } from '../lib/emoji'
@@ -168,7 +169,7 @@ export function Composer({
       return
     }
     setError('')
-    setPhaseSafe('sending')
+    flushSync(() => setPhaseSafe('sending'))
     try {
       const waveform = encodeWaveform(peaks.current).split(',').filter(Boolean).map(Number)
       await sendFileRef.current(blob, type, 'voice', elapsed, waveform)

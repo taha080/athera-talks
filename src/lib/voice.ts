@@ -71,10 +71,14 @@ export function mediaSendError(message: string, kind: 'voice' | 'image' = 'voice
     return `That ${note} was blocked. You can only send one to an accepted contact.`
   }
   if (text.includes('mime') || text.includes('content type') || text.includes('invalid mime')) {
-    return `The ${note} format was rejected. Tap the mic and try again.`
+    return kind === 'voice'
+      ? 'The voice note format was rejected. Tap the mic and try again.'
+      : 'The photo format was rejected. Choose a JPEG, PNG, or WebP image.'
   }
   if (text.includes('payload too large') || text.includes('exceeded') || text.includes('too large')) {
-    return `That ${note} is too large. Keep a voice note under two minutes.`
+    return kind === 'voice'
+      ? 'That voice note is too large. Keep a voice note under two minutes.'
+      : 'That photo is too large. Choose an image under 8 MB.'
   }
   return message || `Could not send that ${note}.`
 }
