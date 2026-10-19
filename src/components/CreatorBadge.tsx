@@ -11,29 +11,45 @@ export function CreatorBadge({ className, size = 18 }: { className?: string; siz
   const raw = useId().replace(/:/g, '')
   const blue = `creator-blue-${raw}`
   const gold = `creator-gold-${raw}`
-  const mask = `creator-mask-${raw}`
+  const tickMask = `creator-tick-mask-${raw}`
+  const sealMask = `creator-seal-mask-${raw}`
   const px = `${size}px`
+  const sweep = (id: string) => (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+      style={{ mask: `url(#${id})`, WebkitMask: `url(#${id})` }}
+    >
+      <span className="creator-sweep" />
+    </span>
+  )
   return (
     <span title={LABEL} role="img" aria-label={LABEL} className={cn('inline-flex shrink-0 items-center gap-1', className)}>
-      <svg viewBox="0 0 32 32" className="overflow-visible" style={{ width: px, height: px }} aria-hidden="true">
-        <defs>
-          <linearGradient id={blue} x1="16" y1="2" x2="16" y2="30" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stopColor="#4cc3ff" />
-            <stop offset="1" stopColor="#0a7cff" />
-          </linearGradient>
-        </defs>
-        <path d={SCALLOP} fill={`url(#${blue})`} />
-        <path
-          d="M10.4 16.5 14.1 20.3 21.8 11.8"
-          fill="none"
-          stroke="#ffffff"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <span className="relative inline-flex" style={{ width: px, height: px }}>
+        <svg viewBox="0 0 32 32" className="h-full w-full" aria-hidden="true">
+          <defs>
+            <linearGradient id={blue} x1="16" y1="2" x2="16" y2="30" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stopColor="#4cc3ff" />
+              <stop offset="1" stopColor="#0a7cff" />
+            </linearGradient>
+            <mask id={tickMask} maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+              <path d={SCALLOP} fill="#ffffff" />
+            </mask>
+          </defs>
+          <path d={SCALLOP} fill={`url(#${blue})`} />
+          <path
+            d="M10.4 16.5 14.1 20.3 21.8 11.8"
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        {sweep(tickMask)}
+      </span>
       <span className="relative inline-flex" style={{ width: px, height: px, filter: 'drop-shadow(0 0 3px #f7c94899)' }}>
-        <svg viewBox="0 0 32 32" className="h-full w-full overflow-visible" aria-hidden="true">
+        <svg viewBox="0 0 32 32" className="h-full w-full" aria-hidden="true">
           <defs>
             <linearGradient id={gold} x1="4" y1="3" x2="28" y2="29" gradientUnits="userSpaceOnUse">
               <stop offset="0" stopColor="#fff4b0" />
@@ -41,7 +57,7 @@ export function CreatorBadge({ className, size = 18 }: { className?: string; siz
               <stop offset="0.68" stopColor="#c8901a" />
               <stop offset="1" stopColor="#fbe08a" />
             </linearGradient>
-            <mask id={mask} maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+            <mask id={sealMask} maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
               <path d={SCALLOP} fill="#ffffff" />
             </mask>
           </defs>
@@ -58,13 +74,7 @@ export function CreatorBadge({ className, size = 18 }: { className?: string; siz
             C
           </text>
         </svg>
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 overflow-hidden"
-          style={{ mask: `url(#${mask})`, WebkitMask: `url(#${mask})` }}
-        >
-          <span className="creator-shine" />
-        </span>
+        {sweep(sealMask)}
       </span>
     </span>
   )
