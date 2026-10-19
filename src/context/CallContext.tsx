@@ -472,10 +472,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
     write()
     const timer = window.setInterval(write, 1000)
     document.addEventListener('visibilitychange', write)
+    window.addEventListener('focus', write)
     window.addEventListener('pageshow', write)
     return () => {
       window.clearInterval(timer)
       document.removeEventListener('visibilitychange', write)
+      window.removeEventListener('focus', write)
       window.removeEventListener('pageshow', write)
     }
   }, [state.phase, state.peer?.id])

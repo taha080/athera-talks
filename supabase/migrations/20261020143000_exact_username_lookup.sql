@@ -125,3 +125,88 @@ $$;
 
 revoke all on function public.find_user_by_username(text) from public;
 grant execute on function public.find_user_by_username(text) to authenticated;
+
+-- Live databases already store is_creator. Re-running this lookup must not
+-- drop that column from the result.
+do $upgrade$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'profiles'
+      and column_name = 'is_creator'
+  ) then
+    execute $sql$
+drop function if exists public.find_user_by_username(text);
+
+create function public.find_user_by_username(name text)
+returns table (
+  id uuid,
+  username text,
+  avatar_url text,
+  favourite_anime text,
+  is_creator boolean,
+  request_id uuid,
+  request_status text,
+  request_from uuid
+)
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $function$
+declare
+  cleaned text;
+  recent int;
+begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  cleaned := lower(btrim(coalesce(name, '')));
+  if cleaned !~ '^[a-z0-9_]{3,20}$' then
+    return;
+  end if;
+
+  delete from public.username_lookups
+  where user_id = auth.uid()
+    and looked_at < now() - interval '1 hour';
+
+  select count(*) into recent
+  from public.username_lookups
+  where user_id = auth.uid()
+    and looked_at > now() - interval '1 minute';
+
+  if recent >= 20 then
+    raise exception 'Too many lookups. Wait a moment and try again.';
+  end if;
+
+  insert into public.username_lookups (user_id) values (auth.uid());
+
+  return query
+  select
+    p.id,
+    p.username,
+    p.avatar_url,
+    p.favourite_anime,
+    p.is_creator,
+    r.id,
+    r.status,
+    r.from_id
+  from public.profiles p
+  left join public.contact_requests r
+    on least(r.from_id, r.to_id) = least(auth.uid(), p.id)
+   and greatest(r.from_id, r.to_id) = greatest(auth.uid(), p.id)
+  where p.id <> auth.uid()
+    and p.username = cleaned
+  limit 1;
+end;
+$function$;
+
+revoke all on function public.find_user_by_username(text) from public;
+grant execute on function public.find_user_by_username(text) to authenticated;
+$sql$;
+  end if;
+end
+$upgrade$;
