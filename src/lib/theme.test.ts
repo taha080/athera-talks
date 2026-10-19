@@ -8,6 +8,8 @@ describe('parseTheme', () => {
     expect(parseTheme('light')).toBe('light')
     expect(parseTheme('naruto')).toBe('naruto')
     expect(parseTheme('amoled')).toBe('amoled')
+    expect(parseTheme('coquette')).toBe('coquette')
+    expect(parseTheme('blossom')).toBe('blossom')
   })
 })
 

@@ -7,12 +7,19 @@ import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
 import { useTheme } from '../context/ThemeContext'
 import { usernameIssue } from '../lib/auth'
-import { THEME_CHOICES, WALLPAPER_CHOICES, wallpaperClass } from '../lib/appearance'
+import {
+  THEME_CHOICES,
+  THEME_GROUPS,
+  WALLPAPER_CHOICES,
+  pairedWallpaper,
+  parseWallpaper,
+  wallpaperClass,
+  type WallpaperName,
+} from '../lib/appearance'
 import { APP_NAME } from '../lib/brand'
 import { cn } from '../lib/cn'
 import { type ThemeName } from '../lib/theme'
 import { dangerButton, fieldClass, ghostButton, primaryButton } from '../lib/styles'
-import type { WallpaperName } from '../lib/appearance'
 
 const SUGGESTIONS = ['Attack on Titan', 'Demon Slayer', 'Jujutsu Kaisen', 'Frieren', 'One Piece', 'Spy x Family']
 const SECTIONS = [
@@ -176,20 +183,27 @@ function AppearanceSection() {
   const session = useSession()
   const { theme, setTheme } = useTheme()
   const profile = session.profile
-  const wallpaper = (profile?.wallpaper as WallpaperName | undefined) ?? 'plain'
+  const savedWallpaper = parseWallpaper(profile?.wallpaper)
+  const [pendingWallpaper, setPendingWallpaper] = useState<WallpaperName | null>(null)
+  const wallpaper = pendingWallpaper ?? savedWallpaper
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
   async function chooseTheme(next: ThemeName) {
     const previous = theme
+    const pair = pairedWallpaper(next)
     setTheme(next)
+    if (pair) setPendingWallpaper(pair)
     setError('')
     try {
-      await session.saveAppearance({ theme: next })
-      setMessage(`${THEME_CHOICES.find((item) => item.id === next)?.label ?? 'Theme'} saved on this account.`)
+      await session.saveAppearance(pair ? { theme: next, wallpaper: pair } : { theme: next })
+      const label = THEME_CHOICES.find((item) => item.id === next)?.label ?? 'Theme'
+      setMessage(pair ? `${label} and its wallpaper are saved on this account.` : `${label} saved on this account.`)
     } catch (err) {
       setTheme(previous)
       setError(err instanceof Error ? err.message : 'Could not save that theme.')
+    } finally {
+      setPendingWallpaper(null)
     }
   }
 
@@ -217,7 +231,7 @@ function AppearanceSection() {
   const preview = wallpaper === 'custom' && profile?.wallpaperUrl ? profile.wallpaperUrl.replace(/"/g, '') : ''
 
   return (
-    <div className="mx-auto max-w-lg space-y-6 px-5 py-8">
+    <div className="mx-auto max-w-3xl space-y-6 px-5 py-8">
       <div
         className={cn('h-48 overflow-hidden rounded-3xl border border-line', wallpaperClass(wallpaper))}
         style={preview ? { backgroundImage: `url("${preview}")` } : undefined}
@@ -227,22 +241,35 @@ function AppearanceSection() {
           <div className="bubble-own ml-auto max-w-[70%] rounded-2xl bg-gradient-to-br from-sakura to-violet px-3 py-2 text-sm text-white">Looks good.</div>
         </div>
       </div>
-      <div>
+      <div className="space-y-5">
         <p className="text-sm font-medium">Theme</p>
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {THEME_CHOICES.map((choice) => (
-            <button
-              key={choice.id}
-              type="button"
-              aria-pressed={theme === choice.id}
-              onClick={() => void chooseTheme(choice.id)}
-              className={cn('rounded-2xl border px-3 py-3 text-left text-sm', theme === choice.id ? 'border-sakura' : 'border-line')}
-            >
-              <span className="mb-2 block h-8 rounded-xl border border-white/10" style={{ background: choice.swatch }} />
-              {choice.label}
-            </button>
-          ))}
-        </div>
+        {THEME_GROUPS.map((group) => (
+          <section key={group.id} aria-label={group.label}>
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mist">{group.label}</h2>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {group.themes.map((choice) => {
+                const sample = pairedWallpaper(choice.id) ?? 'plain'
+                return (
+                  <button
+                    key={choice.id}
+                    type="button"
+                    aria-pressed={theme === choice.id}
+                    onClick={() => void chooseTheme(choice.id)}
+                    className={cn('rounded-2xl border px-3 py-3 text-left text-sm', theme === choice.id ? 'border-sakura' : 'border-line')}
+                  >
+                    <span
+                      data-theme={choice.id}
+                      className={cn('mb-2 block h-14 overflow-hidden rounded-xl border border-line', wallpaperClass(sample))}
+                    >
+                      <span className="mx-2 mt-7 block h-2 rounded-full" style={{ background: choice.swatch }} />
+                    </span>
+                    {choice.label}
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        ))}
       </div>
       <div>
         <p className="text-sm font-medium">Wallpaper</p>

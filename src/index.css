@@ -128,6 +128,118 @@
   --pattern: none;
 }
 
+[data-theme='blush'] {
+  --ink: #fff5f7;
+  --panel: #fffcfd;
+  --elevated: #ffffff;
+  --line: #e7c9d4;
+  --accent: #a32055;
+  --accent-2: #8e3a62;
+  --mist: #6e4454;
+  --foam: #1b7a52;
+  --paper: #2c1822;
+  --scrollbar: #e4c9d3;
+  --pattern: none;
+}
+
+[data-theme='lavender'] {
+  --ink: #f7f4fc;
+  --panel: #fcfbfe;
+  --elevated: #ffffff;
+  --line: #ddd4ee;
+  --accent: #5c3d8f;
+  --accent-2: #6a3f86;
+  --mist: #5c4e72;
+  --foam: #1b7a52;
+  --paper: #241a33;
+  --scrollbar: #d9d0e8;
+  --pattern: none;
+}
+
+[data-theme='peach'] {
+  --ink: #fff6f0;
+  --panel: #fffcf9;
+  --elevated: #ffffff;
+  --line: #f0d5c4;
+  --accent: #b84e2a;
+  --accent-2: #9a4630;
+  --mist: #7a5344;
+  --foam: #1b7a52;
+  --paper: #3a2418;
+  --scrollbar: #edd5c6;
+  --pattern: none;
+}
+
+[data-theme='rosegold'] {
+  --ink: #fbf6f3;
+  --panel: #fffcfb;
+  --elevated: #ffffff;
+  --line: #e8d5cc;
+  --accent: #8e4a3c;
+  --accent-2: #7a5344;
+  --mist: #6f534c;
+  --foam: #1b7a52;
+  --paper: #2e211c;
+  --scrollbar: #e5d4cb;
+  --pattern: none;
+}
+
+[data-theme='cotton'] {
+  --ink: #f8f4fb;
+  --panel: #fdfbfe;
+  --elevated: #ffffff;
+  --line: #e4d4ea;
+  --accent: #b42364;
+  --accent-2: #2f679e;
+  --mist: #5e4e68;
+  --foam: #1b7a52;
+  --paper: #2a2033;
+  --scrollbar: #dfd3e6;
+  --pattern: none;
+}
+
+[data-theme='mint'] {
+  --ink: #f3fbf7;
+  --panel: #fbfefc;
+  --elevated: #ffffff;
+  --line: #cde5d8;
+  --accent: #1a6b4e;
+  --accent-2: #1f5e56;
+  --mist: #3f6556;
+  --foam: #146b45;
+  --paper: #14281f;
+  --scrollbar: #c9e0d4;
+  --pattern: none;
+}
+
+[data-theme='blossom'] {
+  --ink: #fff7f8;
+  --panel: #fffbfc;
+  --elevated: #ffffff;
+  --line: #f0d0d8;
+  --accent: #a3204c;
+  --accent-2: #7e3e56;
+  --mist: #704856;
+  --foam: #1b7a52;
+  --paper: #351c26;
+  --scrollbar: #edd0d8;
+  --pattern: none;
+}
+
+[data-theme='coquette'] {
+  --ink: #fbf6ee;
+  --panel: #fffcf7;
+  --elevated: #ffffff;
+  --line: #e8d9c8;
+  --accent: #9e3450;
+  --accent-2: #7a4e3e;
+  --mist: #6e5648;
+  --foam: #1b7a52;
+  --paper: #2c2118;
+  --scrollbar: #e6d8c8;
+  --pattern: none;
+}
+
 .font-display {
   font-family: 'Cormorant Garamond', Georgia, serif;
 }
@@ -332,6 +444,68 @@ textarea:-webkit-autofill {
   background-position: center;
 }
 
+.wallpaper-blush {
+  background-color: #fff5f7;
+  background-image:
+    radial-gradient(circle at 16% 28%, #f4b8cb 0 26px, transparent 28px),
+    radial-gradient(circle at 74% 62%, #f7c9d6 0 42px, transparent 44px),
+    radial-gradient(circle at 42% 82%, #f8d6e1 0 16px, transparent 18px);
+  background-size: 190px 190px;
+}
+
+.wallpaper-lavender {
+  background-color: #f7f4fc;
+  background-image:
+    radial-gradient(circle at 20% 24%, #d9cff5 0 34px, transparent 36px),
+    radial-gradient(circle at 78% 70%, #e4d9f8 0 46px, transparent 48px);
+  background-size: 200px 200px;
+}
+
+.wallpaper-peach {
+  background-color: #fff6f0;
+  background-image:
+    radial-gradient(120% 80% at 0% 100%, #f8c9b0, transparent 58%),
+    radial-gradient(90% 70% at 100% 0%, #f6d7c4, transparent 52%);
+}
+
+.wallpaper-rosegold {
+  background-color: #fbf6f3;
+  background-image: repeating-linear-gradient(
+    118deg,
+    transparent 0 16px,
+    rgba(176, 122, 106, 0.28) 16px 17px,
+    transparent 17px 34px,
+    rgba(212, 176, 154, 0.45) 34px 35px
+  );
+}
+
+.wallpaper-cotton {
+  background-color: #f8f4fb;
+  background-image:
+    radial-gradient(circle at 12% 40%, #f7b7d2 0 70px, transparent 72px),
+    radial-gradient(circle at 88% 58%, #b9d7f2 0 78px, transparent 80px),
+    radial-gradient(circle at 48% 18%, #f9d0e4 0 28px, transparent 30px);
+}
+
+.wallpaper-mint {
+  background-color: #f3fbf7;
+  background-image:
+    radial-gradient(130% 70% at 0% 100%, #c9efe0, transparent 60%),
+    radial-gradient(90% 60% at 100% 0%, #d7f3e8, transparent 55%);
+}
+
+.wallpaper-blossom {
+  background-color: #fff7f8;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%23d9899e' stroke-width='1.4' stroke-opacity='.55'%3E%3Ccircle cx='28' cy='32' r='7'/%3E%3Ccircle cx='36' cy='26' r='6'/%3E%3Ccircle cx='22' cy='24' r='5'/%3E%3Ccircle cx='30' cy='20' r='4'/%3E%3Ccircle cx='86' cy='78' r='8'/%3E%3Ccircle cx='96' cy='72' r='6'/%3E%3Ccircle cx='80' cy='70' r='5'/%3E%3C/g%3E%3Ccircle cx='29' cy='27' r='2' fill='%23c46b84' fill-opacity='.45'/%3E%3Ccircle cx='88' cy='74' r='2.2' fill='%23c46b84' fill-opacity='.4'/%3E%3C/svg%3E");
+  background-size: 120px 120px;
+}
+
+.wallpaper-coquette {
+  background-color: #fbf6ee;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cpath fill='%23e7b7c6' fill-opacity='.7' d='M28 34c-6-8-16-8-18-2 5 1 8 6 9 10-6 2-12 4-13 8 6-1 12-6 15-10 3 4 9 9 15 10-1-4-7-6-13-8 1-4 4-9 9-10-2-6-12-6-18 2z'/%3E%3Ccircle cx='28' cy='42' r='2.2' fill='%23c9899a'/%3E%3Cpath fill='%23e7a8b8' fill-opacity='.65' d='M68 62c2.4-4 7-3.2 7.2 1 0-4.2 4.6-5.4 7-1.6 2.2 3.6 0 7.2-7 10.4-7-3.2-9.2-6.8-7.2-10.4z'/%3E%3C/svg%3E");
+  background-size: 96px 96px;
+}
+
 .bubble-in {
   animation: bubble-in 180ms ease;
 }
@@ -351,7 +525,15 @@ textarea:-webkit-autofill {
   }
 }
 
-[data-theme='light'] .bubble-other {
+[data-theme='light'] .bubble-other,
+[data-theme='blush'] .bubble-other,
+[data-theme='lavender'] .bubble-other,
+[data-theme='peach'] .bubble-other,
+[data-theme='rosegold'] .bubble-other,
+[data-theme='cotton'] .bubble-other,
+[data-theme='mint'] .bubble-other,
+[data-theme='blossom'] .bubble-other,
+[data-theme='coquette'] .bubble-other {
   box-shadow: inset 0 0 0 1px var(--line);
 }
 

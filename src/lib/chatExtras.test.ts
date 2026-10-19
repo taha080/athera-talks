@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseWallpaper, wallpaperClass } from './appearance'
+import { THEME_GROUPS, pairedWallpaper, parseWallpaper, wallpaperClass } from './appearance'
 import { messageKind, messagePreview } from './messages'
 import { isOnline, presenceLabel } from './presence'
 import { receiptTick } from './receipts'
@@ -12,6 +12,26 @@ describe('appearance', () => {
     expect(parseWallpaper('naruto-art')).toBe('plain')
     expect(wallpaperClass('dots')).toBe('chat-wallpaper wallpaper-dots')
     expect(wallpaperClass('custom')).toBe('chat-wallpaper wallpaper-custom')
+    expect(parseWallpaper('coquette')).toBe('coquette')
+  })
+
+  it('groups the soft themes and pairs each with a wallpaper', () => {
+    const labels = THEME_GROUPS.map((group) => group.label)
+    expect(labels).toEqual(['Classic', 'Anime', 'Soft & Pretty'])
+    const soft = THEME_GROUPS.find((group) => group.id === 'soft')
+    expect(soft?.themes).toHaveLength(8)
+    expect(soft?.themes.map((theme) => theme.label)).toEqual([
+      'Blush Pink',
+      'Lavender Dream',
+      'Peach Sorbet',
+      'Rose Gold',
+      'Cotton Candy',
+      'Mint Cream',
+      'Cherry Blossom',
+      'Coquette',
+    ])
+    expect(pairedWallpaper('cotton')).toBe('cotton')
+    expect(pairedWallpaper('dark')).toBeNull()
   })
 })
 

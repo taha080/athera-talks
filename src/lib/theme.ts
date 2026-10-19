@@ -1,6 +1,23 @@
 export const THEME_KEY = 'tatalk:theme'
 
-export const THEMES = ['dark', 'naruto', 'midnight', 'sakura', 'ocean', 'forest', 'light', 'amoled'] as const
+export const THEMES = [
+  'dark',
+  'naruto',
+  'midnight',
+  'sakura',
+  'ocean',
+  'forest',
+  'light',
+  'amoled',
+  'blush',
+  'lavender',
+  'peach',
+  'rosegold',
+  'cotton',
+  'mint',
+  'blossom',
+  'coquette',
+] as const
 
 export type ThemeName = (typeof THEMES)[number]
 
@@ -13,6 +30,14 @@ const THEME_COLOR: Record<ThemeName, string> = {
   forest: '#0c1410',
   light: '#f6f3ee',
   amoled: '#000000',
+  blush: '#fff5f7',
+  lavender: '#f7f4fc',
+  peach: '#fff6f0',
+  rosegold: '#fbf6f3',
+  cotton: '#f8f4fb',
+  mint: '#f3fbf7',
+  blossom: '#fff7f8',
+  coquette: '#fbf6ee',
 }
 
 export function parseTheme(value: string | null | undefined): ThemeName {
