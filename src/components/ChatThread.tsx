@@ -38,7 +38,11 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
   const nearBottom = useRef(true)
   const seenCount = useRef(0)
   const marked = useRef<string | null>(null)
+  const openedUnread = useRef<{ id?: string; count: number }>({ count: 0 })
   const typingTimer = useRef<number | null>(null)
+  if (openedUnread.current.id !== conversation?.id) {
+    openedUnread.current = { id: conversation?.id, count: conversation?.unread ?? 0 }
+  }
 
   const query = search.trim().toLowerCase()
   const matches = useMemo(
@@ -64,11 +68,10 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
 
   useEffect(() => {
     if (!conversation || chat.messagesLoading || marked.current === conversation.id) return
-    if (chat.messages.length === 0) return
+    if (chat.messages.length === 0 || chat.messages.some((message) => message.conversationId !== conversation.id)) return
     marked.current = conversation.id
-    const firstUnread = conversation.unread > 0
-      ? chat.messages.find((message) => message.senderId !== profile?.id && !message.readAt && !message.deletedAt)
-      : null
+    const incoming = chat.messages.filter((message) => message.senderId !== profile?.id && !message.deletedAt)
+    const firstUnread = openedUnread.current.count > 0 ? incoming[Math.max(0, incoming.length - openedUnread.current.count)] : undefined
     setDividerId(firstUnread?.id ?? null)
   }, [chat.messages, chat.messagesLoading, conversation, profile?.id])
 
