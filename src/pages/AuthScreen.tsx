@@ -156,9 +156,12 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
   return (
     <div className="relative min-h-dvh">
       <Glow />
-      <div className="mx-auto grid min-h-dvh max-w-6xl items-center gap-10 px-4 py-8 lg:grid-cols-[1.1fr_0.9fr] lg:px-8">
+      <div className="mx-auto grid min-h-dvh max-w-6xl items-center gap-10 overflow-y-auto px-4 py-8 lg:grid-cols-[1.1fr_0.9fr] lg:px-8">
         <section className="max-w-xl">
-          <Brand large />
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <Brand large />
+            <ThemeSwitcher />
+          </div>
           <h1 className="mt-8 text-4xl font-semibold tracking-tight sm:text-5xl">
             Chat and call your anime circle.
           </h1>
@@ -176,7 +179,6 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
         </section>
 
         <section className="rounded-[2rem] border border-line bg-panel/90 p-6 shadow-2xl shadow-black/40 sm:p-8">
-          <ThemeSwitcher className="mb-5 justify-between" />
           {mode === 'forgot' ? (
             <div>
               <h2 className="text-2xl font-semibold">Reset your password</h2>

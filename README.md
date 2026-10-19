@@ -36,6 +36,8 @@ If Supabase keys are missing, the app shows a setup screen instead of crashing. 
 
 ![Naruto sign in](docs/screenshots/naruto-sign-in.png)
 
+![Naruto chat list](docs/screenshots/naruto-chat-list.png)
+
 ![Naruto chat](docs/screenshots/naruto-chat.png)
 
 ## Folder structure
