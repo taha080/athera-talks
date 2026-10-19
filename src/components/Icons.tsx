@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
   MoreVertical,
   Pause,
+  Pin,
   Phone,
   PhoneOff,
   Play,
@@ -121,6 +122,10 @@ export function PauseIcon({ className }: IconProps) {
 
 export function CopyIcon({ className }: IconProps) {
   return glyph(Copy, className)
+}
+
+export function PinIcon({ className }: IconProps) {
+  return glyph(Pin, className)
 }
 
 export function PlusIcon({ className }: IconProps) {

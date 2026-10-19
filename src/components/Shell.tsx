@@ -1,13 +1,13 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { CallProvider } from '../context/CallContext'
+import { CallProvider, useCall } from '../context/CallContext'
 import { ChatProvider, useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
 import { cn } from '../lib/cn'
 import { dangerButton, iconButton } from '../lib/styles'
 import { isOnline } from '../lib/presence'
 import { Avatar } from './Avatar'
-import { CallScreen } from './CallScreen'
+import { CallScreen, ReturnToCallBar } from './CallScreen'
 import { AddContactIcon, ChatsIcon, GearIcon, SignOutIcon } from './Icons'
 import { Credit } from './Credit'
 import { Logo } from './Logo'
@@ -22,25 +22,44 @@ export function Shell() {
   return (
     <ChatProvider>
       <CallProvider>
-        <div className="app-canvas flex h-dvh overflow-hidden text-paper">
-          <NavRail />
-          <aside
-            className={cn(
-              'min-h-0 w-full flex-col border-line bg-panel md:flex md:w-[360px] md:shrink-0 md:border-r',
-              showList ? 'flex' : 'hidden',
-            )}
-          >
-            <Sidebar />
-          </aside>
-          <section className={cn('min-h-0 min-w-0 flex-1 flex-col', showList ? 'hidden md:flex' : 'flex')}>
-            <Outlet />
-          </section>
+        <CallNavigation />
+        <div className="app-canvas flex h-dvh flex-col overflow-hidden text-paper">
+          <ReturnToCallBar />
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <NavRail />
+            <aside
+              className={cn(
+                'min-h-0 w-full flex-col border-line bg-panel md:flex md:w-[360px] md:shrink-0 md:border-r',
+                showList ? 'flex' : 'hidden',
+              )}
+            >
+              <Sidebar />
+            </aside>
+            <section className={cn('min-h-0 min-w-0 flex-1 flex-col', showList ? 'hidden md:flex' : 'flex')}>
+              <Outlet />
+            </section>
+          </div>
+          <footer className="shrink-0 border-t border-line bg-panel pb-[env(safe-area-inset-bottom)]">
+            <Credit className="flex h-6 items-center justify-center leading-none" />
+          </footer>
           <CallScreen />
           <Toasts />
         </div>
       </CallProvider>
     </ChatProvider>
   )
+}
+
+function CallNavigation() {
+  const location = useLocation()
+  const { phase, minimize } = useCall()
+  const path = `${location.pathname}${location.search}`
+  const previous = useRef(path)
+  useEffect(() => {
+    if (previous.current !== path && phase !== 'idle' && phase !== 'incoming') minimize()
+    previous.current = path
+  }, [path, phase, minimize])
+  return null
 }
 
 function NavRail() {
@@ -117,7 +136,7 @@ function Toasts() {
   const { toasts, dismissToast } = useChat()
   if (toasts.length === 0) return null
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-full max-w-sm flex-col gap-2 px-4" aria-live="polite">
+    <div className="pointer-events-none fixed bottom-10 right-4 z-50 flex w-full max-w-sm flex-col gap-2 px-4" aria-live="polite">
       {toasts.map((toast) => (
         <button
           key={toast.id}

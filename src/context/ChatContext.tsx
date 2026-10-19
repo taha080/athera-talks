@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { appendMessage, foldConversation } from '../lib/conversations'
+import { appendMessage, compareConversations, foldConversation } from '../lib/conversations'
 import { messagePreview } from '../lib/messages'
 import { desktopNotice, playMessageTone } from '../lib/notify'
 import type { ContactRequest, Conversation, Message, OutgoingMedia, ReactionChange, ReplyTarget, SearchPerson } from '../types'
@@ -34,6 +34,7 @@ type ChatValue = {
   acceptRequest: (requestId: string) => Promise<string>
   declineRequest: (requestId: string) => Promise<void>
   cancelRequest: (requestId: string) => Promise<void>
+  setChatPin: (conversationId: string, pinned: boolean) => Promise<void>
   startChat: (userId: string) => Promise<string>
   send: (conversationId: string, body: string, reply?: ReplyTarget | null) => Promise<void>
   sendMedia: (input: OutgoingMedia) => Promise<void>
@@ -304,6 +305,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     [chat, loadRequests],
   )
 
+  const setChatPin = useCallback(
+    async (conversationId: string, pinned: boolean) => {
+      setConversations((rows) =>
+        rows.map((row) => (row.id === conversationId ? { ...row, pinned } : row)).sort(compareConversations),
+      )
+      try {
+        await chat.setChatPin(conversationId, pinned)
+      } catch (err) {
+        await refresh()
+        setError(err instanceof Error ? err.message : 'Could not update the pin.')
+      }
+    },
+    [chat, refresh],
+  )
+
   const search = useCallback((query: string) => chat.searchUsers(query), [chat])
   const startChat = useCallback((userId: string) => chat.startConversation(userId), [chat])
 
@@ -400,6 +416,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     acceptRequest,
     declineRequest,
     cancelRequest,
+    setChatPin,
     startChat,
     send,
     sendMedia,

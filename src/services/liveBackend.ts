@@ -1,4 +1,5 @@
 import { normalizeUsername, usernameIssue } from '../lib/auth'
+import { compareConversations } from '../lib/conversations'
 import { parseWallpaper } from '../lib/appearance'
 import { baseMime, mediaBucket } from '../lib/media'
 import { messageKind } from '../lib/messages'
@@ -8,7 +9,7 @@ import { getSupabase } from '../lib/supabase'
 import type { ContactRequest, ContactStatus, Conversation, Message, MessageListener, OutgoingMedia, Profile, Reaction, ReactionChange, ReplyTarget, SearchPerson } from '../types'
 
 const PROFILE_COLUMNS =
-  'id, username, avatar_url, favourite_anime, theme, wallpaper, wallpaper_path, last_seen_at, show_last_seen, show_read_receipts, notify_sound, notify_desktop'
+  'id, username, avatar_url, favourite_anime, theme, wallpaper, wallpaper_path, last_seen_at, show_last_seen, show_read_receipts, notify_sound, notify_desktop, is_creator'
 
 const MESSAGE_COLUMNS =
   'id, conversation_id, sender_id, body, created_at, read_at, kind, media_path, media_mime, media_seconds, waveform, reply_to, reply_preview, deleted_at, delivered_at'
@@ -26,6 +27,7 @@ type ProfileRow = {
   show_read_receipts?: boolean | null
   notify_sound?: boolean | null
   notify_desktop?: boolean | null
+  is_creator?: boolean | null
 }
 
 type MessageRow = {
@@ -62,6 +64,8 @@ type ConversationRow = {
   unread: number | string
   last_read_at?: string | null
   last_delivered_at?: string | null
+  peer_is_creator?: boolean | null
+  pinned?: boolean | null
 }
 
 export type PreferencePatch = {
@@ -98,6 +102,7 @@ export function mapProfile(row: ProfileRow): Profile {
     showReadReceipts: row.show_read_receipts ?? true,
     notifySound: row.notify_sound ?? true,
     notifyDesktop: row.notify_desktop ?? true,
+    isCreator: Boolean(row.is_creator),
   }
 }
 
@@ -132,6 +137,7 @@ function mapConversation(row: ConversationRow): Conversation {
       favouriteAnime: row.peer_favourite_anime,
       lastSeenAt: row.peer_last_seen ?? null,
       showReadReceipts: row.peer_receipts ?? true,
+      isCreator: Boolean(row.peer_is_creator),
     },
     lastMessage:
       row.last_body && row.last_sender_id && row.last_created_at
@@ -144,6 +150,7 @@ function mapConversation(row: ConversationRow): Conversation {
           }
         : null,
     unread: Number(row.unread) || 0,
+    pinned: Boolean(row.pinned),
   }
 }
 
@@ -310,7 +317,7 @@ export const liveChat = {
   async listConversations(): Promise<Conversation[]> {
     const { data, error } = await client().rpc('list_my_conversations')
     if (error) throw new Error(error.message)
-    return ((data ?? []) as ConversationRow[]).map(mapConversation)
+    return ((data ?? []) as ConversationRow[]).map(mapConversation).sort(compareConversations)
   },
 
   async listMessages(conversationId: string): Promise<Message[]> {
@@ -325,7 +332,7 @@ export const liveChat = {
   },
 
   async searchUsers(query: string): Promise<SearchPerson[]> {
-    const { data, error } = await client().rpc('search_profiles', { query })
+    const { data, error } = await client().rpc('find_user_by_username', { name: query })
     if (error) throw new Error(error.message)
     return ((data ?? []) as (ProfileRow & { request_id?: string | null; request_status?: string | null; request_from?: string | null })[]).map((row) => ({
       ...mapProfile(row),
@@ -378,6 +385,11 @@ export const liveChat = {
 
   async declineRequest(requestId: string): Promise<void> {
     const { error } = await client().rpc('decline_contact', { request_id: requestId })
+    if (error) throw new Error(error.message)
+  },
+
+  async setChatPin(conversationId: string, pinned: boolean): Promise<void> {
+    const { error } = await client().rpc('set_chat_pin', { cid: conversationId, next_pin: pinned })
     if (error) throw new Error(error.message)
   },
 

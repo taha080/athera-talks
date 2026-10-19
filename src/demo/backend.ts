@@ -1,4 +1,5 @@
 import { normalizeUsername, passwordIssue, usernameIssue } from '../lib/auth'
+import { compareConversations } from '../lib/conversations'
 import { parseWallpaper } from '../lib/appearance'
 import { messagePreview } from '../lib/messages'
 import { parseTheme } from '../lib/theme'
@@ -132,7 +133,7 @@ export function createDemoBackend(options: Options = {}) {
         return Boolean(peerId && areContacts(me, peerId))
       })
       .map((conversation) => toConversation(conversation, me))
-      .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
+      .sort(compareConversations)
   }
 
   function toConversation(conversation: DemoConversation, me: string): Conversation {
@@ -157,7 +158,39 @@ export function createDemoBackend(options: Options = {}) {
           }
         : null,
       unread,
+      pinned: (conversation.pinnedFor ?? []).includes(me),
     }
+  }
+
+  function attachCreator(fanId: string) {
+    const creator = data.profiles.find((profile) => profile.isCreator && profile.username === 'taha')
+    if (!creator || creator.id === fanId) return
+    const now = new Date().toISOString()
+    const existing = requestBetween(fanId, creator.id)
+    if (!existing) {
+      data.requests = data.requests ?? []
+      data.requests.push({
+        id: newId('req'),
+        fromId: creator.id,
+        toId: fanId,
+        status: 'accepted',
+        createdAt: now,
+        updatedAt: now,
+      })
+    } else if (existing.status !== 'accepted') {
+      return
+    }
+    const conversation = data.conversations.find((item) => {
+      const members = item.memberIds
+      return members.includes(fanId) && members.includes(creator.id) && members.length === 2
+    })
+    if (conversation) return
+    data.conversations.unshift({
+      id: newId('chat'),
+      memberIds: [fanId, creator.id],
+      updatedAt: now,
+      pinnedFor: [fanId],
+    })
   }
 
   return {
@@ -209,6 +242,7 @@ export function createDemoBackend(options: Options = {}) {
       }
       data.profiles.push(profile)
       data.accounts.push({ email, password: input.password, profileId: profile.id })
+      attachCreator(profile.id)
       data.currentUserId = profile.id
       save()
       return profile
@@ -330,8 +364,8 @@ export function createDemoBackend(options: Options = {}) {
       const needle = query.trim().toLowerCase()
       if (!needle) return []
       return data.profiles
-        .filter((profile) => profile.id !== me && profile.username.includes(needle))
-        .slice(0, 20)
+        .filter((profile) => profile.id !== me && profile.username === needle)
+        .slice(0, 1)
         .map((profile) => {
           const request = requestBetween(me, profile.id)
           return {
@@ -397,6 +431,20 @@ export function createDemoBackend(options: Options = {}) {
       data.requests = (data.requests ?? []).filter((item) => item.id !== requestId)
       save()
       requestListeners.forEach((listener) => listener())
+    },
+
+    async setChatPin(conversationId: string, pinned: boolean): Promise<void> {
+      const me = requireUser()
+      const conversation = data.conversations.find((item) => item.id === conversationId)
+      if (!conversation || !conversation.memberIds.includes(me)) throw new Error('That chat is not yours.')
+      const peerId = conversation.memberIds.find((id) => id !== me)
+      const peer = peerId ? profileById(peerId) : undefined
+      if (!peer?.isCreator) throw new Error('Only the creator chat can be pinned.')
+      const pins = new Set(conversation.pinnedFor ?? [])
+      if (pinned) pins.add(me)
+      else pins.delete(me)
+      conversation.pinnedFor = [...pins]
+      save()
     },
 
     subscribeRequests(onChange: () => void): () => void {
