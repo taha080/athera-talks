@@ -46,4 +46,21 @@ describe('chat list updates', () => {
     expect(removed?.[0].lastMessage?.body).toBe('Message deleted')
     expect(foldConversation([conversation], message({ conversationId: 'missing' }), 'taha', null)).toBeNull()
   })
+
+  it('keeps a pinned chat above a newer one', () => {
+    const pinned: Conversation = {
+      ...conversation,
+      id: 'pin',
+      pinned: true,
+      updatedAt: '2026-10-19T09:00:00.000Z',
+    }
+    const newer: Conversation = { ...conversation, id: 'new', updatedAt: '2026-10-19T12:00:00.000Z' }
+    const folded = foldConversation(
+      [newer, pinned],
+      message({ id: 'm4', conversationId: 'new', createdAt: '2026-10-19T13:00:00.000Z' }),
+      'taha',
+      null,
+    )
+    expect(folded?.map((item) => item.id)).toEqual(['pin', 'new'])
+  })
 })

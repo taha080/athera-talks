@@ -94,6 +94,7 @@ export type Conversation = {
     deliveredAt?: string | null
   } | null
   unread: number
+  pinned?: boolean
 }
 
 export type SignalKind = 'ring' | 'offer' | 'answer' | 'ice' | 'reject' | 'hangup'

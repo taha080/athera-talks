@@ -36,5 +36,11 @@ export function foldConversation(
       unread: viewing || !incoming ? item.unread : item.unread + 1,
     }
   })
-  return next.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
+  return next.sort(compareConversations)
+}
+
+export function compareConversations(a: Conversation, b: Conversation): number {
+  const pin = Number(Boolean(b.pinned)) - Number(Boolean(a.pinned))
+  if (pin !== 0) return pin
+  return a.updatedAt < b.updatedAt ? 1 : -1
 }
