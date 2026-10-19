@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom'
 import { demoBackend } from '../demo/backend'
 import { googleAuthMode, googleSignInError, normalizeUsername, usernameIssue, type GoogleAuthMode } from '../lib/auth'
 import { readSupabaseEnv } from '../lib/config'
+import { startMode } from '../lib/mode'
 import { blobToDataUrl, squareAvatar } from '../lib/image'
 import { getSupabase } from '../lib/supabase'
 import { appUrl } from '../lib/url'
@@ -49,9 +50,8 @@ type SessionValue = {
 const SessionContext = createContext<SessionValue | null>(null)
 
 function initialMode(configured: boolean): Mode {
-  if (configured) return 'live'
-  if (typeof localStorage !== 'undefined' && localStorage.getItem(DEMO_KEY) === '1') return 'demo'
-  return 'setup'
+  const demoStored = typeof localStorage !== 'undefined' && localStorage.getItem(DEMO_KEY) === '1'
+  return startMode(configured, demoStored)
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {

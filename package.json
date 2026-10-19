@@ -1,5 +1,6 @@
 {
-  "name": "ta-talk",
+  "name": "athera-talks",
+  "description": "Athera Talks — real-time chat and voice calls for anime fans. Created by Taha Ahsan.",
   "private": true,
   "version": "1.0.0",
   "type": "module",

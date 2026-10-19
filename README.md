@@ -1,4 +1,4 @@
-# T.A.Talk
+# Athera Talks
 
 Real-time chat and browser voice calls for anime fans. Created by Taha Ahsan.
 
@@ -160,7 +160,7 @@ The setup screen, landing page, chat list, and profile include a **Dark / Naruto
 
 Chat writes a row in `messages`. The browser listens on Supabase Realtime for inserts in conversations you belong to.
 
-A voice call does not go through a media server. Each browser opens a WebRTC peer connection, uses public Google STUN servers to discover a path, and exchanges the offer, answer, and network candidates on a Realtime broadcast channel named `inbox:<user id>`. Both people need T.A.Talk open. There is no TURN relay in v1, so some office or school networks cannot connect. The call timer, mute, and hang-up controls still work in the demo without a microphone.
+A voice call does not go through a media server. Each browser opens a WebRTC peer connection, uses public Google STUN servers to discover a path, and exchanges the offer, answer, and network candidates on a Realtime broadcast channel named `inbox:<user id>`. Both people need Athera Talks open. There is no TURN relay in v1, so some office or school networks cannot connect. The call timer, mute, and hang-up controls still work in the demo without a microphone.
 
 ## Deploy to GitHub Pages
 
@@ -175,7 +175,7 @@ The workflow in `.github/workflows/deploy.yml` builds with Vite base `/ta-talk/`
 4. Merge to `main`. The **Deploy to GitHub Pages** workflow publishes the site.
 5. Add `https://<github-username>.github.io/ta-talk/**` to the Supabase redirect URLs.
 
-If the secrets are missing, the Pages build still succeeds and the published site opens in demo mode.
+The build step passes repository secrets `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` into Vite (project `jvjgouivqzklfzshmdti`). When those are set, the published site opens real Sign in / Sign up and does not offer **Preview the demo**. If the secrets are missing, the Pages build still succeeds and the site opens the setup screen.
 
 ## Deploy to Vercel
 

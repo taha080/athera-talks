@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
+import { APP_NAME } from '../lib/brand'
 import { cn } from '../lib/cn'
 import { formatListTime } from '../lib/format'
 import { fieldClass } from '../lib/styles'
@@ -53,7 +54,7 @@ export function Sidebar() {
         <div className="flex items-center gap-2">
           {theme === 'naruto' ? <KunaiMark className="h-8 w-8 text-sakura" /> : null}
           <div>
-            <p className="text-lg font-semibold tracking-tight">T.A.Talk</p>
+            <p className="text-lg font-semibold tracking-tight">{APP_NAME}</p>
             <p className="text-xs text-mist">@{profile?.username}</p>
           </div>
         </div>
