@@ -22,13 +22,13 @@ export const THEMES = [
 export type ThemeName = (typeof THEMES)[number]
 
 const THEME_COLOR: Record<ThemeName, string> = {
-  dark: '#0e1116',
+  dark: '#0c1016',
   naruto: '#070d18',
   midnight: '#070b16',
   sakura: '#1a0d14',
   ocean: '#04161a',
   forest: '#0c1410',
-  light: '#f6f3ee',
+  light: '#f3f5f7',
   amoled: '#000000',
   blush: '#fff5f7',
   lavender: '#f7f4fc',

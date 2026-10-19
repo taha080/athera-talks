@@ -10,7 +10,7 @@ import {
 import { appendMessage, foldConversation } from '../lib/conversations'
 import { messagePreview } from '../lib/messages'
 import { desktopNotice, playMessageTone } from '../lib/notify'
-import type { Conversation, Message, OutgoingMedia, Profile, ReplyTarget } from '../types'
+import type { Conversation, Message, OutgoingMedia, Profile, ReactionChange, ReplyTarget } from '../types'
 import { useSession } from './SessionContext'
 
 type Toast = { id: string; text: string }
@@ -35,6 +35,7 @@ type ChatValue = {
   deleteForEveryone: (message: Message) => Promise<void>
   broadcastTyping: (conversationId: string) => void
   subscribeTyping: (conversationId: string, onTyping: (userId: string) => void) => () => void
+  react: (messageId: string, emoji: string) => Promise<void>
 }
 
 const ChatContext = createContext<ChatValue | null>(null)
@@ -85,6 +86,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             body: messagePreview(message),
             createdAt: message.createdAt,
             senderId: message.senderId,
+            readAt: message.readAt,
+            deliveredAt: message.deliveredAt ?? null,
           },
         }
       }),
@@ -264,6 +267,27 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     [chat],
   )
 
+  const applyReaction = useCallback((change: ReactionChange) => {
+    setMessages((prev) =>
+      prev.map((message) => {
+        if (message.id !== change.messageId) return message
+        const reactions = (message.reactions ?? []).filter((item) => item.userId !== change.userId)
+        if (!change.removed) reactions.push({ userId: change.userId, emoji: change.emoji })
+        return { ...message, reactions }
+      }),
+    )
+  }, [])
+
+  const react = useCallback(
+    async (messageId: string, emoji: string) => {
+      const change = await chat.toggleReaction(messageId, emoji)
+      applyReaction(change)
+    },
+    [applyReaction, chat],
+  )
+
+  useEffect(() => chat.subscribeReactions(applyReaction), [applyReaction, chat])
+
   const subscribeTyping = useCallback(
     (conversationId: string, onTyping: (userId: string) => void) => chat.subscribeTyping(conversationId, onTyping),
     [chat],
@@ -289,6 +313,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     deleteForEveryone,
     broadcastTyping,
     subscribeTyping,
+    react,
   }
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>

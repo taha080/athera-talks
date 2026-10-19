@@ -30,6 +30,8 @@ export function foldConversation(
         body: messagePreview(message),
         createdAt: message.createdAt,
         senderId: message.senderId,
+        readAt: message.readAt,
+        deliveredAt: message.deliveredAt ?? null,
       },
       unread: viewing || !incoming ? item.unread : item.unread + 1,
     }

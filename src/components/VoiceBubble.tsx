@@ -16,6 +16,7 @@ export function VoiceBubble({
   const audioRef = useRef<HTMLAudioElement>(null)
   const [playing, setPlaying] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [rate, setRate] = useState(1)
   const bars = waveform && waveform.length > 0 ? waveform.slice(0, 40) : Array.from({ length: 24 }, (_, index) => 30 + ((index * 17) % 50))
   const total = seconds && seconds > 0 ? seconds : 0
 
@@ -47,6 +48,7 @@ export function VoiceBubble({
       return
     }
     try {
+      audio.playbackRate = rate
       await audio.play()
       setPlaying(true)
     } catch {
@@ -80,9 +82,23 @@ export function VoiceBubble({
             )
           })}
         </div>
-        <p className={mine ? 'mt-1 text-[11px] text-white/80' : 'mt-1 text-[11px] text-mist'}>
-          {playing ? formatDuration(elapsed) : formatDuration(total)}
-        </p>
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <p className={mine ? 'text-[11px] text-white/80' : 'text-[11px] text-mist'}>
+            {playing ? formatDuration(elapsed) : formatDuration(total)}
+          </p>
+          <button
+            type="button"
+            className={mine ? 'rounded-md px-1 text-[11px] font-medium text-white/90' : 'rounded-md px-1 text-[11px] font-medium text-mist'}
+            aria-label={`Playback speed ${rate} times`}
+            onClick={() => {
+              const next = rate === 1 ? 1.5 : rate === 1.5 ? 2 : 1
+              setRate(next)
+              if (audioRef.current) audioRef.current.playbackRate = next
+            }}
+          >
+            {rate}×
+          </button>
+        </div>
       </div>
       {src ? <audio ref={audioRef} src={src} preload="metadata" playsInline /> : null}
     </div>

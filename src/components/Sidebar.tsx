@@ -1,24 +1,51 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
 import { cn } from '../lib/cn'
 import { formatListTime } from '../lib/format'
-import { fieldClass } from '../lib/styles'
-import type { Profile } from '../types'
 import { isOnline } from '../lib/presence'
+import { receiptTick } from '../lib/receipts'
+import type { Profile } from '../types'
 import { Avatar } from './Avatar'
-import { PhoneIcon, SearchIcon } from './Icons'
+import { CheckIcon, GearIcon, PhoneIcon, PlusIcon, SearchIcon, MoreIcon } from './Icons'
 
 export function Sidebar() {
-  const { mode } = useSession()
+  const { mode, profile } = useSession()
   const chat = useChat()
   const call = useCall()
   const navigate = useNavigate()
+  const searchRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Profile[] | null>(null)
   const [searchError, setSearchError] = useState('')
+  const [filter, setFilter] = useState<'all' | 'unread'>('all')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [typing, setTyping] = useState<Record<string, boolean>>({})
+  const peers = useRef(new Map<string, string>())
+  peers.current = new Map(chat.conversations.map((item) => [item.id, item.peer.id]))
+  const ids = chat.conversations.map((item) => item.id).join(',')
+
+  useEffect(() => {
+    const timers = new Map<string, number>()
+    const stops = ids.split(',').filter(Boolean).map((id) =>
+      chat.subscribeTyping(id, (userId) => {
+        if (peers.current.get(id) !== userId) return
+        setTyping((current) => ({ ...current, [id]: true }))
+        const previous = timers.get(id)
+        if (previous) window.clearTimeout(previous)
+        timers.set(
+          id,
+          window.setTimeout(() => setTyping((current) => ({ ...current, [id]: false })), 3000),
+        )
+      }),
+    )
+    return () => {
+      stops.forEach((stop) => stop())
+      timers.forEach((timer) => window.clearTimeout(timer))
+    }
+  }, [chat, ids])
 
   async function onSearch(value: string) {
     setQuery(value)
@@ -43,42 +70,94 @@ export function Sidebar() {
     navigate(`/c/${id}`)
   }
 
-  return (
-    <div className="flex h-full min-h-0 flex-col bg-panel">
-      <header className="flex h-14 items-center px-4">
-        <h1 className="text-base font-semibold tracking-tight">Chats</h1>
-      </header>
+  const visible = chat.conversations.filter((item) => filter === 'all' || item.unread > 0)
 
-      <div className="px-3 pb-2">
+  return (
+    <div className="relative flex h-full min-h-0 flex-col bg-panel">
+      <header className="flex h-14 items-center gap-2 px-3">
+        <h1 className="min-w-0 flex-1 text-lg font-semibold tracking-tight">Chats</h1>
+        <button type="button" className="hover-wash grid h-9 w-9 place-items-center rounded-full text-mist hover:text-paper" aria-label="New chat" onClick={() => searchRef.current?.focus()}>
+          <PlusIcon className="h-5 w-5" />
+        </button>
+        <button
+          type="button"
+          className="hover-wash grid h-9 w-9 place-items-center rounded-full text-mist hover:text-paper"
+          aria-label="Chat list menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <MoreIcon className="h-5 w-5" />
+        </button>
+      </header>
+      {menuOpen ? (
+        <div className="absolute right-3 top-12 z-30 w-48 rounded-xl border border-line bg-panel p-1 shadow-md" role="menu">
+          <Link to="/settings" className="hover-wash flex items-center gap-2 rounded-lg px-3 py-2 text-sm" onClick={() => setMenuOpen(false)}>
+            <GearIcon className="h-4 w-4" />
+            Settings
+          </Link>
+          {mode === 'demo' ? (
+            <button
+              type="button"
+              className="hover-wash flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm"
+              onClick={() => {
+                const target = chat.conversations.find((item) => item.peer.username === 'sakura') ?? chat.conversations[0]
+                if (target) call.simulateIncoming(target.peer, target.id)
+                setMenuOpen(false)
+              }}
+            >
+              <PhoneIcon className="h-4 w-4" />
+              Preview call
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="px-3">
         <label className="relative block">
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-mist" />
           <input
-            className={`${fieldClass} bg-ink/40 pl-9`}
+            ref={searchRef}
+            className="h-10 w-full rounded-full border border-line bg-elevated pl-9 pr-3 text-sm text-paper outline-none transition placeholder:text-mist/70 focus:border-sakura"
             value={query}
             onChange={(event) => void onSearch(event.target.value)}
-            placeholder="Search username"
+            placeholder="Search or start a chat"
             aria-label="Search username"
           />
         </label>
+        <div className="mt-2 flex gap-1 pb-2" role="tablist" aria-label="Chat filters">
+          {(['all', 'unread'] as const).map((item) => (
+            <button
+              key={item}
+              type="button"
+              role="tab"
+              aria-selected={filter === item}
+              className={cn(
+                'rounded-full px-3 py-1 text-xs font-medium transition',
+                filter === item ? 'bg-sakura text-white' : 'bg-elevated text-mist hover:text-paper',
+              )}
+              onClick={() => setFilter(item)}
+            >
+              {item === 'all' ? 'All' : 'Unread'}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {results ? (
-          <div className="space-y-0.5">
-            {searchError ? <p className="px-3 py-3 text-sm text-danger">{searchError}</p> : null}
-            {results.length === 0 && !searchError ? (
-              <p className="px-3 py-8 text-center text-sm text-mist">No one with that username.</p>
-            ) : null}
+          <div>
+            {searchError ? <p className="px-4 py-3 text-sm text-danger">{searchError}</p> : null}
+            {results.length === 0 && !searchError ? <p className="px-4 py-8 text-center text-sm text-mist">No one with that username.</p> : null}
             {results.map((person) => (
               <button
                 key={person.id}
                 type="button"
                 onClick={() => void openPerson(person.id)}
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-white/5"
+                className="hover-wash flex w-full items-center gap-3 px-3 py-2.5 text-left"
               >
                 <Avatar name={person.username} url={person.avatarUrl} size="sm" />
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium">@{person.username}</span>
+                  <span className="block truncate text-sm font-medium">{person.username}</span>
                   {person.favouriteAnime ? <span className="block truncate text-xs text-mist">{person.favouriteAnime}</span> : null}
                 </span>
               </button>
@@ -86,39 +165,46 @@ export function Sidebar() {
           </div>
         ) : chat.loading ? (
           <ListSkeleton />
-        ) : chat.conversations.length === 0 ? (
-          <p className="px-3 py-8 text-center text-sm leading-6 text-mist">No chats yet. Search a username to start one.</p>
+        ) : visible.length === 0 ? (
+          <p className="px-4 py-10 text-center text-sm leading-6 text-mist">
+            {filter === 'unread' ? 'No unread chats.' : 'No chats yet. Search a username to start one.'}
+          </p>
         ) : (
           <ul>
-            {chat.conversations.map((conversation) => {
+            {visible.map((conversation) => {
               const active = chat.activeId === conversation.id
-              const preview = conversation.lastMessage?.body ?? 'No messages yet'
+              const mine = conversation.lastMessage?.senderId === profile?.id
+              const tick = conversation.lastMessage && mine ? receiptTick(conversation.lastMessage, conversation.peer.showReadReceipts !== false) : null
+              const preview = typing[conversation.id] ? 'typing…' : conversation.lastMessage?.body ?? 'No messages yet'
               return (
                 <li key={conversation.id}>
                   <Link
                     to={`/c/${conversation.id}`}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'flex items-center gap-3 rounded-lg px-2 py-2.5 transition',
-                      active ? 'bg-white/10' : 'hover:bg-white/5',
+                      'flex items-center gap-3 border-b border-line/70 px-3 py-2.5 transition',
+                      active ? 'bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]' : 'hover-wash',
                     )}
                   >
-                    <Avatar
-                      name={conversation.peer.username}
-                      url={conversation.peer.avatarUrl}
-                      online={isOnline(conversation.peer.lastSeenAt)}
-                    />
+                    <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} online={isOnline(conversation.peer.lastSeenAt)} />
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-2">
-                        <span className="truncate text-sm font-medium">@{conversation.peer.username}</span>
+                        <span className={cn('truncate text-sm', conversation.unread > 0 ? 'font-semibold' : 'font-medium')}>
+                          {conversation.peer.username}
+                        </span>
                         {conversation.lastMessage ? (
-                          <time className="shrink-0 text-[11px] text-mist" dateTime={conversation.lastMessage.createdAt}>
+                          <time className={cn('shrink-0 text-[11px]', conversation.unread > 0 ? 'text-sakura' : 'text-mist')} dateTime={conversation.lastMessage.createdAt}>
                             {formatListTime(conversation.lastMessage.createdAt)}
                           </time>
                         ) : null}
                       </span>
                       <span className="mt-0.5 flex items-center justify-between gap-2">
-                        <span className="truncate text-sm text-mist">{preview}</span>
+                        <span className={cn('flex min-w-0 items-center gap-1 text-sm', typing[conversation.id] ? 'text-foam' : 'text-mist')}>
+                          {tick ? (
+                            <CheckIcon className={cn('h-3.5 w-3.5 shrink-0', tick === 'seen' ? 'text-sakura' : '')} double={tick !== 'sent'} />
+                          ) : null}
+                          <span className="truncate">{preview}</span>
+                        </span>
                         {conversation.unread > 0 ? (
                           <span className="grid h-5 min-w-5 place-items-center rounded-full bg-sakura px-1.5 text-[11px] font-semibold text-white">
                             {conversation.unread}
@@ -132,33 +218,17 @@ export function Sidebar() {
             })}
           </ul>
         )}
-        {chat.error ? <p className="px-3 py-2 text-sm text-danger">{chat.error}</p> : null}
+        {chat.error ? <p className="px-4 py-2 text-sm text-danger">{chat.error}</p> : null}
       </div>
-
-      {mode === 'demo' ? (
-        <footer className="border-t border-line px-3 py-2">
-          <button
-            type="button"
-            className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-mist transition hover:bg-white/5 hover:text-paper"
-            onClick={() => {
-              const target = chat.conversations.find((item) => item.peer.username === 'sakura') ?? chat.conversations[0]
-              if (target) call.simulateIncoming(target.peer, target.id)
-            }}
-          >
-            <PhoneIcon className="h-4 w-4" />
-            Preview call
-          </button>
-        </footer>
-      ) : null}
     </div>
   )
 }
 
 function ListSkeleton() {
   return (
-    <div className="space-y-1 px-1" aria-hidden="true">
-      {Array.from({ length: 6 }, (_, index) => (
-        <div key={index} className="flex items-center gap-3 px-2 py-2.5">
+    <div aria-hidden="true">
+      {Array.from({ length: 7 }, (_, index) => (
+        <div key={index} className="flex items-center gap-3 border-b border-line/60 px-3 py-3">
           <span className="skeleton h-12 w-12 rounded-full" />
           <span className="min-w-0 flex-1 space-y-2">
             <span className="skeleton block h-3 w-2/5 rounded" />

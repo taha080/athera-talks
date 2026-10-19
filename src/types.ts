@@ -31,6 +31,18 @@ export type OutgoingMedia = {
   reply?: ReplyTarget | null
 }
 
+export type Reaction = {
+  userId: string
+  emoji: string
+}
+
+export type ReactionChange = {
+  messageId: string
+  userId: string
+  emoji: string
+  removed: boolean
+}
+
 export type Message = {
   id: string
   conversationId: string
@@ -48,6 +60,7 @@ export type Message = {
   replyTo?: string | null
   replyPreview?: string | null
   deletedAt?: string | null
+  reactions?: Reaction[]
 }
 
 export type Conversation = {
@@ -58,6 +71,8 @@ export type Conversation = {
     body: string
     createdAt: string
     senderId: string
+    readAt?: string | null
+    deliveredAt?: string | null
   } | null
   unread: number
 }

@@ -3,7 +3,7 @@ import { parseWallpaper } from '../lib/appearance'
 import { messagePreview } from '../lib/messages'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform } from '../lib/voice'
-import type { Conversation, Message, MessageListener, OutgoingMedia, Profile, ReplyTarget } from '../types'
+import type { Conversation, Message, MessageListener, OutgoingMedia, Profile, ReactionChange, ReplyTarget } from '../types'
 import {
   DEMO_EMAIL,
   TAHA_ID,
@@ -41,6 +41,7 @@ export function createDemoBackend(options: Options = {}) {
   const storage = options.storage
   let data: DemoData = options.initial ?? load(storage) ?? buildSeed(options.now)
   const listeners = new Set<MessageListener>()
+  const reactionListeners = new Set<(change: ReactionChange) => void>()
   const typingListeners = new Map<string, Set<(userId: string) => void>>()
   data.hides = data.hides ?? []
 
@@ -95,7 +96,13 @@ export function createDemoBackend(options: Options = {}) {
       updatedAt: conversation.updatedAt,
       peer: peer ?? { id: peerId, username: 'fan', avatarUrl: null, favouriteAnime: null },
       lastMessage: last
-        ? { body: messagePreview(last), createdAt: last.createdAt, senderId: last.senderId }
+        ? {
+            body: messagePreview(last),
+            createdAt: last.createdAt,
+            senderId: last.senderId,
+            readAt: last.readAt,
+            deliveredAt: last.deliveredAt ?? null,
+          }
         : null,
       unread,
     }
@@ -263,7 +270,7 @@ export function createDemoBackend(options: Options = {}) {
       return data.messages
         .filter((message) => message.conversationId === conversationId && !hidden(message.id, me))
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-        .map((message) => ({ ...message }))
+        .map((message) => ({ ...message, reactions: message.reactions ? message.reactions.map((item) => ({ ...item })) : [] }))
     },
 
     async searchUsers(query: string): Promise<Profile[]> {
@@ -414,6 +421,27 @@ export function createDemoBackend(options: Options = {}) {
 
     async attachMedia(message: Message): Promise<Message> {
       return message
+    },
+
+    async toggleReaction(messageId: string, emoji: string): Promise<ReactionChange> {
+      const me = requireUser()
+      const message = data.messages.find((item) => item.id === messageId)
+      if (!message || hidden(message.id, me)) throw new Error('Message not found')
+      const reactions = message.reactions ?? []
+      const mine = reactions.find((item) => item.userId === me)
+      const removed = mine?.emoji === emoji
+      message.reactions = removed
+        ? reactions.filter((item) => item.userId !== me)
+        : [...reactions.filter((item) => item.userId !== me), { userId: me, emoji }]
+      save()
+      const change = { messageId, userId: me, emoji, removed }
+      reactionListeners.forEach((listener) => listener(change))
+      return change
+    },
+
+    subscribeReactions(onChange: (change: ReactionChange) => void): () => void {
+      reactionListeners.add(onChange)
+      return () => reactionListeners.delete(onChange)
     },
 
     subscribe(listener: MessageListener): () => void {

@@ -748,7 +748,9 @@ returns table (
   last_kind text,
   last_sender_id uuid,
   last_created_at timestamptz,
-  unread int
+  unread int,
+  last_read_at timestamptz,
+  last_delivered_at timestamptz
 )
 language plpgsql
 stable
@@ -790,7 +792,9 @@ begin
           select 1 from public.message_hides h
           where h.message_id = um.id and h.user_id = auth.uid()
         )
-    ) as unread
+    ) as unread,
+    lm.read_at,
+    lm.delivered_at
   from public.conversations c
   join public.conversation_members mine
     on mine.conversation_id = c.id and mine.user_id = auth.uid()
@@ -804,7 +808,7 @@ begin
   ) other on true
   join public.profiles peer on peer.id = other.user_id
   left join lateral (
-    select m.body, m.sender_id, m.created_at, m.kind, m.deleted_at
+    select m.body, m.sender_id, m.created_at, m.kind, m.deleted_at, m.read_at, m.delivered_at
     from public.messages m
     where m.conversation_id = c.id
       and not exists (
@@ -987,3 +991,68 @@ create policy "Members delete own chat images"
     bucket_id = 'chat-images'
     and (storage.foldername(name))[2] = auth.uid()::text
   );
+create table if not exists public.message_reactions (
+  message_id uuid not null references public.messages (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  emoji text not null check (char_length(emoji) between 1 and 16),
+  created_at timestamptz not null default now(),
+  primary key (message_id, user_id)
+);
+
+create index if not exists message_reactions_message_idx
+  on public.message_reactions (message_id);
+
+alter table public.message_reactions enable row level security;
+
+grant select, insert, update, delete on public.message_reactions to authenticated;
+
+drop policy if exists "Members read reactions" on public.message_reactions;
+create policy "Members read reactions"
+  on public.message_reactions for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.messages m
+      where m.id = message_id and public.is_member(m.conversation_id)
+    )
+  );
+
+drop policy if exists "React as yourself" on public.message_reactions;
+create policy "React as yourself"
+  on public.message_reactions for insert
+  to authenticated
+  with check (
+    user_id = auth.uid()
+    and exists (
+      select 1 from public.messages m
+      where m.id = message_id and public.is_member(m.conversation_id)
+    )
+  );
+
+drop policy if exists "Change own reaction" on public.message_reactions;
+create policy "Change own reaction"
+  on public.message_reactions for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists "Remove own reaction" on public.message_reactions;
+create policy "Remove own reaction"
+  on public.message_reactions for delete
+  to authenticated
+  using (user_id = auth.uid());
+
+alter table public.message_reactions replica identity full;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'message_reactions'
+  ) then
+    alter publication supabase_realtime add table public.message_reactions;
+  end if;
+end $$;
