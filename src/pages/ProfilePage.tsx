@@ -7,6 +7,7 @@ import { ThemeSwitcher } from '../components/ThemeSwitcher'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
 import { usernameIssue } from '../lib/auth'
+import { APP_NAME } from '../lib/brand'
 import { dangerButton, fieldClass, ghostButton, primaryButton } from '../lib/styles'
 
 const SUGGESTIONS = ['Attack on Titan', 'Demon Slayer', 'Jujutsu Kaisen', 'Frieren', 'One Piece', 'Spy x Family']
@@ -159,7 +160,7 @@ export function ProfilePage() {
         </button>
 
         <p className="text-center text-sm leading-6 text-mist">
-          T.A.Talk is a small chat for anime circles.
+          {APP_NAME} is a small chat for anime circles.
         </p>
         <Credit />
       </form>

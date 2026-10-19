@@ -1,4 +1,4 @@
--- T.A.Talk schema
+-- Athera Talks schema
 -- Run this once in the Supabase SQL editor (Project → SQL → New query).
 -- Safe to run again: policies are dropped and recreated, tables stay if they exist.
 

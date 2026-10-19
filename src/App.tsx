@@ -5,6 +5,7 @@ import { MissingProfile, Shell } from './components/Shell'
 import { SetupScreen, Splash } from './components/SetupScreen'
 import { SessionProvider, useSession } from './context/SessionContext'
 import { ThemeProvider } from './context/ThemeContext'
+import { APP_NAME } from './lib/brand'
 import { routerBasename } from './lib/url'
 import { AuthScreen } from './pages/AuthScreen'
 import { HomePage } from './pages/HomePage'
@@ -66,7 +67,7 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { message: str
     return (
       <div className="grid min-h-dvh place-items-center px-6 text-center">
         <div>
-          <h1 className="text-xl font-semibold">T.A.Talk hit a snag</h1>
+          <h1 className="text-xl font-semibold">{APP_NAME} hit a snag</h1>
           <p className="mt-2 text-sm text-mist">{this.state.message}</p>
           <button type="button" className="mt-4 text-sm text-sakura" onClick={() => window.location.reload()}>
             Reload

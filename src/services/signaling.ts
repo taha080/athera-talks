@@ -3,7 +3,7 @@ import { isCallSignal } from '../lib/signal'
 import { getSupabase } from '../lib/supabase'
 import type { CallSignal } from '../types'
 
-// One shared inbox per user. Both people must have T.A.Talk open; signals are not stored.
+// One shared inbox per user. Both people must have Athera Talks open; signals are not stored.
 const outbox = new Map<string, { channel: RealtimeChannel; ready: Promise<void> }>()
 
 export function subscribeSignals(userId: string, onSignal: (signal: CallSignal) => void): () => void {

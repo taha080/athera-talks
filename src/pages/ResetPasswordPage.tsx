@@ -6,6 +6,7 @@ import { Glow } from '../components/SetupScreen'
 import { KunaiMark } from '../components/KunaiMark'
 import { NightShell } from '../components/NightVillage'
 import { useSession } from '../context/SessionContext'
+import { APP_NAME } from '../lib/brand'
 import { useTheme } from '../context/ThemeContext'
 import { passwordIssue } from '../lib/auth'
 import { fieldClass, primaryButton } from '../lib/styles'
@@ -58,7 +59,7 @@ export function ResetPasswordPage() {
             <span className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-[#ff8a1a]/80 bg-[#0c1830] text-[#ff9a2e]">
               <KunaiMark className="h-7 w-7" />
             </span>
-            <p className="font-display mt-3 text-4xl text-white">T.A.Talk</p>
+            <p className="font-display mt-3 text-4xl text-white">{APP_NAME}</p>
           </div>
           <h1 className="mt-6 text-center text-xl font-semibold">Choose a new password</h1>
           {canReset ? (

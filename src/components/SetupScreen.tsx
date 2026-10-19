@@ -1,4 +1,5 @@
 import { useTheme } from '../context/ThemeContext'
+import { APP_NAME } from '../lib/brand'
 import { useSession } from '../context/SessionContext'
 import { primaryButton } from '../lib/styles'
 import { Brand } from './Brand'
@@ -59,7 +60,7 @@ function NightSetup({ onDemo }: { onDemo: () => void }) {
           <span className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-[#ff8a1a]/80 bg-[#0c1830] text-[#ff9a2e] shadow-[0_0_24px_rgba(255,138,26,0.28)]">
             <KunaiMark className="h-7 w-7" />
           </span>
-          <p className="font-display mt-3 text-4xl font-semibold tracking-wide text-white">T.A.Talk</p>
+          <p className="font-display mt-3 text-4xl font-semibold text-white">{APP_NAME}</p>
           <p className="mt-1 text-sm text-[#c5d4e6]">Connect the village, or walk through the demo.</p>
         </div>
         <h1 className="mt-6 text-center text-2xl font-semibold tracking-tight">Connect Supabase to start talking.</h1>

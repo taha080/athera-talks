@@ -8,6 +8,7 @@ import { NightShell } from '../components/NightVillage'
 import { ThemeSwitcher } from '../components/ThemeSwitcher'
 import { GoogleIcon } from '../components/Icons'
 import { useSession } from '../context/SessionContext'
+import { APP_NAME } from '../lib/brand'
 import { useTheme } from '../context/ThemeContext'
 import { isValidEmail, normalizeUsername, passwordIssue, usernameIssue } from '../lib/auth'
 import { cn } from '../lib/cn'
@@ -127,10 +128,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
           setError(status === 'taken' ? 'That username is taken.' : 'Choose a different username.')
           return
         }
-        const result = await session.signUp({ email, password, username })
-        if (result.needsEmailConfirm) {
-          setInfo('Check your email to confirm the account, then sign in.')
-        }
+        await session.signUp({ email, password, username })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Could not create the account.')
       } finally {
@@ -172,7 +170,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
             <span className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-[#ff8a1a]/80 bg-[#0c1830] text-[#ff9a2e] shadow-[0_0_28px_rgba(255,138,26,0.3)]">
               <KunaiMark className="h-8 w-8" />
             </span>
-            <p className="font-display mt-3 text-4xl font-semibold tracking-wide text-white">T.A.Talk</p>
+            <p className="font-display mt-3 text-4xl font-semibold text-white">{APP_NAME}</p>
             <p className="mt-1 text-sm text-[#c5d4e6]">
               <span className="text-[#ff8a1a]">◆</span> Speak freely. Connect deeply.{' '}
               <span className="text-[#ff8a1a]">◆</span>

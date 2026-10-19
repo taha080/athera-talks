@@ -10,8 +10,16 @@ import {
 import type { Session } from '@supabase/supabase-js'
 import { useNavigate } from 'react-router-dom'
 import { demoBackend } from '../demo/backend'
-import { googleAuthMode, googleSignInError, normalizeUsername, usernameIssue, type GoogleAuthMode } from '../lib/auth'
+import {
+  googleAuthMode,
+  googleSignInError,
+  normalizeUsername,
+  signUpNeedsPasswordSignIn,
+  usernameIssue,
+  type GoogleAuthMode,
+} from '../lib/auth'
 import { readSupabaseEnv } from '../lib/config'
+import { startMode } from '../lib/mode'
 import { blobToDataUrl, squareAvatar } from '../lib/image'
 import { getSupabase } from '../lib/supabase'
 import { appUrl } from '../lib/url'
@@ -35,7 +43,7 @@ type SessionValue = {
   enterDemo: () => void
   leaveDemo: () => void
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (input: { email: string; password: string; username: string }) => Promise<{ needsEmailConfirm: boolean }>
+  signUp: (input: { email: string; password: string; username: string }) => Promise<void>
   signInWithGoogle: () => Promise<void>
   sendPasswordReset: (email: string) => Promise<{ demoReset: boolean }>
   updatePassword: (password: string) => Promise<void>
@@ -49,9 +57,8 @@ type SessionValue = {
 const SessionContext = createContext<SessionValue | null>(null)
 
 function initialMode(configured: boolean): Mode {
-  if (configured) return 'live'
-  if (typeof localStorage !== 'undefined' && localStorage.getItem(DEMO_KEY) === '1') return 'demo'
-  return 'setup'
+  const demoStored = typeof localStorage !== 'undefined' && localStorage.getItem(DEMO_KEY) === '1'
+  return startMode(configured, demoStored)
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -135,10 +142,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const next = await demoBackend.signUp({ ...input, username })
         setProfile(next)
         setEmail(demoBackend.currentEmail())
-        return { needsEmailConfirm: false }
+        return
       }
-      const { data, error } = await getSupabase()!.auth.signUp({
-        email: input.email.trim(),
+      const supabase = getSupabase()!
+      const email = input.email.trim()
+      const { data, error } = await supabase.auth.signUp({
+        email,
         password: input.password,
         options: {
           data: { username },
@@ -146,7 +155,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         },
       })
       if (error) throw new Error(error.message)
-      return { needsEmailConfirm: !data.session }
+
+      let session = data.session
+      if (signUpNeedsPasswordSignIn(session)) {
+        const signedIn = await supabase.auth.signInWithPassword({ email, password: input.password })
+        if (signedIn.error) throw new Error(signedIn.error.message)
+        session = signedIn.data.session
+      }
+      if (!session) throw new Error('Could not start your session.')
+      setEmail(session.user.email ?? email)
+      setProfile(await fetchProfile(session.user.id))
     },
     [mode],
   )

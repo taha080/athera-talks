@@ -33,6 +33,8 @@ jobs:
       - name: Build
         env:
           # Project site: https://<user>.github.io/ta-talk/
+          # Repo secrets are baked in here. With URL + anon key set, the published
+          # site opens real Sign in / Sign up and does not offer the demo.
           VITE_BASE_PATH: /ta-talk/
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
