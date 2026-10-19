@@ -18,6 +18,7 @@ describe('demo auth and chat', () => {
     expect(first.currentProfile()).toBeNull()
     const profile = await first.signIn(DEMO_EMAIL, DEMO_PASSWORD)
     expect(profile.username).toBe('taha')
+    expect(profile.isCreator).toBe(true)
 
     const restored = createDemoBackend({ persist: true, storage })
     expect(restored.currentProfile()?.id).toBe(TAHA_ID)
@@ -58,6 +59,7 @@ describe('demo auth and chat', () => {
     await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
     const found = await demo.searchUsers('sak')
     expect(found.map((profile) => profile.username)).toEqual(['sakura'])
+    expect(found[0]?.isCreator).toBeFalsy()
     const existing = await demo.startConversation(SAKURA_ID)
     expect(existing).toBe(SAKURA_CHAT)
     const before = await demo.listConversations()

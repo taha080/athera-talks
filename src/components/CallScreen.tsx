@@ -3,6 +3,7 @@ import { useCall } from '../context/CallContext'
 import { callHeadline } from '../lib/callMachine'
 import { cn } from '../lib/cn'
 import { Avatar } from './Avatar'
+import { DisplayName } from './CreatorBadge'
 import { EndIcon, MicIcon, PhoneIcon, VolumeIcon } from './Icons'
 
 export function CallScreen() {
@@ -54,9 +55,11 @@ export function CallScreen() {
           {call.phase !== 'connected' && call.phase !== 'failed' ? (
             <span className="absolute inset-4 animate-ping rounded-full bg-sakura/20" />
           ) : null}
-          <Avatar name={peer?.username ?? 'caller'} url={peer?.avatarUrl} size="xl" />
+          <Avatar name={peer?.username ?? 'caller'} url={peer?.avatarUrl} size="xl" creator={peer?.isCreator} />
         </div>
-        <h2 className="mt-6 text-3xl font-semibold tracking-tight">@{peer?.username}</h2>
+        <h2 className="mt-6 flex items-center justify-center gap-1.5 text-3xl font-semibold tracking-tight">
+          <DisplayName name={`@${peer?.username ?? 'caller'}`} creator={peer?.isCreator} />
+        </h2>
         {call.error ? <p className="mx-auto mt-4 max-w-sm text-sm text-danger">{call.error}</p> : null}
         {call.demo && call.phase === 'connected' ? (
           <p className="mt-3 text-xs text-mist">Preview only. Your microphone stays off.</p>

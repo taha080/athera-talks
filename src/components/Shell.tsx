@@ -76,7 +76,7 @@ function NavRail() {
           <SignOutIcon className="h-5 w-5" />
         </button>
         <Link to="/settings" aria-label="Your profile" className="rounded-full">
-          <Avatar name={profile?.username ?? 'you'} url={profile?.avatarUrl} size="sm" online={isOnline(profile?.lastSeenAt)} />
+          <Avatar name={profile?.username ?? 'you'} url={profile?.avatarUrl} size="sm" online={isOnline(profile?.lastSeenAt)} creator={profile?.isCreator} />
         </Link>
       </div>
     </nav>

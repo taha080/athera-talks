@@ -324,6 +324,32 @@ body {
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--line) 90%, transparent);
 }
 
+.bubble-creator {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #fffdf5 0%, #fff3c4 100%);
+  border: 1px solid #f1d27a;
+  box-shadow: 0 2px 10px #f7c94855;
+  color: #3d2e12;
+}
+
+.bubble-creator::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background: linear-gradient(180deg, #fbe08a 0%, #c8901a 100%);
+}
+
+.creator-bubble-head {
+  color: #9a6b0b;
+  font-size: 11.5px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
 .typing-dot {
   display: inline-block;
   width: 6px;
@@ -649,6 +675,53 @@ textarea:-webkit-autofill {
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
+.creator-shine {
+  position: absolute;
+  top: -30%;
+  bottom: -30%;
+  left: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.15), rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.15), transparent);
+  transform: translateX(-180%) skewX(-18deg);
+  animation: creator-shine 2.5s linear infinite;
+}
+
+.creator-ring {
+  padding: 2px;
+  background: conic-gradient(from 0deg, #fff4b0, #f7c948, #c8901a, #fbe08a, #fff4b0);
+  animation: creator-ring-pulse 2.5s ease-in-out infinite;
+}
+
+.creator-ring-lg {
+  padding: 5px;
+}
+
+.creator-card {
+  border: 1px solid #e7c56a;
+  background: linear-gradient(180deg, #fff8e1 0%, #fff1c2 100%);
+  color: #6b4300;
+  box-shadow: 0 8px 24px #f7c94833;
+}
+
+@keyframes creator-shine {
+  from {
+    transform: translateX(-180%) skewX(-18deg);
+  }
+  to {
+    transform: translateX(420%) skewX(-18deg);
+  }
+}
+
+@keyframes creator-ring-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 8px 1px #f7c94873;
+  }
+  50% {
+    box-shadow: 0 0 18px 5px #f7c948b3;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -656,5 +729,10 @@ textarea:-webkit-autofill {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
+  }
+
+  .creator-shine,
+  .creator-ring {
+    animation: none;
   }
 }

@@ -20,13 +20,16 @@ export function Avatar({
   url,
   size = 'md',
   online = false,
+  creator = false,
 }: {
   name: string
   url?: string | null
   size?: 'sm' | 'md' | 'lg' | 'xl'
   online?: boolean
+  creator?: boolean
 }) {
   const px = { sm: 'h-10 w-10 text-xs', md: 'h-12 w-12 text-sm', lg: 'h-16 w-16 text-lg', xl: 'h-36 w-36 text-3xl' }[size]
+  const ring = creator ? (size === 'xl' ? 'creator-ring creator-ring-lg' : 'creator-ring') : ''
   const initials = name.slice(0, 2).toUpperCase()
   const face = url ? (
     <img src={url} alt="" className={cn('shrink-0 rounded-full object-cover', px)} />
@@ -40,7 +43,7 @@ export function Avatar({
     </span>
   )
   return (
-    <span className="relative inline-flex shrink-0">
+    <span className={cn('relative inline-flex shrink-0 rounded-full', ring)}>
       {face}
       {online ? <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-panel bg-foam" aria-label="Online" /> : null}
     </span>

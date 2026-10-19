@@ -10,6 +10,7 @@ import { isOnline } from '../lib/presence'
 import { receiptTick } from '../lib/receipts'
 import type { SearchPerson } from '../types'
 import { Avatar } from './Avatar'
+import { DisplayName } from './CreatorBadge'
 import { CheckIcon, GearIcon, PhoneIcon, PlusIcon, SearchIcon, MoreIcon } from './Icons'
 
 export function Sidebar() {
@@ -189,9 +190,9 @@ export function Sidebar() {
             {results.map((person) => (
               <article key={person.id} className="mx-3 my-2 rounded-xl border border-line bg-panel p-3 shadow-sm">
                 <div className="flex items-center gap-3">
-                  <Avatar name={person.username} url={person.avatarUrl} size="sm" />
+                  <Avatar name={person.username} url={person.avatarUrl} size="sm" creator={person.isCreator} />
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold">{person.username}</span>
+                    <DisplayName name={person.username} creator={person.isCreator} className="text-sm font-semibold" />
                     {person.favouriteAnime ? <span className="block truncate text-xs text-mist">{person.favouriteAnime}</span> : null}
                   </span>
                 </div>
@@ -246,12 +247,14 @@ export function Sidebar() {
                       active ? 'bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]' : 'hover-wash',
                     )}
                   >
-                    <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} online={isOnline(conversation.peer.lastSeenAt)} />
+                    <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} online={isOnline(conversation.peer.lastSeenAt)} creator={conversation.peer.isCreator} />
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-2">
-                        <span className={cn('truncate text-sm', conversation.unread > 0 ? 'font-semibold' : 'font-medium')}>
-                          {conversation.peer.username}
-                        </span>
+                        <DisplayName
+                          name={conversation.peer.username}
+                          creator={conversation.peer.isCreator}
+                          className={cn('text-sm', conversation.unread > 0 ? 'font-semibold' : 'font-medium')}
+                        />
                         {conversation.lastMessage ? (
                           <time className={cn('shrink-0 text-[11px]', conversation.unread > 0 ? 'text-sakura' : 'text-mist')} dateTime={conversation.lastMessage.createdAt}>
                             {formatListTime(conversation.lastMessage.createdAt)}
@@ -359,8 +362,8 @@ function RequestsPanel({
           {incoming.map((request) => (
             <li key={request.id} className="rounded-xl border border-line bg-panel p-3 shadow-sm">
               <div className="flex items-center gap-3">
-                <Avatar name={request.peer.username} url={request.peer.avatarUrl} size="sm" />
-                <span className="min-w-0 truncate text-sm font-semibold">{request.peer.username}</span>
+                <Avatar name={request.peer.username} url={request.peer.avatarUrl} size="sm" creator={request.peer.isCreator} />
+                <DisplayName name={request.peer.username} creator={request.peer.isCreator} className="text-sm font-semibold" />
               </div>
               <div className="mt-3 flex gap-2">
                 <button type="button" className={`${primaryButton} h-9 px-3 text-xs`} onClick={() => void onAccept(request.id)}>
@@ -380,9 +383,9 @@ function RequestsPanel({
         <ul className="mt-2 space-y-2">
           {outgoing.map((request) => (
             <li key={request.id} className="flex items-center gap-3 rounded-xl border border-line bg-panel p-3 shadow-sm">
-              <Avatar name={request.peer.username} url={request.peer.avatarUrl} size="sm" />
+              <Avatar name={request.peer.username} url={request.peer.avatarUrl} size="sm" creator={request.peer.isCreator} />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{request.peer.username}</span>
+                <DisplayName name={request.peer.username} creator={request.peer.isCreator} className="text-sm font-semibold" />
                 <span className="text-xs text-mist">Pending</span>
               </span>
               <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium" onClick={() => void onCancel(request.id)}>
