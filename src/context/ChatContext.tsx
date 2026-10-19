@@ -84,7 +84,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [chat])
 
   const applyUpdate = useCallback((message: Message) => {
-    setMessages((prev) => prev.map((item) => (item.id === message.id ? { ...item, ...message, mediaUrl: message.mediaUrl ?? item.mediaUrl } : item)))
+    setMessages((prev) =>
+      prev.map((item) =>
+        item.id === message.id
+          ? {
+              ...item,
+              ...message,
+              mediaUrl: message.mediaUrl ?? item.mediaUrl,
+              readAt: message.readAt ?? item.readAt,
+              deliveredAt: message.deliveredAt ?? item.deliveredAt,
+            }
+          : item,
+      ),
+    )
     setConversations((prev) =>
       prev.map((item) => {
         if (item.id !== message.conversationId || !item.lastMessage) return item
@@ -95,8 +107,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             body: messagePreview(message),
             createdAt: message.createdAt,
             senderId: message.senderId,
-            readAt: message.readAt,
-            deliveredAt: message.deliveredAt ?? null,
+            readAt: message.readAt ?? item.lastMessage.readAt,
+            deliveredAt: message.deliveredAt ?? item.lastMessage.deliveredAt ?? null,
           },
         }
       }),
@@ -174,8 +186,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       onUpdate: (message) => {
         void chat.attachMedia(message).then(applyUpdate).catch(() => applyUpdate(message))
       },
+      onReceipt: (receipt) => {
+        setMessages((prev) =>
+          prev.map((item) =>
+            item.id === receipt.messageId ? { ...item, readAt: receipt.readAt, deliveredAt: receipt.deliveredAt } : item,
+          ),
+        )
+        void refresh()
+      },
     })
-  }, [applyUpdate, chat, ingest])
+  }, [applyUpdate, chat, ingest, refresh])
 
   useEffect(() => {
     if (!profile) return

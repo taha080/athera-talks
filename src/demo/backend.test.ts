@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createDemoBackend, type MemoryStorage } from './backend'
-import { DEMO_EMAIL, DEMO_PASSWORD, SAKURA_CHAT, SAKURA_ID, TAHA_ID } from './seed'
+import { buildSeed, DEMO_EMAIL, DEMO_PASSWORD, MIRA_CHAT, MIRA_ID, SAKURA_CHAT, SAKURA_ID, TAHA_ID } from './seed'
 
 function memory(): MemoryStorage {
   const map = new Map<string, string>()
@@ -134,5 +134,59 @@ describe('demo auth and chat', () => {
     expect((await demo.listConversations()).some((chat) => chat.id === chatId)).toBe(true)
     const reply = await demo.sendMessage(chatId, 'hi back')
     expect(reply.body).toBe('hi back')
+  })
+
+  it('stores hidden reads and shows them only to the creator', async () => {
+    const seed = buildSeed(Date.parse('2026-10-19T12:00:00Z'))
+    const mira = seed.profiles.find((profile) => profile.id === MIRA_ID)
+    if (!mira) throw new Error('Mira is missing from the demo seed.')
+    mira.showLastSeen = false
+    mira.showReadReceipts = false
+    seed.accounts.push(
+      { email: 'mira@example.com', password: 'secret1', profileId: MIRA_ID },
+      { email: 'sakura@example.com', password: 'secret1', profileId: SAKURA_ID },
+    )
+    const demo = createDemoBackend({ initial: seed })
+
+    await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
+    const asCreator = (await demo.listConversations()).find((chat) => chat.id === MIRA_CHAT)
+    expect(asCreator?.peer.lastSeenAt).toBeTruthy()
+    expect(asCreator?.peer.showReadReceipts).toBe(true)
+    expect(asCreator?.lastMessage?.readAt).toBeTruthy()
+    const sent = await demo.sendMessage(MIRA_CHAT, 'still there?')
+
+    demo.signOut()
+    await demo.signIn('mira@example.com', 'secret1')
+    await demo.markRead(MIRA_CHAT)
+
+    demo.signOut()
+    await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
+    const creatorThread = await demo.listMessages(MIRA_CHAT)
+    expect(creatorThread.find((message) => message.id === sent.id)?.readAt).toBeTruthy()
+
+    demo.signOut()
+    await demo.signIn('sakura@example.com', 'secret1')
+    await demo.requestContact(MIRA_ID)
+    demo.signOut()
+    await demo.signIn('mira@example.com', 'secret1')
+    const request = (await demo.listRequests())[0]
+    const chatId = await demo.acceptRequest(request.id)
+    demo.signOut()
+    await demo.signIn('sakura@example.com', 'secret1')
+    const fromSakura = await demo.sendMessage(chatId, 'hello mira')
+    const hiddenPresence = (await demo.listConversations()).find((chat) => chat.id === chatId)
+    expect(hiddenPresence?.peer.lastSeenAt ?? null).toBeNull()
+    expect(hiddenPresence?.peer.showReadReceipts).toBe(false)
+
+    demo.signOut()
+    await demo.signIn('mira@example.com', 'secret1')
+    await demo.markRead(chatId)
+    demo.signOut()
+    await demo.signIn('sakura@example.com', 'secret1')
+    const hiddenThread = await demo.listMessages(chatId)
+    expect(hiddenThread.find((message) => message.id === fromSakura.id)?.readAt ?? null).toBeNull()
+    expect(hiddenThread.find((message) => message.id === fromSakura.id)?.deliveredAt ?? null).toBeNull()
+    const hiddenList = (await demo.listConversations()).find((chat) => chat.id === chatId)
+    expect(hiddenList?.lastMessage?.readAt ?? null).toBeNull()
   })
 })

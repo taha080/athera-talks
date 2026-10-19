@@ -135,25 +135,47 @@ export function createDemoBackend(options: Options = {}) {
       .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
   }
 
+  function receiptsVisible(me: string, conversation: DemoConversation): boolean {
+    if (profileById(me)?.isCreator) return true
+    const peerId = conversation.memberIds.find((id) => id !== me)
+    const peer = peerId ? profileById(peerId) : undefined
+    return peer?.showReadReceipts !== false
+  }
+
+  function presentMessage(message: Message, visible: boolean): Message {
+    const copy: Message = {
+      ...message,
+      reactions: message.reactions ? message.reactions.map((item) => ({ ...item })) : [],
+    }
+    if (visible) return copy
+    return { ...copy, readAt: null, deliveredAt: null }
+  }
+
   function toConversation(conversation: DemoConversation, me: string): Conversation {
     const peerId = conversation.memberIds.find((id) => id !== me) ?? conversation.memberIds[0]
-    const peer = profileById(peerId)
+    const peer = profileById(peerId) ?? { id: peerId, username: 'fan', avatarUrl: null, favouriteAnime: null }
     const thread = data.messages
       .filter((message) => message.conversationId === conversation.id && !hidden(message.id, me))
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     const last = thread.at(-1) ?? null
     const unread = thread.filter((message) => message.senderId !== me && !message.readAt && !message.deletedAt).length
+    const seeReceipts = receiptsVisible(me, conversation)
+    const seePresence = profileById(me)?.isCreator === true || peer.showLastSeen !== false
     return {
       id: conversation.id,
       updatedAt: conversation.updatedAt,
-      peer: peer ?? { id: peerId, username: 'fan', avatarUrl: null, favouriteAnime: null },
+      peer: {
+        ...peer,
+        lastSeenAt: seePresence ? peer.lastSeenAt ?? null : null,
+        showReadReceipts: seeReceipts,
+      },
       lastMessage: last
         ? {
             body: messagePreview(last),
             createdAt: last.createdAt,
             senderId: last.senderId,
-            readAt: last.readAt,
-            deliveredAt: last.deliveredAt ?? null,
+            readAt: seeReceipts ? last.readAt ?? null : null,
+            deliveredAt: seeReceipts ? last.deliveredAt ?? null : null,
           }
         : null,
       unread,
@@ -319,10 +341,11 @@ export function createDemoBackend(options: Options = {}) {
       if (!conversation || !conversation.memberIds.includes(me)) {
         throw new Error('That chat is not yours.')
       }
+      const visible = receiptsVisible(me, conversation)
       return data.messages
         .filter((message) => message.conversationId === conversationId && !hidden(message.id, me))
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-        .map((message) => ({ ...message, reactions: message.reactions ? message.reactions.map((item) => ({ ...item })) : [] }))
+        .map((message) => presentMessage(message, visible))
     },
 
     async searchUsers(query: string): Promise<SearchPerson[]> {

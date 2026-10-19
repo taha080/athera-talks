@@ -107,7 +107,15 @@ export type CallSignal = {
   candidate?: RTCIceCandidateInit
 }
 
+export type MessageReceipt = {
+  messageId: string
+  conversationId: string
+  readAt: string | null
+  deliveredAt: string | null
+}
+
 export type MessageListener = {
   onInsert: (message: Message) => void
   onUpdate: (message: Message) => void
+  onReceipt?: (receipt: MessageReceipt) => void
 }

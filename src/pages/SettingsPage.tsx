@@ -351,6 +351,9 @@ function PrivacySection() {
         checked={profile.showReadReceipts !== false}
         onChange={(checked) => void toggle({ showReadReceipts: checked })}
       />
+      <p className="px-1 text-xs leading-5 text-mist">
+        Note: the app creator (Taha Ahsan) can always see last seen and read receipts.
+      </p>
       <Toggle
         label="Message sound"
         detail="A short tone plays when a new message arrives."
