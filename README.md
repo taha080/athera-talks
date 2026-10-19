@@ -70,7 +70,7 @@ You only read and update your own profile row. Chats and messages are limited to
 ### Email auth
 
 1. Open **Authentication → Providers → Email** and leave it enabled.
-2. For a quicker local test, turn **Confirm email** off. If you leave it on, sign up shows “check your email” and the session starts after the link is opened.
+2. Leave **Confirm email** off. New accounts are confirmed on the server, and sign-up opens the app. There is no confirmation email.
 3. Under **Authentication → URL configuration**, set **Site URL** to `http://localhost:5173` while you develop.
 4. Add these **Redirect URLs**:
    - `http://localhost:5173/**`

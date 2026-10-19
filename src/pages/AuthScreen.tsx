@@ -128,10 +128,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
           setError(status === 'taken' ? 'That username is taken.' : 'Choose a different username.')
           return
         }
-        const result = await session.signUp({ email, password, username })
-        if (result.needsEmailConfirm) {
-          setInfo('Check your email to confirm the account, then sign in.')
-        }
+        await session.signUp({ email, password, username })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Could not create the account.')
       } finally {

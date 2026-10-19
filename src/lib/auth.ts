@@ -17,6 +17,12 @@ export function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
 }
 
+// Accounts are confirmed on the server. A sign-up response with no session
+// still gets a password sign-in, so the app never asks anyone to check email.
+export function signUpNeedsPasswordSignIn(session: { access_token?: string } | null | undefined): boolean {
+  return !session?.access_token
+}
+
 export function passwordIssue(password: string): string | null {
   if (password.length < 6) return 'Use at least 6 characters.'
   if (password.length > 72) return 'Use 72 characters or fewer.'
