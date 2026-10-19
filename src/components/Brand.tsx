@@ -1,6 +1,6 @@
 import { useTheme } from '../context/ThemeContext'
 import { cn } from '../lib/cn'
-import { LeafMark } from './LeafMark'
+import { KunaiMark } from './KunaiMark'
 
 export function Brand({ large = false }: { large?: boolean }) {
   const { theme } = useTheme()
@@ -12,7 +12,7 @@ export function Brand({ large = false }: { large?: boolean }) {
           large ? 'h-14 w-14 text-lg' : 'h-11 w-11 text-sm',
         )}
       >
-        {theme === 'naruto' ? <LeafMark className={large ? 'h-9 w-9' : 'h-7 w-7'} /> : 'TA'}
+        {theme === 'naruto' ? <KunaiMark className={large ? 'h-8 w-8' : 'h-6 w-6'} /> : 'TA'}
       </span>
       <div>
         <p className={cn('font-semibold tracking-tight', large ? 'text-2xl' : 'text-lg')}>T.A.Talk</p>
