@@ -10,6 +10,7 @@ import { parseTheme } from './lib/theme'
 import { routerBasename } from './lib/url'
 import { AuthScreen } from './pages/AuthScreen'
 import { HomePage } from './pages/HomePage'
+import { NotFoundPage } from './pages/NotFoundPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { SettingsPage } from './pages/SettingsPage'
 
@@ -47,7 +48,7 @@ function Gate() {
           <Route path="/settings/:section" element={<SettingsPage />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
 }
@@ -81,8 +82,8 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { message: str
       <div className="grid min-h-dvh place-items-center px-6 text-center">
         <div>
           <h1 className="text-xl font-semibold">{APP_NAME} hit a snag</h1>
-          <p className="mt-2 text-sm text-mist">{this.state.message}</p>
-          <button type="button" className="mt-4 text-sm text-sakura" onClick={() => window.location.reload()}>
+          <p className="mt-2 max-w-sm text-sm text-mist">{this.state.message}</p>
+          <button type="button" className="mt-4 rounded-lg bg-sakura px-4 py-2 text-sm font-semibold text-white" onClick={() => window.location.reload()}>
             Reload
           </button>
           <Credit className="mt-6" />

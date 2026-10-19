@@ -16,7 +16,6 @@ import {
   wallpaperClass,
   type WallpaperName,
 } from '../lib/appearance'
-import { APP_NAME } from '../lib/brand'
 import { cn } from '../lib/cn'
 import { type ThemeName } from '../lib/theme'
 import { dangerButton, fieldClass, ghostButton, primaryButton } from '../lib/styles'
@@ -35,20 +34,20 @@ export function SettingsPage() {
   const current: Section = section === 'appearance' || section === 'privacy' ? section : 'profile'
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex items-center gap-3 border-b border-line px-3 py-3">
-        <Link to="/" className="grid h-11 w-11 place-items-center rounded-full hover:bg-white/5 md:hidden" aria-label="Back to chats">
+      <header className="flex h-14 items-center gap-2 border-b border-line bg-panel px-2">
+        <Link to="/" className="grid h-10 w-10 place-items-center rounded-lg hover:bg-white/8 md:hidden" aria-label="Back to chats">
           <BackIcon className="h-5 w-5" />
         </Link>
         <h1 className="text-lg font-semibold">Settings</h1>
       </header>
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <nav className="flex gap-2 overflow-x-auto border-b border-line px-3 py-3 md:w-44 md:flex-col md:border-b-0 md:border-r" aria-label="Settings">
+        <nav className="flex gap-1 overflow-x-auto border-b border-line px-3 py-3 md:w-48 md:flex-col md:border-b-0 md:border-r" aria-label="Settings">
           {SECTIONS.map((item) => (
             <Link
               key={item.id}
               to={item.id === 'profile' ? '/settings' : `/settings/${item.id}`}
               className={cn(
-                'rounded-full px-4 py-2 text-sm font-medium md:rounded-2xl',
+                'rounded-lg px-3 py-2 text-sm font-medium transition',
                 current === item.id ? 'bg-white/10 text-paper' : 'text-mist hover:text-paper',
               )}
               aria-current={current === item.id ? 'page' : undefined}
@@ -155,7 +154,7 @@ function ProfileSection() {
           ))}
         </div>
       </div>
-      {error ? <p className="text-sm text-sakura">{error}</p> : null}
+      {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
       {message ? <p className="text-sm text-foam">{message}</p> : null}
       <button type="submit" className={`${primaryButton} w-full`} disabled={busy}>
         {busy ? 'Saving…' : 'Save profile'}
@@ -167,13 +166,13 @@ function ProfileSection() {
           onClick={() => {
             session.resetDemo()
             void chat.refresh()
-            setMessage('Demo circle restored.')
+            setMessage('Demo chats restored.')
           }}
         >
           Reset demo chats
         </button>
       ) : null}
-      <p className="text-center text-sm leading-6 text-mist">{APP_NAME} is a small chat for anime circles.</p>
+      <p className="text-center text-sm leading-6 text-mist">Messages stay between you and the people you write to.</p>
       <Credit />
     </form>
   )
@@ -238,7 +237,7 @@ function AppearanceSection() {
       >
         <div className="flex h-full flex-col justify-end gap-2 p-4">
           <div className="bubble-other max-w-[70%] rounded-2xl bg-elevated px-3 py-2 text-sm">This is the live preview.</div>
-          <div className="bubble-own ml-auto max-w-[70%] rounded-2xl bg-gradient-to-br from-sakura to-violet px-3 py-2 text-sm text-white">Looks good.</div>
+          <div className="bubble-own ml-auto max-w-[70%] rounded-2xl px-3 py-2 text-sm">Looks good.</div>
         </div>
       </div>
       <div className="space-y-5">
@@ -255,7 +254,7 @@ function AppearanceSection() {
                     type="button"
                     aria-pressed={theme === choice.id}
                     onClick={() => void chooseTheme(choice.id)}
-                    className={cn('rounded-2xl border px-3 py-3 text-left text-sm', theme === choice.id ? 'border-sakura' : 'border-line')}
+                    className={cn('rounded-lg border px-3 py-3 text-left text-sm transition hover:bg-white/5', theme === choice.id ? 'border-sakura ring-2 ring-sakura/30' : 'border-line')}
                   >
                     <span
                       data-theme={choice.id}
@@ -299,7 +298,7 @@ function AppearanceSection() {
           ) : null}
         </div>
       </div>
-      {error ? <p className="text-sm text-sakura">{error}</p> : null}
+      {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
       {message ? <p className="text-sm text-foam">{message}</p> : null}
       <p className="text-xs leading-5 text-mist">Themes and wallpapers are original colours and patterns. They stay with your profile on every device.</p>
     </div>
@@ -364,7 +363,7 @@ function PrivacySection() {
       <button type="button" className={`${ghostButton} w-full`} onClick={() => void allowDesktop()}>
         Allow desktop alerts
       </button>
-      {error ? <p className="text-sm text-sakura">{error}</p> : null}
+      {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
       <button type="button" className={`${dangerButton} w-full`} onClick={() => void session.signOut().then(() => navigate('/login'))}>
         Sign out
       </button>
@@ -384,7 +383,7 @@ function Toggle({
   onChange: (checked: boolean) => void
 }) {
   return (
-    <button type="button" className="flex w-full items-center gap-4 rounded-3xl border border-line px-4 py-3 text-left" onClick={() => onChange(!checked)} aria-pressed={checked}>
+    <button type="button" className="flex w-full items-center gap-4 rounded-lg border border-line px-4 py-3 text-left transition hover:bg-white/5" onClick={() => onChange(!checked)} aria-pressed={checked}>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-medium">{label}</span>
         <span className="mt-1 block text-xs leading-5 text-mist">{detail}</span>

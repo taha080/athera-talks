@@ -41,6 +41,8 @@ type CallValue = {
   reject: () => Promise<void>
   hangup: () => Promise<void>
   toggleMute: () => void
+  speakerOn: boolean
+  toggleSpeaker: () => void
   simulateIncoming: (peer: Profile, conversationId: string) => void
   audioRef: RefObject<HTMLAudioElement | null>
 }
@@ -52,6 +54,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(callReducer, initialCallState)
   const [banner, setBanner] = useState<string | null>(null)
   const [debug, setDebug] = useState('')
+  const [speakerOn, setSpeakerOn] = useState(true)
+  const speakerRef = useRef(true)
   const stateRef = useRef(state)
   const profileRef = useRef(profile)
   const pcRef = useRef<RTCPeerConnection | null>(null)
@@ -70,27 +74,28 @@ export function CallProvider({ children }: { children: ReactNode }) {
   stateRef.current = state
   profileRef.current = profile
 
-  const playRemote = useCallback(() => {
+  const applyOutput = useCallback(() => {
     const audio = audioRef.current
     if (!audio) return
-    audio.muted = false
+    const on = speakerRef.current
+    audio.muted = !on
+    audio.volume = on ? 1 : 0
     audio.autoplay = true
-    audio.volume = 1
     const pending = audio.play()
     if (pending) void pending.catch(() => {})
   }, [])
+
+  const playRemote = useCallback(() => {
+    applyOutput()
+  }, [applyOutput])
 
   // Must run synchronously inside the Start / Accept click, before any await.
   const primePlayback = useCallback(() => {
     const audio = audioRef.current
     if (!audio) return
-    audio.muted = false
-    audio.autoplay = true
-    audio.volume = 1
     if (!audio.srcObject && !audio.src) audio.src = SILENT_WAV
-    const pending = audio.play()
-    if (pending) void pending.catch(() => {})
-  }, [])
+    applyOutput()
+  }, [applyOutput])
 
   const clearTimers = useCallback(() => {
     if (demoTimer.current) window.clearTimeout(demoTimer.current)
@@ -116,6 +121,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
       audioRef.current.srcObject = null
       audioRef.current.removeAttribute('src')
     }
+    speakerRef.current = true
+    setSpeakerOn(true)
     setDebug('')
     const peerId = stateRef.current.peer?.id
     if (peerId && mode === 'live') void closeOutbox(peerId)
@@ -491,6 +498,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const reject = useCallback(() => finish('reject'), [finish])
   const hangup = useCallback(() => finish(stateRef.current.phase === 'incoming' ? 'reject' : 'hangup'), [finish])
 
+  const toggleSpeaker = useCallback(() => {
+    speakerRef.current = !speakerRef.current
+    setSpeakerOn(speakerRef.current)
+    applyOutput()
+  }, [applyOutput])
+
   const toggleMute = useCallback(() => {
     const nextMuted = !stateRef.current.muted
     localRef.current?.getAudioTracks().forEach((track) => {
@@ -518,6 +531,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
     reject,
     hangup,
     toggleMute,
+    speakerOn,
+    toggleSpeaker,
     simulateIncoming,
     audioRef,
   }

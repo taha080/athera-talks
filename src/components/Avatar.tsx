@@ -1,11 +1,11 @@
 import { cn } from '../lib/cn'
 
 const PALETTES = [
-  ['#ff4f8b', '#8d6bff'],
-  ['#22d3ee', '#6366f1'],
-  ['#f59e0b', '#ef4444'],
-  ['#34d399', '#0ea5e9'],
-  ['#fb7185', '#f97316'],
+  ['#1a56db', '#3b82f6'],
+  ['#0f766e', '#14b8a6'],
+  ['#334155', '#64748b'],
+  ['#1e3a5f', '#3b6ea5'],
+  ['#3f3f46', '#71717a'],
 ]
 
 function gradient(name: string): string {
@@ -26,7 +26,7 @@ export function Avatar({
   size?: 'sm' | 'md' | 'lg' | 'xl'
   online?: boolean
 }) {
-  const px = { sm: 'h-10 w-10 text-xs', md: 'h-12 w-12 text-sm', lg: 'h-16 w-16 text-lg', xl: 'h-28 w-28 text-3xl' }[size]
+  const px = { sm: 'h-10 w-10 text-xs', md: 'h-12 w-12 text-sm', lg: 'h-16 w-16 text-lg', xl: 'h-36 w-36 text-3xl' }[size]
   const initials = name.slice(0, 2).toUpperCase()
   const face = url ? (
     <img src={url} alt="" className={cn('shrink-0 rounded-full object-cover', px)} />

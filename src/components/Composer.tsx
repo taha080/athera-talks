@@ -225,7 +225,7 @@ export function Composer({
       }}
     >
       {reply ? (
-        <div className="mb-2 flex items-center gap-2 rounded-2xl border-l-4 border-sakura bg-white/5 px-3 py-2 text-sm">
+        <div className="mb-2 flex items-center gap-2 rounded-lg border-l-4 border-sakura bg-white/5 px-3 py-2 text-sm">
           <p className="min-w-0 flex-1 truncate text-mist">{reply.preview}</p>
           <button type="button" aria-label="Cancel reply" onClick={onClearReply}>
             <CloseIcon className="h-4 w-4" />
@@ -233,7 +233,7 @@ export function Composer({
         </div>
       ) : null}
       {emojiOpen ? (
-        <div className="mb-2 grid grid-cols-8 gap-1 rounded-2xl bg-elevated p-2" role="listbox" aria-label="Emoji">
+        <div className="mb-2 grid grid-cols-8 gap-1 rounded-lg bg-elevated p-2" role="listbox" aria-label="Emoji">
           {EMOJI.map((emoji) => (
             <button
               key={emoji}
@@ -253,11 +253,11 @@ export function Composer({
         <div className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-sakura" />
           <p className="min-w-0 flex-1 text-sm">{phase === 'locked' ? 'Tap send to share' : 'Recording'} · {formatDuration(seconds)}</p>
-          <button type="button" className="rounded-full px-3 py-2 text-sm text-mist" onClick={() => void finish(false)}>
+          <button type="button" className="rounded-lg px-3 py-2 text-sm text-mist hover:text-paper" onClick={() => void finish(false)}>
             Cancel
           </button>
           {phase === 'locked' ? (
-            <button type="button" className="grid h-12 w-12 place-items-center rounded-full bg-white text-ink" aria-label="Send voice message" onClick={() => void finish(true)}>
+            <button type="button" className="grid h-10 w-10 place-items-center rounded-lg bg-sakura text-white" aria-label="Send voice message" onClick={() => void finish(true)}>
               <SendIcon className="h-5 w-5" />
             </button>
           ) : null}
@@ -270,10 +270,10 @@ export function Composer({
             void submitText()
           }}
         >
-          <button type="button" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-white/5" aria-label="Emoji" onClick={() => setEmojiOpen((open) => !open)}>
+          <button type="button" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-mist transition hover:bg-white/8 hover:text-paper" aria-label="Emoji" aria-expanded={emojiOpen} onClick={() => setEmojiOpen((open) => !open)}>
             <SmileIcon className="h-5 w-5" />
           </button>
-          <label className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-full hover:bg-white/5" aria-label="Send a photo">
+          <label className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-lg text-mist transition hover:bg-white/8 hover:text-paper" aria-label="Send a photo">
             <ImageIcon className="h-5 w-5" />
             <input
               type="file"
@@ -303,13 +303,13 @@ export function Composer({
             />
           </label>
           {draft.trim() ? (
-            <button type="submit" className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-ink" aria-label="Send message">
+            <button type="submit" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-sakura text-white transition hover:brightness-110" aria-label="Send message">
               <SendIcon className="h-5 w-5" />
             </button>
           ) : (
             <button
               type="button"
-              className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-ink"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-sakura text-white transition hover:brightness-110"
               aria-label="Record voice message"
               onPointerDown={(event) => void onMicDown(event)}
             >
@@ -318,7 +318,7 @@ export function Composer({
           )}
         </form>
       )}
-      {error ? <p className="px-1 pt-2 text-sm text-sakura">{error}</p> : null}
+      {error ? <p className="px-1 pt-2 text-sm text-danger" role="alert">{error}</p> : null}
     </div>
   )
 }
