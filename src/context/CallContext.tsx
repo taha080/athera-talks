@@ -23,6 +23,7 @@ import {
   waitForIceCandidate,
   type IcePolicy,
 } from '../lib/webrtc'
+import { profileIsCreator } from '../services/liveBackend'
 import { closeOutbox, sendSignal, subscribeSignals } from '../services/signaling'
 import type { CallSignal, Profile } from '../types'
 import { useSession } from './SessionContext'
@@ -348,7 +349,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
         if (signal.sdp) pendingOfferRef.current = signal.sdp
         if (phase === 'idle' && !activeCallRef.current) {
           activeCallRef.current = signal.conversationId
-          dispatch({ type: 'incoming', conversationId: signal.conversationId, peer: signal.from })
+          const peer = mode === 'live'
+            ? { ...signal.from, isCreator: await profileIsCreator(signal.from.id) }
+            : signal.from
+          dispatch({ type: 'incoming', conversationId: signal.conversationId, peer })
           return
         }
         if ((currentId ?? activeCallRef.current) === signal.conversationId) return
@@ -399,7 +403,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         setBanner(signal.kind === 'reject' ? 'Call declined' : 'Call ended')
       }
     },
-    [answerOffer, cleanupMedia, deliver, failFinal, flushIce],
+    [answerOffer, cleanupMedia, deliver, failFinal, flushIce, mode],
   )
 
   const onSignalRef = useRef(onSignal)
