@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0e1116" />
+    <meta name="theme-color" content="#eef1f4" />
     <meta name="description" content="Athera Talks — private messages and voice calls. Created by Taha Ahsan." />
     <meta name="application-name" content="Athera Talks" />
     <meta property="og:title" content="Athera Talks" />
@@ -22,9 +22,9 @@
       try {
         var themes = ['dark','naruto','midnight','sakura','ocean','forest','light','amoled','blush','lavender','peach','rosegold','cotton','mint','blossom','coquette']
         var savedTheme = localStorage.getItem('tatalk:theme')
-        document.documentElement.setAttribute('data-theme', themes.indexOf(savedTheme) >= 0 ? savedTheme : 'dark')
+        document.documentElement.setAttribute('data-theme', themes.indexOf(savedTheme) >= 0 ? savedTheme : 'light')
       } catch (e) {
-        document.documentElement.setAttribute('data-theme', 'dark')
+        document.documentElement.setAttribute('data-theme', 'light')
       }
     </script>
   </head>

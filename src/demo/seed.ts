@@ -31,6 +31,15 @@ export type DemoHide = {
   userId: string
 }
 
+export type DemoRequest = {
+  id: string
+  fromId: string
+  toId: string
+  status: 'pending' | 'accepted' | 'declined'
+  createdAt: string
+  updatedAt: string
+}
+
 export type DemoData = {
   version: 1
   currentUserId: string | null
@@ -39,6 +48,7 @@ export type DemoData = {
   conversations: DemoConversation[]
   messages: Message[]
   hides: DemoHide[]
+  requests?: DemoRequest[]
 }
 
 const hour = 60 * 60 * 1000
@@ -48,7 +58,7 @@ export function buildSeed(now = Date.now()): DemoData {
   const at = (msAgo: number) => new Date(now - msAgo).toISOString()
 
   const profiles: Profile[] = [
-    { id: TAHA_ID, username: 'taha', avatarUrl: null, favouriteAnime: 'Attack on Titan', theme: 'dark', wallpaper: 'waves', lastSeenAt: at(15_000), showLastSeen: true, showReadReceipts: true, notifySound: true, notifyDesktop: true },
+    { id: TAHA_ID, username: 'taha', avatarUrl: null, favouriteAnime: 'Attack on Titan', theme: 'light', wallpaper: 'plain', lastSeenAt: at(15_000), showLastSeen: true, showReadReceipts: true, notifySound: true, notifyDesktop: true },
     { id: SAKURA_ID, username: 'sakura', avatarUrl: null, favouriteAnime: 'Demon Slayer', lastSeenAt: at(20_000), showReadReceipts: true },
     { id: KENJI_ID, username: 'kenji', avatarUrl: null, favouriteAnime: 'One Piece', lastSeenAt: at(2 * hour), showReadReceipts: true },
     { id: MIRA_ID, username: 'mira', avatarUrl: null, favouriteAnime: 'Spy x Family', lastSeenAt: at(5 * hour), showReadReceipts: false },
@@ -82,6 +92,23 @@ export function buildSeed(now = Date.now()): DemoData {
     ],
     messages,
     hides: [],
+    requests: [SAKURA_CHAT, KENJI_CHAT, MIRA_CHAT, REN_CHAT].map((id, index) => {
+      const conversation = [
+        [TAHA_ID, SAKURA_ID],
+        [TAHA_ID, KENJI_ID],
+        [TAHA_ID, MIRA_ID],
+        [TAHA_ID, REN_ID],
+      ][index]
+      const [fromId, toId] = conversation[0] < conversation[1] ? conversation : [conversation[1], conversation[0]]
+      return {
+        id: `req-${id}`,
+        fromId,
+        toId,
+        status: 'accepted' as const,
+        createdAt: at(0),
+        updatedAt: at(0),
+      }
+    }),
   }
 }
 

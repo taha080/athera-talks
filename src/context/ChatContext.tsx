@@ -10,7 +10,7 @@ import {
 import { appendMessage, foldConversation } from '../lib/conversations'
 import { messagePreview } from '../lib/messages'
 import { desktopNotice, playMessageTone } from '../lib/notify'
-import type { Conversation, Message, OutgoingMedia, Profile, ReplyTarget } from '../types'
+import type { ContactRequest, Conversation, Message, OutgoingMedia, ReactionChange, ReplyTarget, SearchPerson } from '../types'
 import { useSession } from './SessionContext'
 
 type Toast = { id: string; text: string }
@@ -27,7 +27,13 @@ type ChatValue = {
   pushToast: (text: string) => void
   setActive: (id: string | null) => void
   refresh: () => Promise<void>
-  search: (query: string) => Promise<Profile[]>
+  search: (query: string) => Promise<SearchPerson[]>
+  requests: ContactRequest[]
+  incomingRequests: number
+  requestContact: (userId: string) => Promise<void>
+  acceptRequest: (requestId: string) => Promise<string>
+  declineRequest: (requestId: string) => Promise<void>
+  cancelRequest: (requestId: string) => Promise<void>
   startChat: (userId: string) => Promise<string>
   send: (conversationId: string, body: string, reply?: ReplyTarget | null) => Promise<void>
   sendMedia: (input: OutgoingMedia) => Promise<void>
@@ -35,6 +41,7 @@ type ChatValue = {
   deleteForEveryone: (message: Message) => Promise<void>
   broadcastTyping: (conversationId: string) => void
   subscribeTyping: (conversationId: string, onTyping: (userId: string) => void) => () => void
+  react: (messageId: string, emoji: string) => Promise<void>
 }
 
 const ChatContext = createContext<ChatValue | null>(null)
@@ -47,6 +54,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [requests, setRequests] = useState<ContactRequest[]>([])
+  const seenRequests = useRef(new Set<string>())
+  const requestsReady = useRef(false)
   const [toasts, setToasts] = useState<Toast[]>([])
   const activeRef = useRef<string | null>(null)
   const seen = useRef(new Set<string>())
@@ -85,6 +95,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             body: messagePreview(message),
             createdAt: message.createdAt,
             senderId: message.senderId,
+            readAt: message.readAt,
+            deliveredAt: message.deliveredAt ?? null,
           },
         }
       }),
@@ -213,6 +225,85 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setActiveId(id)
   }, [])
 
+  const applyRequests = useCallback((rows: ContactRequest[], announce: boolean) => {
+    const me = profileRef.current?.id
+    if (announce && me) {
+      for (const request of rows) {
+        if (request.status === 'pending' && request.toId === me && !seenRequests.current.has(request.id)) {
+          pushToast(`Contact request from @${request.peer.username}`)
+          const prefs = profileRef.current
+          if (prefs?.notifySound !== false) playMessageTone()
+          if (prefs?.notifyDesktop !== false) void desktopNotice('Contact request', `@${request.peer.username} wants to connect`)
+        }
+      }
+    }
+    rows.forEach((request) => seenRequests.current.add(request.id))
+    requestsReady.current = true
+    setRequests(rows)
+  }, [pushToast])
+
+  const loadRequests = useCallback(async () => {
+    const rows = await chat.listRequests()
+    applyRequests(rows, requestsReady.current)
+  }, [applyRequests, chat])
+
+  useEffect(() => {
+    if (!profile) return
+    let stop = () => {}
+    let cancelled = false
+    void chat.listRequests().then((rows) => {
+      if (cancelled) return
+      applyRequests(rows, false)
+      stop = chat.subscribeRequests(() => {
+        void chat.listRequests().then((next) => {
+          applyRequests(next, true)
+          void refresh()
+        }).catch(() => undefined)
+      })
+      void chat.listRequests().then((next) => {
+        if (!cancelled) applyRequests(next, true)
+      }).catch(() => undefined)
+    }).catch(() => undefined)
+    return () => {
+      cancelled = true
+      stop()
+    }
+  }, [applyRequests, chat, profile, refresh])
+
+  const requestContact = useCallback(
+    async (userId: string) => {
+      await chat.requestContact(userId)
+      await loadRequests()
+    },
+    [chat, loadRequests],
+  )
+
+  const acceptRequest = useCallback(
+    async (requestId: string) => {
+      const id = await chat.acceptRequest(requestId)
+      await loadRequests()
+      await refresh()
+      return id
+    },
+    [chat, loadRequests, refresh],
+  )
+
+  const declineRequest = useCallback(
+    async (requestId: string) => {
+      await chat.declineRequest(requestId)
+      await loadRequests()
+    },
+    [chat, loadRequests],
+  )
+
+  const cancelRequest = useCallback(
+    async (requestId: string) => {
+      await chat.cancelRequest(requestId)
+      await loadRequests()
+    },
+    [chat, loadRequests],
+  )
+
   const search = useCallback((query: string) => chat.searchUsers(query), [chat])
   const startChat = useCallback((userId: string) => chat.startConversation(userId), [chat])
 
@@ -264,6 +355,27 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     [chat],
   )
 
+  const applyReaction = useCallback((change: ReactionChange) => {
+    setMessages((prev) =>
+      prev.map((message) => {
+        if (message.id !== change.messageId) return message
+        const reactions = (message.reactions ?? []).filter((item) => item.userId !== change.userId)
+        if (!change.removed) reactions.push({ userId: change.userId, emoji: change.emoji })
+        return { ...message, reactions }
+      }),
+    )
+  }, [])
+
+  const react = useCallback(
+    async (messageId: string, emoji: string) => {
+      const change = await chat.toggleReaction(messageId, emoji)
+      applyReaction(change)
+    },
+    [applyReaction, chat],
+  )
+
+  useEffect(() => chat.subscribeReactions(applyReaction), [applyReaction, chat])
+
   const subscribeTyping = useCallback(
     (conversationId: string, onTyping: (userId: string) => void) => chat.subscribeTyping(conversationId, onTyping),
     [chat],
@@ -282,6 +394,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setActive,
     refresh,
     search,
+    requests,
+    incomingRequests: requests.filter((request) => request.status === 'pending' && request.toId === profile?.id).length,
+    requestContact,
+    acceptRequest,
+    declineRequest,
+    cancelRequest,
     startChat,
     send,
     sendMedia,
@@ -289,6 +407,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     deleteForEveryone,
     broadcastTyping,
     subscribeTyping,
+    react,
   }
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>

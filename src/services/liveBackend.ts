@@ -5,7 +5,7 @@ import { messageKind } from '../lib/messages'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform, extensionForMime, parseWaveform } from '../lib/voice'
 import { getSupabase } from '../lib/supabase'
-import type { Conversation, Message, MessageListener, OutgoingMedia, Profile, ReplyTarget } from '../types'
+import type { ContactRequest, ContactStatus, Conversation, Message, MessageListener, OutgoingMedia, Profile, Reaction, ReactionChange, ReplyTarget, SearchPerson } from '../types'
 
 const PROFILE_COLUMNS =
   'id, username, avatar_url, favourite_anime, theme, wallpaper, wallpaper_path, last_seen_at, show_last_seen, show_read_receipts, notify_sound, notify_desktop'
@@ -60,6 +60,8 @@ type ConversationRow = {
   last_sender_id: string | null
   last_created_at: string | null
   unread: number | string
+  last_read_at?: string | null
+  last_delivered_at?: string | null
 }
 
 export type PreferencePatch = {
@@ -75,6 +77,11 @@ function client() {
   const supabase = getSupabase()
   if (!supabase) throw new Error('Supabase is not configured.')
   return supabase
+}
+
+function contactStatus(value: string | null | undefined): ContactStatus | null {
+  if (value === 'pending' || value === 'accepted' || value === 'declined') return value
+  return null
 }
 
 export function mapProfile(row: ProfileRow): Profile {
@@ -132,6 +139,8 @@ function mapConversation(row: ConversationRow): Conversation {
             body: row.last_body,
             createdAt: row.last_created_at,
             senderId: row.last_sender_id,
+            readAt: row.last_read_at ?? null,
+            deliveredAt: row.last_delivered_at ?? null,
           }
         : null,
     unread: Number(row.unread) || 0,
@@ -143,6 +152,25 @@ async function withWallpaper(profile: Profile): Promise<Profile> {
   const { data, error } = await client().storage.from('wallpapers').createSignedUrl(profile.wallpaperPath, 60 * 60 * 24 * 7)
   if (error || !data?.signedUrl) return profile
   return { ...profile, wallpaperUrl: data.signedUrl }
+}
+
+async function withReactions(messages: Message[]): Promise<Message[]> {
+  if (messages.length === 0) return messages
+  const { data, error } = await client()
+    .from('message_reactions')
+    .select('message_id, user_id, emoji')
+    .in(
+      'message_id',
+      messages.map((message) => message.id),
+    )
+  if (error) throw new Error(error.message)
+  const grouped = new Map<string, Reaction[]>()
+  for (const row of (data ?? []) as { message_id: string; user_id: string; emoji: string }[]) {
+    const list = grouped.get(row.message_id) ?? []
+    list.push({ userId: row.user_id, emoji: row.emoji })
+    grouped.set(row.message_id, list)
+  }
+  return messages.map((message) => ({ ...message, reactions: grouped.get(message.id) ?? [] }))
 }
 
 async function signMessages(messages: Message[]): Promise<Message[]> {
@@ -293,13 +321,80 @@ export const liveChat = {
       .order('created_at', { ascending: true })
       .limit(200)
     if (error) throw new Error(error.message)
-    return signMessages(((data ?? []) as MessageRow[]).map(mapMessage))
+    return withReactions(await signMessages(((data ?? []) as MessageRow[]).map(mapMessage)))
   },
 
-  async searchUsers(query: string): Promise<Profile[]> {
+  async searchUsers(query: string): Promise<SearchPerson[]> {
     const { data, error } = await client().rpc('search_profiles', { query })
     if (error) throw new Error(error.message)
-    return ((data ?? []) as ProfileRow[]).map(mapProfile)
+    return ((data ?? []) as (ProfileRow & { request_id?: string | null; request_status?: string | null; request_from?: string | null })[]).map((row) => ({
+      ...mapProfile(row),
+      requestId: row.request_id ?? null,
+      requestStatus: contactStatus(row.request_status),
+      requestFromId: row.request_from ?? null,
+    }))
+  },
+
+  async listRequests(): Promise<ContactRequest[]> {
+    const { data, error } = await client().rpc('list_contact_requests')
+    if (error) throw new Error(error.message)
+    return ((data ?? []) as {
+      id: string
+      from_id: string
+      to_id: string
+      status: string
+      created_at: string
+      updated_at: string
+      peer_id: string
+      peer_username: string
+      peer_avatar_url: string | null
+      peer_favourite_anime: string | null
+    }[]).map((row) => ({
+      id: row.id,
+      fromId: row.from_id,
+      toId: row.to_id,
+      status: contactStatus(row.status) ?? 'pending',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      peer: {
+        id: row.peer_id,
+        username: row.peer_username,
+        avatarUrl: row.peer_avatar_url,
+        favouriteAnime: row.peer_favourite_anime,
+      },
+    }))
+  },
+
+  async requestContact(userId: string): Promise<void> {
+    const { error } = await client().rpc('request_contact', { other_id: userId })
+    if (error) throw new Error(error.message)
+  },
+
+  async acceptRequest(requestId: string): Promise<string> {
+    const { data, error } = await client().rpc('accept_contact', { request_id: requestId })
+    if (error) throw new Error(error.message)
+    return String(data)
+  },
+
+  async declineRequest(requestId: string): Promise<void> {
+    const { error } = await client().rpc('decline_contact', { request_id: requestId })
+    if (error) throw new Error(error.message)
+  },
+
+  async cancelRequest(requestId: string): Promise<void> {
+    const { error } = await client().rpc('cancel_contact', { request_id: requestId })
+    if (error) throw new Error(error.message)
+  },
+
+  subscribeRequests(onChange: () => void): () => void {
+    const supabase = client()
+    const channel = supabase
+      .channel('contact-requests')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contact_requests' }, () => onChange())
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
   },
 
   async startConversation(otherUserId: string): Promise<string> {
@@ -389,6 +484,46 @@ export const liveChat = {
   async touchPresence(): Promise<void> {
     const { error } = await client().rpc('touch_last_seen')
     if (error) throw new Error(error.message)
+  },
+
+  async toggleReaction(messageId: string, emoji: string): Promise<ReactionChange> {
+    const userId = await currentUserId()
+    const existing = await client()
+      .from('message_reactions')
+      .select('emoji')
+      .eq('message_id', messageId)
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (existing.error) throw new Error(existing.error.message)
+    if (existing.data?.emoji === emoji) {
+      const { error } = await client().from('message_reactions').delete().eq('message_id', messageId).eq('user_id', userId)
+      if (error) throw new Error(error.message)
+      return { messageId, userId, emoji, removed: true }
+    }
+    if (existing.data) {
+      const { error } = await client().from('message_reactions').update({ emoji }).eq('message_id', messageId).eq('user_id', userId)
+      if (error) throw new Error(error.message)
+      return { messageId, userId, emoji, removed: false }
+    }
+    const { error } = await client().from('message_reactions').insert({ message_id: messageId, user_id: userId, emoji })
+    if (error) throw new Error(error.message)
+    return { messageId, userId, emoji, removed: false }
+  },
+
+  subscribeReactions(onChange: (change: ReactionChange) => void): () => void {
+    const supabase = client()
+    const channel = supabase
+      .channel('message-reactions')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, (payload) => {
+        const removed = payload.eventType === 'DELETE'
+        const row = (removed ? payload.old : payload.new) as { message_id?: string; user_id?: string; emoji?: string }
+        if (!row.message_id || !row.user_id || !row.emoji) return
+        onChange({ messageId: row.message_id, userId: row.user_id, emoji: row.emoji, removed })
+      })
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
   },
 
   async attachMedia(message: Message): Promise<Message> {

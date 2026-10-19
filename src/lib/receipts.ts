@@ -1,7 +1,7 @@
 export type ReceiptTick = 'sent' | 'delivered' | 'seen'
 
 export function receiptTick(
-  message: { readAt: string | null; deliveredAt?: string | null },
+  message: { readAt?: string | null; deliveredAt?: string | null },
   receiptsShared: boolean,
 ): ReceiptTick {
   if (!receiptsShared) return 'sent'

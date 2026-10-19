@@ -8,7 +8,7 @@ import { dangerButton, iconButton } from '../lib/styles'
 import { isOnline } from '../lib/presence'
 import { Avatar } from './Avatar'
 import { CallScreen } from './CallScreen'
-import { ChatsIcon, GearIcon, SignOutIcon } from './Icons'
+import { AddContactIcon, ChatsIcon, GearIcon, SignOutIcon } from './Icons'
 import { Credit } from './Credit'
 import { Logo } from './Logo'
 import { Sidebar } from './Sidebar'
@@ -22,7 +22,7 @@ export function Shell() {
   return (
     <ChatProvider>
       <CallProvider>
-        <div className="flex h-dvh overflow-hidden bg-ink text-paper">
+        <div className="app-canvas flex h-dvh overflow-hidden text-paper">
           <NavRail />
           <aside
             className={cn(
@@ -32,7 +32,7 @@ export function Shell() {
           >
             <Sidebar />
           </aside>
-          <section className={cn('min-h-0 min-w-0 flex-1 flex-col bg-ink', showList ? 'hidden md:flex' : 'flex')}>
+          <section className={cn('min-h-0 min-w-0 flex-1 flex-col', showList ? 'hidden md:flex' : 'flex')}>
             <Outlet />
           </section>
           <CallScreen />
@@ -47,15 +47,20 @@ function NavRail() {
   const location = useLocation()
   const navigate = useNavigate()
   const { profile, signOut } = useSession()
+  const { incomingRequests } = useChat()
   const settings = location.pathname.startsWith('/settings')
+  const requestsOpen = location.pathname === '/' && new URLSearchParams(location.search).get('requests') === '1'
   return (
     <nav aria-label="Primary" className="hidden h-full w-16 shrink-0 flex-col items-center justify-between border-r border-line bg-panel py-3 md:flex">
       <div className="flex flex-col items-center gap-1">
         <Link to="/" aria-label="Athera Talks home" className="mb-2 rounded-lg">
           <Logo className="h-9 w-9" />
         </Link>
-        <RailLink to="/" label="Chats" active={!settings}>
+        <RailLink to="/" label="Chats" active={!settings && !requestsOpen}>
           <ChatsIcon className="h-5 w-5" />
+        </RailLink>
+        <RailLink to="/?requests=1" label="Requests" active={requestsOpen} badge={incomingRequests}>
+          <AddContactIcon className="h-5 w-5" />
         </RailLink>
         <RailLink to="/settings" label="Settings" active={settings}>
           <GearIcon className="h-5 w-5" />
@@ -82,21 +87,28 @@ function RailLink({
   to,
   label,
   active,
+  badge = 0,
   children,
 }: {
   to: string
   label: string
   active: boolean
+  badge?: number
   children: ReactNode
 }) {
   return (
     <Link
       to={to}
-      aria-label={label}
+      aria-label={badge > 0 ? `${label}, ${badge} new` : label}
       aria-current={active ? 'page' : undefined}
-      className={cn(iconButton, active ? 'bg-white/10 text-paper' : '')}
+      className={cn(iconButton, 'relative', active ? 'bg-elevated text-paper' : '')}
     >
       {children}
+      {badge > 0 ? (
+        <span className="absolute right-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-sakura px-1 text-[10px] font-semibold text-white">
+          {badge}
+        </span>
+      ) : null}
     </Link>
   )
 }

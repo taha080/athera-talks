@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDayLabel, formatDuration, formatListTime, formatMessageTime } from './format'
+import { formatCallClock, formatDayLabel, formatDuration, formatListTime, formatMessageTime } from './format'
 
 const now = new Date(2026, 9, 19, 15, 0, 0)
 
@@ -8,6 +8,17 @@ describe('formatDuration', () => {
     expect(formatDuration(0)).toBe('0:00')
     expect(formatDuration(65)).toBe('1:05')
     expect(formatDuration(600)).toBe('10:00')
+  })
+})
+
+describe('formatCallClock', () => {
+  it('pads minutes and seconds, then adds hours', () => {
+    expect(formatCallClock(0)).toBe('00:00')
+    expect(formatCallClock(1)).toBe('00:01')
+    expect(formatCallClock(65)).toBe('01:05')
+    expect(formatCallClock(3599)).toBe('59:59')
+    expect(formatCallClock(3600)).toBe('1:00:00')
+    expect(formatCallClock(3665)).toBe('1:01:05')
   })
 })
 

@@ -1,7 +1,11 @@
 import {
   Check,
   CheckCheck,
+  ChevronDown,
   ChevronLeft,
+  Copy,
+  Plus,
+  Reply,
   Image,
   LogOut,
   MessageSquare,
@@ -17,6 +21,8 @@ import {
   Send,
   Settings,
   Smile,
+  Trash2,
+  UserPlus,
   Volume2,
   VolumeX,
   X,
@@ -77,6 +83,10 @@ export function CloseIcon({ className }: IconProps) {
   return glyph(X, className)
 }
 
+export function TrashIcon({ className }: IconProps) {
+  return glyph(Trash2, className)
+}
+
 export function CheckIcon({ className, double = false }: IconProps & { double?: boolean }) {
   return glyph(double ? CheckCheck : Check, className)
 }
@@ -107,4 +117,24 @@ export function PlayIcon({ className }: IconProps) {
 
 export function PauseIcon({ className }: IconProps) {
   return glyph(Pause, className)
+}
+
+export function CopyIcon({ className }: IconProps) {
+  return glyph(Copy, className)
+}
+
+export function PlusIcon({ className }: IconProps) {
+  return glyph(Plus, className)
+}
+
+export function AddContactIcon({ className }: IconProps) {
+  return glyph(UserPlus, className)
+}
+
+export function ReplyIcon({ className }: IconProps) {
+  return glyph(Reply, className)
+}
+
+export function DownIcon({ className }: IconProps) {
+  return glyph(ChevronDown, className)
 }

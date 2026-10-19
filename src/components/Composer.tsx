@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { EMOJI } from '../lib/emoji'
 import { fitImage } from '../lib/image'
-import { fieldClass } from '../lib/styles'
 import { encodeWaveform, pickAudioMime } from '../lib/voice'
 import { formatDuration } from '../lib/format'
 import type { ReplyTarget } from '../types'
@@ -43,6 +42,9 @@ export function Composer({
   const finishing = useRef(false)
   const lastType = useRef(0)
   const shell = useRef<HTMLDivElement>(null)
+  const box = useRef<HTMLTextAreaElement>(null)
+  const originX = useRef(0)
+  const [slide, setSlide] = useState(0)
 
   useEffect(() => {
     return () => {
@@ -61,6 +63,12 @@ export function Composer({
     audioContext.current = null
   }
 
+  function grow(node: HTMLTextAreaElement | null) {
+    if (!node) return
+    node.style.height = '0px'
+    node.style.height = `${Math.min(node.scrollHeight, 128)}px`
+  }
+
   function noteTyping(value: string) {
     setDraft(value)
     const now = Date.now()
@@ -74,6 +82,7 @@ export function Composer({
     if (!body) return
     setDraft('')
     setEmojiOpen(false)
+    if (box.current) box.current.style.height = 'auto'
     setError('')
     try {
       await onSendText(body)
@@ -185,6 +194,8 @@ export function Composer({
     if (phase !== 'idle') return
     holding.current = true
     try {
+      originX.current = event.clientX
+      setSlide(0)
       shell.current?.setPointerCapture(event.pointerId)
       await begin()
       if (!holding.current && !locked.current) {
@@ -217,15 +228,21 @@ export function Composer({
   return (
     <div
       ref={shell}
-      className="border-t border-line px-3 py-3"
+      className="rounded-xl border border-line bg-panel px-2 py-1.5 shadow-md"
       onPointerUp={onMicUp}
+      onPointerMove={(event) => {
+        if (phase !== 'recording' || locked.current) return
+        const dx = Math.min(0, event.clientX - originX.current)
+        setSlide(dx)
+        if (dx < -88) void finish(false)
+      }}
       onPointerCancel={() => {
         holding.current = false
         if (!locked.current && recorder.current) void finish(false)
       }}
     >
       {reply ? (
-        <div className="mb-2 flex items-center gap-2 rounded-lg border-l-4 border-sakura bg-white/5 px-3 py-2 text-sm">
+        <div className="mb-2 flex items-center gap-2 rounded-lg border-l-4 border-sakura bg-elevated px-3 py-2 text-sm">
           <p className="min-w-0 flex-1 truncate text-mist">{reply.preview}</p>
           <button type="button" aria-label="Cancel reply" onClick={onClearReply}>
             <CloseIcon className="h-4 w-4" />
@@ -238,7 +255,7 @@ export function Composer({
             <button
               key={emoji}
               type="button"
-              className="rounded-lg py-1 text-lg hover:bg-white/10"
+              className="hover-wash rounded-lg py-1 text-lg"
               onClick={() => {
                 setDraft((value) => `${value}${emoji}`)
                 onTyping()
@@ -250,14 +267,17 @@ export function Composer({
         </div>
       ) : null}
       {recording ? (
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-sakura" />
-          <p className="min-w-0 flex-1 text-sm">{phase === 'locked' ? 'Tap send to share' : 'Recording'} · {formatDuration(seconds)}</p>
-          <button type="button" className="rounded-lg px-3 py-2 text-sm text-mist hover:text-paper" onClick={() => void finish(false)}>
+        <div className="flex items-center gap-2 px-1">
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#e5484d]" />
+          <p className="tabular-nums text-sm font-medium">{formatDuration(seconds)}</p>
+          <p className="min-w-0 flex-1 text-center text-sm text-mist" style={{ transform: `translateX(${slide}px)` }}>
+            {phase === 'locked' ? 'Tap send to share' : 'Slide to cancel'}
+          </p>
+          <button type="button" className="rounded-full px-3 py-2 text-sm text-mist hover:text-paper" onClick={() => void finish(false)}>
             Cancel
           </button>
           {phase === 'locked' ? (
-            <button type="button" className="grid h-10 w-10 place-items-center rounded-lg bg-sakura text-white" aria-label="Send voice message" onClick={() => void finish(true)}>
+            <button type="button" className="grid h-10 w-10 place-items-center rounded-full bg-sakura text-white" aria-label="Send voice message" onClick={() => void finish(true)}>
               <SendIcon className="h-5 w-5" />
             </button>
           ) : null}
@@ -270,10 +290,10 @@ export function Composer({
             void submitText()
           }}
         >
-          <button type="button" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-mist transition hover:bg-white/8 hover:text-paper" aria-label="Emoji" aria-expanded={emojiOpen} onClick={() => setEmojiOpen((open) => !open)}>
+          <button type="button" className="hover-wash grid h-10 w-10 shrink-0 place-items-center rounded-full text-mist hover:text-paper" aria-label="Emoji" aria-expanded={emojiOpen} onClick={() => setEmojiOpen((open) => !open)}>
             <SmileIcon className="h-5 w-5" />
           </button>
-          <label className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-lg text-mist transition hover:bg-white/8 hover:text-paper" aria-label="Send a photo">
+          <label className="hover-wash grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full text-mist hover:text-paper" aria-label="Attach a photo">
             <ImageIcon className="h-5 w-5" />
             <input
               type="file"
@@ -288,12 +308,16 @@ export function Composer({
           <label className="min-w-0 flex-1">
             <span className="sr-only">Message</span>
             <textarea
-              className={`${fieldClass} max-h-32 resize-none`}
+              ref={box}
+              className="max-h-32 min-h-10 w-full resize-none bg-transparent px-1 py-2.5 text-sm leading-5 text-paper outline-none placeholder:text-mist/70"
               rows={1}
               maxLength={4000}
               value={draft}
               placeholder={`Message @${peerName}`}
-              onChange={(event) => noteTyping(event.target.value)}
+              onChange={(event) => {
+                noteTyping(event.target.value)
+                grow(event.target)
+              }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                   event.preventDefault()
@@ -303,13 +327,13 @@ export function Composer({
             />
           </label>
           {draft.trim() ? (
-            <button type="submit" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-sakura text-white transition hover:brightness-110" aria-label="Send message">
+            <button type="submit" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label="Send message">
               <SendIcon className="h-5 w-5" />
             </button>
           ) : (
             <button
               type="button"
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-sakura text-white transition hover:brightness-110"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110"
               aria-label="Record voice message"
               onPointerDown={(event) => void onMicDown(event)}
             >

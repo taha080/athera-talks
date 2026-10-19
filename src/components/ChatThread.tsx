@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
 import { wallpaperClass } from '../lib/appearance'
+import { QUICK_REACTIONS, groupPosition, groupedReactions, linkHost, linkParts, type GroupPos } from '../lib/chatView'
 import { dayKey, formatDayLabel, formatMessageTime } from '../lib/format'
 import { messagePreview } from '../lib/messages'
 import { isOnline, presenceLabel } from '../lib/presence'
@@ -13,26 +14,7 @@ import type { Conversation, Message, ReplyTarget } from '../types'
 import { Avatar } from './Avatar'
 import { Composer } from './Composer'
 import { VoiceBubble } from './VoiceBubble'
-import { BackIcon, CheckIcon, CloseIcon, MoreHorizontalIcon, MoreIcon, PhoneIcon } from './Icons'
-
-type GroupPos = 'single' | 'start' | 'mid' | 'end'
-
-function groupPos(messages: Message[], index: number): GroupPos {
-  const current = messages[index]
-  const prev = messages[index - 1]
-  const next = messages[index + 1]
-  const close = (a: Message | undefined, b: Message | undefined) => {
-    if (!a || !b || a.senderId !== b.senderId || a.deletedAt || b.deletedAt) return false
-    if (dayKey(a.createdAt) !== dayKey(b.createdAt)) return false
-    return Math.abs(new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) < 5 * 60 * 1000
-  }
-  const withPrev = close(prev, current)
-  const withNext = close(current, next)
-  if (withPrev && withNext) return 'mid'
-  if (withPrev) return 'end'
-  if (withNext) return 'start'
-  return 'single'
-}
+import { BackIcon, CheckIcon, CloseIcon, CopyIcon, DownIcon, MoreIcon, PhoneIcon, ReplyIcon, SearchIcon, SmileIcon, TrashIcon } from './Icons'
 
 export function ChatThread({ conversation }: { conversation: Conversation | undefined }) {
   const { profile } = useSession()
@@ -40,41 +22,113 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
   const call = useCall()
   const [reply, setReply] = useState<ReplyTarget | null>(null)
   const [menuId, setMenuId] = useState<string | null>(null)
+  const [reactId, setReactId] = useState<string | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [matchIndex, setMatchIndex] = useState(0)
   const [typing, setTyping] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [lightbox, setLightbox] = useState<string | null>(null)
+  const [showJump, setShowJump] = useState(false)
+  const [jumpCount, setJumpCount] = useState(0)
+  const [dividerId, setDividerId] = useState<string | null>(null)
+  const scroller = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const nearBottom = useRef(true)
+  const seenCount = useRef(0)
+  const marked = useRef<string | null>(null)
+  const openedUnread = useRef<{ id?: string; count: number }>({ count: 0 })
   const typingTimer = useRef<number | null>(null)
+  if (openedUnread.current.id !== conversation?.id) {
+    openedUnread.current = { id: conversation?.id, count: conversation?.unread ?? 0 }
+  }
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: 'end' })
-  }, [chat.messages, conversation?.id])
+  const query = search.trim().toLowerCase()
+  const matches = useMemo(
+    () => (query ? chat.messages.filter((message) => !message.deletedAt && message.body.toLowerCase().includes(query)) : []),
+    [chat.messages, query],
+  )
 
   useEffect(() => {
     setReply(null)
     setMenuId(null)
+    setReactId(null)
     setInfoOpen(false)
+    setSearchOpen(false)
+    setSearch('')
     setTyping(false)
+    setShowJump(false)
+    setJumpCount(0)
+    setDividerId(null)
+    nearBottom.current = true
+    seenCount.current = 0
+    marked.current = null
   }, [conversation?.id])
 
   useEffect(() => {
-    if (!infoOpen) return
+    if (!conversation || chat.messagesLoading || marked.current === conversation.id) return
+    if (chat.messages.length === 0 || chat.messages.some((message) => message.conversationId !== conversation.id)) return
+    marked.current = conversation.id
+    const incoming = chat.messages.filter((message) => message.senderId !== profile?.id && !message.deletedAt)
+    const firstUnread = openedUnread.current.count > 0 ? incoming[Math.max(0, incoming.length - openedUnread.current.count)] : undefined
+    setDividerId(firstUnread?.id ?? null)
+  }, [chat.messages, chat.messagesLoading, conversation, profile?.id])
+
+  useEffect(() => {
+    if (chat.messagesLoading) return
+    const added = chat.messages.length - seenCount.current
+    const last = chat.messages.at(-1)
+    seenCount.current = chat.messages.length
+    if (nearBottom.current || last?.senderId === profile?.id) {
+      bottomRef.current?.scrollIntoView({ block: 'end', behavior: added === 1 ? 'smooth' : 'auto' })
+      setJumpCount(0)
+      setShowJump(false)
+      return
+    }
+    if (added > 0 && last && last.senderId !== profile?.id) {
+      setJumpCount((count) => count + added)
+      setShowJump(true)
+      setDividerId((current) => current ?? chat.messages[Math.max(0, chat.messages.length - added)]?.id ?? null)
+    }
+  }, [chat.messages, chat.messagesLoading, profile?.id])
+
+  useEffect(() => {
+    if (!infoOpen && !lightbox) return
     function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') setInfoOpen(false)
+      if (event.key === 'Escape') {
+        setInfoOpen(false)
+        setLightbox(null)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [infoOpen])
+  }, [infoOpen, lightbox])
+
+  const peerId = conversation?.peer.id
+  const conversationId = conversation?.id
+  const subscribeTyping = useRef(chat.subscribeTyping)
+  subscribeTyping.current = chat.subscribeTyping
 
   useEffect(() => {
-    if (!conversation) return
-    return chat.subscribeTyping(conversation.id, (userId) => {
-      if (userId !== conversation.peer.id) return
+    if (!conversationId || !peerId) return
+    const stop = subscribeTyping.current(conversationId, (userId) => {
+      if (userId !== peerId) return
       setTyping(true)
       if (typingTimer.current) window.clearTimeout(typingTimer.current)
       typingTimer.current = window.setTimeout(() => setTyping(false), 3000)
     })
-  }, [chat, conversation])
+    return () => {
+      stop()
+      if (typingTimer.current) window.clearTimeout(typingTimer.current)
+    }
+  }, [conversationId, peerId])
+
+  useEffect(() => {
+    const id = matches[matchIndex]?.id
+    if (!id) return
+    document.querySelector(`[data-message-id="${id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [matchIndex, matches])
 
   if (!conversation) {
     return (
@@ -90,6 +144,23 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
   const status = typing ? 'typing…' : presenceLabel(conversation.peer.lastSeenAt) || 'offline'
   let lastDay = ''
 
+  function onScroll() {
+    const node = scroller.current
+    if (!node) return
+    const distance = node.scrollHeight - node.scrollTop - node.clientHeight
+    const near = distance < 96
+    nearBottom.current = near
+    setShowJump(!near)
+    if (near) setJumpCount(0)
+  }
+
+  function jumpToBottom() {
+    nearBottom.current = true
+    setJumpCount(0)
+    setShowJump(false)
+    bottomRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
+  }
+
   async function act(task: Promise<void>) {
     setActionError('')
     try {
@@ -100,47 +171,57 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
     }
   }
 
+  async function copyMessage(message: Message) {
+    const text = message.kind === 'image' ? 'Photo' : message.kind === 'voice' ? 'Voice message' : message.body
+    try {
+      await navigator.clipboard.writeText(text)
+      chat.pushToast('Copied')
+    } catch {
+      chat.pushToast('Could not copy that message')
+    }
+    setMenuId(null)
+  }
+
   return (
     <div
-      className={`flex h-full min-h-0 flex-col ${wallpaperClass(wallpaper)}`}
-      style={customImage ? { backgroundImage: `url("${customImage}")` } : undefined}
+      className={`relative flex h-full min-h-0 flex-col ${wallpaperClass(wallpaper)}`}
+      style={customImage ? { backgroundImage: `url("${customImage}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
     >
-      <header className="relative flex h-14 items-center gap-2 border-b border-line bg-panel/95 px-2 backdrop-blur">
+      <header className="relative flex h-14 shrink-0 items-center gap-2 border-b border-line bg-panel px-2">
         <Link to="/" className={`${iconButton} md:hidden`} aria-label="Back to chats">
           <BackIcon className="h-5 w-5" />
         </Link>
         <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} size="sm" online={online} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">@{conversation.peer.username}</p>
+          <p className="truncate text-sm font-semibold">{conversation.peer.username}</p>
           <p className={`truncate text-xs ${typing || online ? 'text-foam' : 'text-mist'}`}>{status}</p>
         </div>
-        <button
-          type="button"
-          className={iconButton}
-          aria-label="Start voice call"
-          onClick={() => void call.startCall(conversation.peer, conversation.id)}
-        >
+        <button type="button" className={iconButton} aria-label="Start voice call" onClick={() => void call.startCall(conversation.peer, conversation.id)}>
           <PhoneIcon className="h-5 w-5" />
         </button>
         <button
           type="button"
           className={iconButton}
-          aria-label="Conversation details"
-          aria-expanded={infoOpen}
-          aria-haspopup="dialog"
-          onClick={() => setInfoOpen((open) => !open)}
+          aria-label="Search in chat"
+          aria-pressed={searchOpen}
+          onClick={() => {
+            setSearchOpen((open) => !open)
+            setSearch('')
+            setMatchIndex(0)
+          }}
         >
+          <SearchIcon className="h-5 w-5" />
+        </button>
+        <button type="button" className={iconButton} aria-label="Conversation details" aria-expanded={infoOpen} aria-haspopup="dialog" onClick={() => setInfoOpen((open) => !open)}>
           <MoreIcon className="h-5 w-5" />
         </button>
         {infoOpen ? (
-          <div className="absolute right-2 top-14 z-20 w-64 rounded-lg border border-line bg-panel p-3 text-left shadow-md" role="dialog" aria-label="Conversation details">
+          <div className="absolute right-2 top-14 z-20 w-64 rounded-xl border border-line bg-panel p-3 text-left shadow-md" role="dialog" aria-label="Conversation details">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">@{conversation.peer.username}</p>
+                <p className="truncate text-sm font-semibold">{conversation.peer.username}</p>
                 <p className="mt-1 text-xs text-mist">{status}</p>
-                {conversation.peer.favouriteAnime ? (
-                  <p className="mt-2 text-xs text-mist">{conversation.peer.favouriteAnime}</p>
-                ) : null}
+                {conversation.peer.favouriteAnime ? <p className="mt-2 text-xs text-mist">{conversation.peer.favouriteAnime}</p> : null}
               </div>
               <button type="button" className={iconButton} aria-label="Close details" onClick={() => setInfoOpen(false)}>
                 <CloseIcon className="h-4 w-4" />
@@ -149,73 +230,133 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
           </div>
         ) : null}
       </header>
+      {searchOpen ? (
+        <div className="flex items-center gap-2 border-b border-line bg-panel px-3 py-2">
+          <input
+            className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-elevated px-3 text-sm outline-none focus:border-sakura focus:ring-2 focus:ring-sakura/30"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value)
+              setMatchIndex(0)
+            }}
+            placeholder="Search messages"
+            aria-label="Search messages"
+          />
+          <span className="shrink-0 text-xs text-mist">{matches.length === 0 ? '0' : `${matchIndex + 1}/${matches.length}`}</span>
+          <button type="button" className={iconButton} aria-label="Previous match" onClick={() => setMatchIndex((index) => (matches.length === 0 ? 0 : (index - 1 + matches.length) % matches.length))}>
+            <DownIcon className="h-4 w-4 rotate-180" />
+          </button>
+          <button type="button" className={iconButton} aria-label="Next match" onClick={() => setMatchIndex((index) => (matches.length === 0 ? 0 : (index + 1) % matches.length))}>
+            <DownIcon className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6">
+      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-6" onScroll={onScroll}>
         {chat.messagesLoading ? <MessageSkeleton /> : null}
         {!chat.messagesLoading && chat.messages.length === 0 ? (
-          <p className="mx-auto mt-16 max-w-xs text-center text-sm leading-6 text-mist">
-            No messages yet. Say hello, send a photo, or hold the mic for a voice note.
-          </p>
+          <p className="mx-auto mt-16 max-w-xs text-center text-sm leading-6 text-mist">No messages yet. Say hello, send a photo, or hold the mic for a voice note.</p>
         ) : null}
         {chat.messages.map((message, index) => {
           const day = dayKey(message.createdAt)
           const showDay = day !== lastDay
           lastDay = day
           const mine = message.senderId === profile?.id
-          const pos = groupPos(chat.messages, index)
+          const pos = groupPosition(chat.messages, index)
+          const hit = Boolean(query) && !message.deletedAt && message.body.toLowerCase().includes(query)
           return (
-            <div key={message.id} className={pos === 'start' || pos === 'single' ? 'mt-3 first:mt-0' : 'mt-0.5'}>
+            <div key={message.id} data-message-id={message.id} className={pos === 'start' || pos === 'single' ? 'mt-2.5 first:mt-0' : 'mt-0.5'}>
               {showDay ? (
-                <p className="my-3 text-center">
-                  <span className="rounded-full bg-panel/90 px-3 py-1 text-[11px] font-medium text-mist shadow-sm">
+                <div className="sticky top-2 z-10 my-3 flex justify-center">
+                  <span className="rounded-full border border-line bg-panel/95 px-3 py-1 text-[11px] font-medium text-mist shadow-sm backdrop-blur">
                     {formatDayLabel(message.createdAt)}
                   </span>
-                </p>
+                </div>
+              ) : null}
+              {dividerId === message.id ? (
+                <p className="my-3 text-center text-[11px] font-medium uppercase tracking-[0.14em] text-sakura">New messages</p>
               ) : null}
               <MessageRow
                 message={message}
                 mine={mine}
                 pos={pos}
+                meId={profile?.id ?? ''}
+                highlighted={hit}
                 receiptsShared={conversation.peer.showReadReceipts !== false}
                 menuOpen={menuId === message.id}
-                onOpenMenu={() => setMenuId((current) => (current === message.id ? null : message.id))}
+                reactOpen={reactId === message.id}
+                onOpenMenu={() => {
+                  setMenuId((current) => (current === message.id ? null : message.id))
+                  setReactId(null)
+                }}
                 onReply={() => {
                   setReply({ id: message.id, preview: messagePreview(message).slice(0, 80) })
                   setMenuId(null)
                 }}
+                onReact={() => setReactId((current) => (current === message.id ? null : message.id))}
+                onCopy={() => void copyMessage(message)}
                 onHide={() => void act(chat.hideMessage(message.id))}
                 onDelete={() => void act(chat.deleteForEveryone(message))}
+                onToggleReaction={(emoji) => {
+                  setReactId(null)
+                  void act(chat.react(message.id, emoji))
+                }}
+                onOpenImage={(src) => setLightbox(src)}
               />
             </div>
           )
         })}
+        {typing ? (
+          <div className="mt-2 mr-auto max-w-[min(78%,26rem)]" aria-live="polite">
+            <div className="bubble-other inline-flex items-center gap-1 rounded-[18px] rounded-bl-[4px] px-3 py-2.5 text-mist">
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+              <span className="sr-only">typing…</span>
+            </div>
+          </div>
+        ) : null}
         <div ref={bottomRef} />
       </div>
-      {actionError ? <p className="px-4 text-sm text-danger">{actionError}</p> : null}
-      <div className="bg-panel/95 backdrop-blur">
+
+      {showJump ? (
+        <button
+          type="button"
+          className="absolute bottom-24 right-4 z-20 grid h-10 min-w-10 place-items-center rounded-full border border-line bg-panel px-2 text-paper shadow-md"
+          aria-label={jumpCount > 0 ? `Jump to latest, ${jumpCount} new` : 'Jump to latest'}
+          onClick={jumpToBottom}
+        >
+          <DownIcon className="h-5 w-5" />
+          {jumpCount > 0 ? <span className="absolute -top-1.5 right-0 grid h-5 min-w-5 place-items-center rounded-full bg-sakura px-1 text-[10px] font-semibold text-white">{jumpCount}</span> : null}
+        </button>
+      ) : null}
+      {actionError ? <p className="px-4 pb-1 text-sm text-danger">{actionError}</p> : null}
+      <div className="px-2 pb-2 pt-1 sm:px-4">
         <Composer
           peerName={conversation.peer.username}
           reply={reply}
           onClearReply={() => setReply(null)}
           onTyping={() => chat.broadcastTyping(conversation.id)}
           onSendText={async (body) => {
+            nearBottom.current = true
             await chat.send(conversation.id, body, reply)
             setReply(null)
           }}
           onSendFile={async (file, mime, kind, seconds, waveform) => {
-            await chat.sendMedia({
-              conversationId: conversation.id,
-              kind,
-              file,
-              mime,
-              seconds,
-              waveform,
-              reply,
-            })
+            nearBottom.current = true
+            await chat.sendMedia({ conversationId: conversation.id, kind, file, mime, seconds, waveform, reply })
             setReply(null)
           }}
         />
       </div>
+      {lightbox ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4" role="dialog" aria-modal="true" aria-label="Photo" data-testid="lightbox" onClick={() => setLightbox(null)}>
+          <button type="button" className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white" aria-label="Close photo" onClick={() => setLightbox(null)}>
+            <CloseIcon className="h-5 w-5" />
+          </button>
+          <img src={lightbox} alt="Photo" className="max-h-[85vh] max-w-full rounded-xl object-contain" onClick={(event) => event.stopPropagation()} />
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -224,50 +365,70 @@ function MessageRow({
   message,
   mine,
   pos,
+  meId,
+  highlighted,
   receiptsShared,
   menuOpen,
+  reactOpen,
   onOpenMenu,
   onReply,
+  onReact,
+  onCopy,
   onHide,
   onDelete,
+  onToggleReaction,
+  onOpenImage,
 }: {
   message: Message
   mine: boolean
   pos: GroupPos
+  meId: string
+  highlighted: boolean
   receiptsShared: boolean
   menuOpen: boolean
+  reactOpen: boolean
   onOpenMenu: () => void
   onReply: () => void
+  onReact: () => void
+  onCopy: () => void
   onHide: () => void
   onDelete: () => void
+  onToggleReaction: (emoji: string) => void
+  onOpenImage: (src: string) => void
 }) {
   const deleted = Boolean(message.deletedAt)
   const tick = receiptTick(message, receiptsShared)
   const tailed = !deleted && (pos === 'single' || pos === 'end')
   const radius = mine
-    ? tailed
-      ? 'rounded-[18px] rounded-br-[4px]'
-      : 'rounded-[18px] rounded-br-[8px]'
-    : tailed
-      ? 'rounded-[18px] rounded-bl-[4px]'
-      : 'rounded-[18px] rounded-bl-[8px]'
+    ? tailed ? 'rounded-[18px] rounded-br-[5px]' : 'rounded-[18px]'
+    : tailed ? 'rounded-[18px] rounded-bl-[5px]' : 'rounded-[18px]'
   const image = !deleted && message.kind === 'image'
+  const reactions = groupedReactions(message.reactions, meId)
+  const parts = linkParts(message.body)
+  const firstLink = parts.find((part) => part.type === 'link')?.value
   return (
-    <div className={mine ? 'ml-auto flex max-w-[78%] items-end justify-end gap-1' : 'mr-auto flex max-w-[78%] items-end gap-1'}>
-      {!mine ? <span className="w-6 shrink-0" /> : null}
-      <div className="relative min-w-0">
-        <div
-          className={`${mine ? 'bubble-own' : 'bubble-other'} bubble-in relative w-full text-left ${radius} ${image ? 'overflow-hidden p-1' : 'px-3 py-2'} ${tailed ? (mine ? 'tail-own' : 'tail-other') : ''}`}
-        >
+    <div className={`msg-group relative flex max-w-[min(78%,26rem)] ${mine ? 'ml-auto justify-end' : 'mr-auto'}`}>
+      {!deleted ? (
+        <div className={`msg-actions absolute -top-8 z-10 flex gap-0.5 rounded-full border border-line bg-panel p-0.5 shadow-sm ${mine ? 'right-0' : 'left-0'}`}>
+          <Tiny label="Reply" onClick={onReply}><ReplyIcon className="h-3.5 w-3.5" /></Tiny>
+          <Tiny label="React" onClick={onReact}><SmileIcon className="h-3.5 w-3.5" /></Tiny>
+          <Tiny label="Copy" onClick={onCopy}><CopyIcon className="h-3.5 w-3.5" /></Tiny>
+          <Tiny label="Delete" onClick={onOpenMenu}><TrashIcon className="h-3.5 w-3.5" /></Tiny>
+        </div>
+      ) : null}
+      <div className={`relative min-w-0 ${highlighted ? 'rounded-[18px] ring-2 ring-sakura/70' : ''}`}>
+        <div className={`${mine ? 'bubble-own' : 'bubble-other'} bubble-in relative text-left ${radius} ${image ? 'overflow-hidden p-1' : 'px-2.5 py-1.5'} ${tailed ? (mine ? 'tail-own' : 'tail-other') : ''}`}>
           {message.replyPreview && !deleted ? (
-            <p className={mine ? 'mb-1 truncate border-l-2 border-white/70 pl-2 text-xs text-white/80' : 'mb-1 truncate border-l-2 border-sakura pl-2 text-xs text-mist'}>
+            <p className={mine ? 'mb-1 truncate rounded-md border-l-2 border-white/70 bg-black/10 px-2 py-1 text-xs text-white/85' : 'mb-1 truncate rounded-md border-l-2 border-sakura bg-black/5 px-2 py-1 text-xs text-mist'}>
               {message.replyPreview}
             </p>
           ) : null}
-          {deleted ? <p className="text-sm italic opacity-80">Message deleted</p> : null}
+          {deleted ? <p className="px-1 text-sm italic opacity-80">Message deleted</p> : null}
           {image ? (
             message.mediaUrl ? (
-              <img src={message.mediaUrl} alt="Photo" className="max-h-72 rounded-xl object-cover" />
+              <button type="button" className="block" aria-label="Open photo" onClick={() => onOpenImage(message.mediaUrl as string)}>
+                <img src={message.mediaUrl} alt="Photo" className="max-h-72 rounded-[14px] object-cover" />
+              </button>
             ) : (
               <p className="px-2 py-1 text-sm">Photo</p>
             )
@@ -276,48 +437,106 @@ function MessageRow({
             <VoiceBubble src={message.mediaUrl} seconds={message.mediaSeconds} waveform={message.waveform} mine={mine} />
           ) : null}
           {!deleted && message.kind !== 'voice' && message.kind !== 'image' ? (
-            <p className="whitespace-pre-wrap text-sm leading-5">{message.body}</p>
-          ) : null}
-          <p className={mine ? 'mt-1 flex items-center justify-end gap-1 px-1 text-[11px] text-white/80' : 'mt-1 text-right text-[11px] text-mist'}>
-            <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
-            {mine && !deleted ? (
-              <span title={tick} aria-label={tick}>
-                <CheckIcon className={tick === 'seen' ? 'h-3.5 w-3.5 text-white' : 'h-3.5 w-3.5'} double={tick !== 'sent'} />
-              </span>
-            ) : null}
-          </p>
+            <div>
+              <p className="msg-copy whitespace-pre-wrap px-0.5 text-sm leading-5">
+                {parts.map((part, index) =>
+                  part.type === 'link' ? (
+                    <a key={`${part.value}-${index}`} href={part.value} target="_blank" rel="noreferrer" className={mine ? 'underline decoration-white/70 underline-offset-2' : 'text-sakura underline underline-offset-2'}>
+                      {part.value}
+                    </a>
+                  ) : (
+                    <span key={`${index}-${part.value.slice(0, 8)}`}>{part.value}</span>
+                  ),
+                )}
+                <Meta mine={mine} createdAt={message.createdAt} tick={tick} showTick={mine && !deleted} floated />
+              </p>
+              {firstLink ? (
+                <a href={firstLink} target="_blank" rel="noreferrer" className={mine ? 'mt-1 block rounded-lg bg-black/15 px-2 py-1.5 text-xs text-white/90' : 'mt-1 block rounded-lg bg-black/[0.04] px-2 py-1.5 text-xs text-mist'}>
+                  <span className="block font-medium">{linkHost(firstLink)}</span>
+                  <span className="block truncate opacity-80">{firstLink}</span>
+                </a>
+              ) : null}
+            </div>
+          ) : (
+            <Meta mine={mine} createdAt={message.createdAt} tick={tick} showTick={mine && !deleted} />
+          )}
         </div>
-        {menuOpen && !deleted ? (
-          <div className={mine ? 'absolute right-0 z-10 mt-1 w-44 rounded-lg border border-line bg-panel p-1 shadow-md' : 'absolute left-0 z-10 mt-1 w-44 rounded-lg border border-line bg-panel p-1 shadow-md'} role="menu">
-            <button type="button" role="menuitem" className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-white/5" onClick={onReply}>
-              Reply
-            </button>
-            <button type="button" role="menuitem" className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-white/5" onClick={onHide}>
-              Delete for me
-            </button>
-            {mine ? (
-              <button type="button" role="menuitem" className="block w-full rounded-md px-3 py-2 text-left text-sm text-danger hover:bg-white/5" onClick={onDelete}>
-                Delete for everyone
+        {reactions.length > 0 ? (
+          <div className={`mt-1 flex flex-wrap gap-1 ${mine ? 'justify-end' : ''}`}>
+            {reactions.map((reaction) => (
+              <button
+                key={reaction.emoji}
+                type="button"
+                className={`rounded-full border px-1.5 py-0.5 text-xs ${reaction.mine ? 'border-sakura bg-sakura/15' : 'border-line bg-panel'}`}
+                aria-label={`${reaction.emoji} ${reaction.count}`}
+                onClick={() => onToggleReaction(reaction.emoji)}
+              >
+                {reaction.emoji} {reaction.count}
               </button>
+            ))}
+          </div>
+        ) : null}
+        {reactOpen && !deleted ? (
+          <div className={`absolute z-20 mt-1 flex gap-1 rounded-full border border-line bg-panel p-1 shadow-md ${mine ? 'right-0' : 'left-0'}`} role="listbox" aria-label="Reactions">
+            {QUICK_REACTIONS.map((emoji) => (
+              <button key={emoji} type="button" className="hover-wash grid h-8 w-8 place-items-center rounded-full text-base" onClick={() => onToggleReaction(emoji)}>
+                {emoji}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {menuOpen && !deleted ? (
+          <div className={`absolute z-20 mt-1 w-44 rounded-xl border border-line bg-panel p-1 shadow-md ${mine ? 'right-0' : 'left-0'}`} role="menu">
+            <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onReply}>Reply</button>
+            <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onCopy}>Copy</button>
+            <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onHide}>Delete for me</button>
+            {mine ? (
+              <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm text-danger" onClick={onDelete}>Delete for everyone</button>
             ) : null}
           </div>
         ) : null}
       </div>
-      {!deleted ? (
-        <button type="button" className={`${iconButton} h-8 w-8`} aria-expanded={menuOpen} aria-label="Message actions" onClick={onOpenMenu}>
-          <MoreHorizontalIcon className="h-4 w-4" />
-        </button>
-      ) : mine ? (
-        <span className="w-8" />
-      ) : null}
     </div>
+  )
+}
+
+function Meta({
+  mine,
+  createdAt,
+  tick,
+  showTick,
+  floated = false,
+}: {
+  mine: boolean
+  createdAt: string
+  tick: string
+  showTick: boolean
+  floated?: boolean
+}) {
+  return (
+    <span className={`${floated ? 'float-right ml-2 mt-1.5' : 'mt-0.5 flex justify-end'} inline-flex items-center gap-1 px-0.5 text-[11px] leading-none ${mine ? 'text-white/75' : 'text-mist'}`}>
+      <time dateTime={createdAt}>{formatMessageTime(createdAt)}</time>
+      {showTick ? (
+        <span title={tick} aria-label={tick}>
+          <CheckIcon className={`h-3.5 w-3.5 ${tick === 'seen' ? 'text-white' : 'opacity-70'}`} double={tick !== 'sent'} />
+        </span>
+      ) : null}
+    </span>
+  )
+}
+
+function Tiny({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" aria-label={label} className="hover-wash grid h-7 w-7 place-items-center rounded-full text-mist hover:text-paper" onClick={onClick}>
+      {children}
+    </button>
   )
 }
 
 function MessageSkeleton() {
   return (
     <div className="space-y-3" aria-hidden="true">
-      <span className="skeleton ml-0 block h-10 w-40 rounded-2xl" />
+      <span className="skeleton block h-10 w-40 rounded-2xl" />
       <span className="skeleton ml-auto block h-14 w-52 rounded-2xl" />
       <span className="skeleton block h-10 w-48 rounded-2xl" />
     </div>
@@ -326,13 +545,25 @@ function MessageSkeleton() {
 
 export function Welcome() {
   return (
-    <div className="grid h-full place-items-center bg-ink px-8 text-center">
+    <div className="chat-wallpaper wallpaper-plain grid h-full place-items-center px-8 text-center">
       <div>
-        <p className="text-xl font-semibold tracking-tight">Select a chat</p>
-        <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-mist">
-          Search for someone to start a conversation. Messages, photos, voice notes, and calls stay in the thread.
+        <EmptyArt />
+        <p className="mt-4 text-lg font-semibold tracking-tight">Select a chat</p>
+        <p className="mx-auto mt-1 max-w-xs text-sm leading-6 text-mist">
+          Messages, photos, and voice notes show up here. Start one from the list.
         </p>
       </div>
     </div>
+  )
+}
+
+function EmptyArt() {
+  return (
+    <svg className="mx-auto h-24 w-24 text-mist" viewBox="0 0 96 96" fill="none" aria-hidden="true">
+      <rect x="14" y="22" width="52" height="36" rx="16" stroke="currentColor" strokeWidth="2.5" />
+      <path d="M28 58l-6 10 16-10" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
+      <rect x="34" y="40" width="44" height="30" rx="14" fill="color-mix(in oklab, var(--accent) 18%, transparent)" stroke="currentColor" strokeWidth="2.5" />
+      <path d="M46 52h20M46 59h12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
   )
 }

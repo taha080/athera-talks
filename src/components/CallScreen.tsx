@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useCall } from '../context/CallContext'
-import { formatDuration } from '../lib/format'
+import { callHeadline } from '../lib/callMachine'
+import { cn } from '../lib/cn'
 import { Avatar } from './Avatar'
 import { EndIcon, MicIcon, PhoneIcon, VolumeIcon } from './Icons'
 
@@ -10,10 +11,17 @@ export function CallScreen() {
   const [details, setDetails] = useState(false)
 
   useEffect(() => {
-    if (call.phase !== 'connected') return
-    const timer = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(timer)
-  }, [call.phase])
+    if (call.phase !== 'connected' || !call.connectedAt) return
+    const connectedAt = call.connectedAt
+    let timer = 0
+    const tick = () => {
+      const elapsed = Date.now() - connectedAt
+      setNow(Date.now())
+      timer = window.setTimeout(tick, 1000 - (elapsed % 1000))
+    }
+    tick()
+    return () => window.clearTimeout(timer)
+  }, [call.connectedAt, call.phase])
 
   useEffect(() => {
     setDetails(false)
@@ -28,21 +36,19 @@ export function CallScreen() {
   }
 
   const peer = call.peer
-  const seconds = call.startedAt ? Math.floor((now - call.startedAt) / 1000) : 0
-  const status =
-    call.phase === 'incoming' || call.phase === 'ringing'
-      ? 'Incoming call'
-      : call.phase === 'outgoing'
-        ? 'Calling…'
-        : call.phase === 'connecting'
-          ? 'Connecting…'
-          : call.phase === 'failed'
-            ? 'Call failed'
-            : 'Connected'
+  const headline = callHeadline(call.phase, call.connectedAt, now)
+  const timing = call.phase === 'connected'
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-between bg-ink px-6 py-10 text-center" role="dialog" aria-modal="true" aria-label="Voice call">
-      <p className="text-xs font-medium uppercase tracking-[0.16em] text-mist">{status}</p>
+      <p
+        className={cn(
+          timing ? 'text-3xl font-semibold tabular-nums tracking-normal text-paper' : 'text-xs font-medium uppercase tracking-[0.16em] text-mist',
+        )}
+        data-testid="call-status"
+      >
+        {headline}
+      </p>
       <div>
         <div className="relative mx-auto grid h-44 w-44 place-items-center">
           {call.phase !== 'connected' && call.phase !== 'failed' ? (
@@ -51,7 +57,6 @@ export function CallScreen() {
           <Avatar name={peer?.username ?? 'caller'} url={peer?.avatarUrl} size="xl" />
         </div>
         <h2 className="mt-6 text-3xl font-semibold tracking-tight">@{peer?.username}</h2>
-        <p className="mt-6 text-4xl font-semibold tabular-nums">{call.phase === 'connected' ? formatDuration(seconds) : '0:00'}</p>
         {call.error ? <p className="mx-auto mt-4 max-w-sm text-sm text-danger">{call.error}</p> : null}
         {call.demo && call.phase === 'connected' ? (
           <p className="mt-3 text-xs text-mist">Preview only. Your microphone stays off.</p>

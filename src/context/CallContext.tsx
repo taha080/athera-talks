@@ -31,7 +31,7 @@ type CallValue = {
   phase: typeof initialCallState.phase
   peer: Profile | null
   muted: boolean
-  startedAt: number | null
+  connectedAt: number | null
   error: string | null
   banner: string | null
   demo: boolean
@@ -375,9 +375,21 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
       if (signal.kind === 'answer' && signal.sdp && pcRef.current) {
         if (pcRef.current.signalingState !== 'have-local-offer') return
-        await pcRef.current.setRemoteDescription(signal.sdp)
-        await flushIce(signal.conversationId)
+        const pc = pcRef.current
         dispatch({ type: 'remote-joined' })
+        try {
+          await pc.setRemoteDescription(signal.sdp)
+          await flushIce(signal.conversationId)
+        } catch (error) {
+          failFinal(mediaError(error))
+          return
+        }
+        if (pcRef.current !== pc) return
+        const ice = pc.iceConnectionState
+        const link = pc.connectionState
+        if (ice === 'connected' || ice === 'completed' || link === 'connected') {
+          dispatch({ type: 'connected', at: Date.now() })
+        }
         return
       }
 
@@ -521,7 +533,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     phase: state.phase,
     peer: state.peer,
     muted: state.muted,
-    startedAt: state.startedAt,
+    connectedAt: state.connectedAt,
     error: state.error,
     banner,
     demo: mode === 'demo',
