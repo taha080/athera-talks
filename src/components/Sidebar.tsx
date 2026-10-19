@@ -283,6 +283,17 @@ export function Sidebar() {
         )}
         {chat.error ? <p className="px-4 py-2 text-sm text-danger">{chat.error}</p> : null}
       </div>
+      <footer className="shrink-0 px-3 pb-4 pt-3 text-center text-xs leading-4 text-mist">
+        Created by{' '}
+        <a
+          href="https://github.com/taha080"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="text-mist underline-offset-2 hover:underline"
+        >
+          Taha Ahsan
+        </a>
+      </footer>
     </div>
   )
 }
