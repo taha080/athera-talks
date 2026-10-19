@@ -64,6 +64,7 @@ type ConversationRow = {
   unread: number | string
   last_read_at?: string | null
   last_delivered_at?: string | null
+  pinned?: boolean | null
 }
 
 export type PreferencePatch = {
@@ -148,6 +149,7 @@ function mapConversation(row: ConversationRow): Conversation {
           }
         : null,
     unread: Number(row.unread) || 0,
+    pinned: Boolean(row.pinned),
   }
 }
 
@@ -395,6 +397,11 @@ export const liveChat = {
 
   async cancelRequest(requestId: string): Promise<void> {
     const { error } = await client().rpc('cancel_contact', { request_id: requestId })
+    if (error) throw new Error(error.message)
+  },
+
+  async setChatPin(conversationId: string, pinned: boolean): Promise<void> {
+    const { error } = await client().rpc('set_chat_pin', { cid: conversationId, next_pin: pinned })
     if (error) throw new Error(error.message)
   },
 

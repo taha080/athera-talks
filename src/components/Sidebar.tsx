@@ -11,7 +11,7 @@ import { receiptTick } from '../lib/receipts'
 import type { SearchPerson } from '../types'
 import { Avatar } from './Avatar'
 import { DisplayName } from './CreatorBadge'
-import { CheckIcon, GearIcon, PhoneIcon, PlusIcon, SearchIcon, MoreIcon } from './Icons'
+import { CheckIcon, GearIcon, PhoneIcon, PinIcon, PlusIcon, SearchIcon, MoreIcon } from './Icons'
 
 export function Sidebar() {
   const { mode, profile } = useSession()
@@ -272,11 +272,28 @@ export function Sidebar() {
                     <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} online={isOnline(conversation.peer.lastSeenAt)} />
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-2">
-                        <DisplayName
-                          name={conversation.peer.username}
-                          creator={conversation.peer.isCreator}
-                          className={cn('text-sm', conversation.unread > 0 ? 'font-semibold' : 'font-medium')}
-                        />
+                        <span className="flex min-w-0 items-center gap-1">
+                          {conversation.pinned ? (
+                            <button
+                              type="button"
+                              aria-label="Unpin chat"
+                              title="Unpin"
+                              className="relative z-10 shrink-0 text-sakura"
+                              onClick={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                void chat.setChatPin(conversation.id, false)
+                              }}
+                            >
+                              <PinIcon className="h-3.5 w-3.5 fill-current" />
+                            </button>
+                          ) : null}
+                          <DisplayName
+                            name={conversation.peer.username}
+                            creator={conversation.peer.isCreator}
+                            className={cn('text-sm', conversation.unread > 0 ? 'font-semibold' : 'font-medium')}
+                          />
+                        </span>
                         {conversation.lastMessage ? (
                           <time className={cn('shrink-0 text-[11px]', conversation.unread > 0 ? 'text-sakura' : 'text-mist')} dateTime={conversation.lastMessage.createdAt}>
                             {formatListTime(conversation.lastMessage.createdAt)}
