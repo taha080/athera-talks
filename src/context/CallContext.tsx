@@ -10,6 +10,24 @@ import {
   type RefObject,
 } from 'react'
 import {
+  BACKGROUND_RECONNECT_DELAY_MS,
+  OFFER_RESEND_LIMIT,
+  OFFER_RESEND_MS,
+  RECOVER_COOLDOWN_MS,
+  bindHangupAction,
+  callInProgress,
+  canAttemptRecover,
+  describeCallMediaSession,
+  pageEventChangesCall,
+  reconnectablePhase,
+  shouldAcceptRestartOffer,
+  shouldConfirmPageLeave,
+  shouldReconnectInBackground,
+  shouldReconnectOnReturn,
+  shouldRequestWakeLock,
+  type PeerLink,
+} from '../lib/callBackground'
+import {
   callReducer,
   CONNECT_TIMEOUT_MESSAGE,
   CONNECT_TIMEOUT_MS,
@@ -53,6 +71,8 @@ type CallValue = {
   speakerOn: boolean
   toggleSpeaker: () => void
   simulateIncoming: (peer: Profile, conversationId: string) => void
+  returnBanner: boolean
+  returnToCall: () => void
   audioRef: RefObject<HTMLAudioElement | null>
 }
 
@@ -65,9 +85,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [debug, setDebug] = useState('')
   const [relaying, setRelaying] = useState(false)
   const [speakerOn, setSpeakerOn] = useState(true)
+  const [returnBanner, setReturnBanner] = useState(false)
   const speakerRef = useRef(true)
   const stateRef = useRef(state)
   const profileRef = useRef(profile)
+  const modeRef = useRef(mode)
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const localRef = useRef<MediaStream | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -83,8 +105,16 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const waitRef = useRef<number | null>(null)
   const demoTimer = useRef<number | null>(null)
   const restartRelayRef = useRef<() => Promise<void>>(async () => {})
+  const remoteStreamRef = useRef<MediaStream | null>(null)
+  const recoverTimerRef = useRef<number | null>(null)
+  const recoveringRef = useRef(false)
+  const recoverAttemptsRef = useRef(0)
+  const recoverCooldownUntilRef = useRef(0)
+  const recoverRef = useRef<() => Promise<void>>(async () => {})
+  const hangupRef = useRef<() => Promise<void>>(async () => {})
   stateRef.current = state
   profileRef.current = profile
+  modeRef.current = mode
 
   const applyOutput = useCallback(() => {
     const audio = audioRef.current
@@ -93,6 +123,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
     audio.muted = !on
     audio.volume = on ? 1 : 0
     audio.autoplay = true
+    // A one-shot silent clip ends immediately, so loop it until the remote stream is attached.
+    audio.loop = !audio.srcObject
     const pending = audio.play()
     if (pending) void pending.catch(() => {})
   }, [])
@@ -125,8 +157,31 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const clearTimers = useCallback(() => {
     if (demoTimer.current) window.clearTimeout(demoTimer.current)
     if (waitRef.current) window.clearTimeout(waitRef.current)
+    if (recoverTimerRef.current !== null) window.clearTimeout(recoverTimerRef.current)
     demoTimer.current = null
     waitRef.current = null
+    recoverTimerRef.current = null
+  }, [])
+
+  const scheduleBackgroundRecover = useCallback(() => {
+    if (recoverTimerRef.current !== null || (roleRef.current !== 'caller' && roleRef.current !== 'callee') || modeRef.current !== 'live') return
+    const wait = Math.max(BACKGROUND_RECONNECT_DELAY_MS, recoverCooldownUntilRef.current - Date.now())
+    recoverTimerRef.current = window.setTimeout(() => {
+      recoverTimerRef.current = null
+      const pc = pcRef.current
+      const link: PeerLink = pc
+        ? { ice: pc.iceConnectionState, connection: pc.connectionState }
+        : { ice: 'closed', connection: 'closed' }
+      if (!shouldReconnectInBackground({
+        phase: stateRef.current.phase,
+        role: roleRef.current,
+        hidden: document.visibilityState === 'hidden',
+        link,
+        recovering: recoveringRef.current,
+        live: modeRef.current === 'live',
+      })) return
+      void recoverRef.current()
+    }, wait)
   }, [])
 
   const cleanupMedia = useCallback(() => {
@@ -145,6 +200,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
     relayingRef.current = false
     setRelaying(false)
     candidatesRef.current = new Set()
+    recoveringRef.current = false
+    recoverAttemptsRef.current = 0
+    recoverCooldownUntilRef.current = 0
+    remoteStreamRef.current = null
+    setReturnBanner(false)
     if (audioRef.current) {
       audioRef.current.srcObject = null
       audioRef.current.removeAttribute('src')
@@ -187,6 +247,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const failFinal = useCallback(
     (message: string) => {
       if (stateRef.current.phase === 'idle' || stateRef.current.phase === 'failed') return
+      if (modeRef.current === 'live' && document.visibilityState === 'hidden' && reconnectablePhase(stateRef.current.phase)) {
+        scheduleBackgroundRecover()
+        return
+      }
       clearTimers()
       localRef.current?.getTracks().forEach((track) => track.stop())
       localRef.current = null
@@ -194,7 +258,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       pcRef.current = null
       dispatch({ type: 'fail', error: message })
     },
-    [clearTimers],
+    [clearTimers, scheduleBackgroundRecover],
   )
 
   const publishLink = useCallback(async () => {
@@ -230,7 +294,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   publishLinkRef.current = publishLink
 
   const openPeer = useCallback(
-    async (peer: Profile, conversationId: string, me: Profile, policy: IcePolicy) => {
+    async (peer: Profile, conversationId: string, me: Profile, policy: IcePolicy, allowMuted = false) => {
       let stream = localRef.current
       const live = stream?.getAudioTracks().filter((track) => track.readyState === 'live') ?? []
       if (!stream || live.length === 0) {
@@ -245,7 +309,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
       pcRef.current = pc
       // Both sides add the microphone before createOffer / createAnswer.
       stream.getAudioTracks().forEach((track) => pc.addTrack(track, stream))
-      if (!hasLiveAudioSender(pc.getSenders())) {
+      const senders = pc.getSenders()
+      const microphoneLive = senders.some((sender) => sender.track?.kind === 'audio' && sender.track.readyState === 'live')
+      if (!microphoneLive || (!allowMuted && !hasLiveAudioSender(senders))) {
         throw new Error('The microphone is not on this call.')
       }
       pc.onicecandidate = (event) => {
@@ -264,20 +330,27 @@ export function CallProvider({ children }: { children: ReactNode }) {
         if (!audio) return
         event.track.enabled = true
         const remote = pickRemoteStream(event.streams, event.track)
-        audio.muted = false
+        remoteStreamRef.current = remote
         audio.srcObject = remote
+        audio.removeAttribute('src')
         playRemote()
       }
       const markConnected = () => {
         if (pcRef.current !== pc) return
         const ice = pc.iceConnectionState
         if (ice !== 'connected' && ice !== 'completed') return
+        recoverAttemptsRef.current = 0
+        recoverCooldownUntilRef.current = 0
         playRemote()
         dispatch({ type: 'connected', at: Date.now() })
         void publishLink()
       }
       const giveUp = () => {
-        if (pcRef.current !== pc) return
+        if (pcRef.current !== pc || recoveringRef.current) return
+        if (document.visibilityState === 'hidden') {
+          scheduleBackgroundRecover()
+          return
+        }
         if (!relayTriedRef.current && policyRef.current === 'all' && roleRef.current === 'caller') {
           noteRelay()
           void restartRelayRef.current()
@@ -289,27 +362,39 @@ export function CallProvider({ children }: { children: ReactNode }) {
         }
         failFinal(CONNECT_TIMEOUT_MESSAGE)
       }
-      pc.oniceconnectionstatechange = () => {
-        if (pc.iceConnectionState === 'failed') giveUp()
+      const onLink = () => {
+        if (pcRef.current !== pc) return
+        const link = { ice: pc.iceConnectionState, connection: pc.connectionState }
+        if (shouldReconnectInBackground({
+          phase: stateRef.current.phase,
+          role: roleRef.current,
+          hidden: document.visibilityState === 'hidden',
+          link,
+          recovering: recoveringRef.current,
+          live: modeRef.current === 'live',
+        })) {
+          scheduleBackgroundRecover()
+          return
+        }
+        if (link.ice === 'failed' || link.connection === 'failed') giveUp()
         else markConnected()
       }
-      pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'failed') giveUp()
-        else markConnected()
-      }
+      pc.oniceconnectionstatechange = onLink
+      pc.onconnectionstatechange = onLink
       setDebug(formatCallLink(pc.iceConnectionState, 'none', 0, 0, 'silent', formatCandidateTypes(candidatesRef.current)))
       return pc
     },
-    [deliver, failFinal, noteCandidate, noteRelay, playRemote, publishLink],
+    [deliver, failFinal, noteCandidate, noteRelay, playRemote, publishLink, scheduleBackgroundRecover],
   )
 
   const restartRelay = useCallback(async () => {
-    if (relayTriedRef.current || roleRef.current !== 'caller') return
+    if (relayTriedRef.current || roleRef.current !== 'caller' || recoveringRef.current) return
     const peer = stateRef.current.peer
     const conversationId = stateRef.current.conversationId
     const me = profileRef.current
     if (!peer || !conversationId || !me) return
     relayTriedRef.current = true
+    recoveringRef.current = true
     noteRelay()
     const previous = pcRef.current
     pcRef.current = null
@@ -327,9 +412,71 @@ export function CallProvider({ children }: { children: ReactNode }) {
       await deliver(peer, { kind: 'offer', conversationId, from: me, sdp: local.toJSON() })
     } catch (error) {
       failFinal(mediaError(error))
+    } finally {
+      recoveringRef.current = false
     }
   }, [deliver, failFinal, noteRelay, openPeer])
   restartRelayRef.current = restartRelay
+
+  const recoverCall = useCallback(async () => {
+    if (recoveringRef.current || (roleRef.current !== 'caller' && roleRef.current !== 'callee') || modeRef.current !== 'live') return
+    const phase = stateRef.current.phase
+    if (!reconnectablePhase(phase) || !canAttemptRecover(recoverAttemptsRef.current)) return
+    const peer = stateRef.current.peer
+    const conversationId = stateRef.current.conversationId
+    const me = profileRef.current
+    if (!peer || !conversationId || !me) return
+    const existing = pcRef.current
+    const link: PeerLink | null = existing
+      ? { ice: existing.iceConnectionState, connection: existing.connectionState }
+      : null
+    const hidden = document.visibilityState === 'hidden'
+    const base = { phase, role: roleRef.current, live: true, recovering: false }
+    const needed = hidden
+      ? shouldReconnectInBackground({ ...base, hidden, link: link ?? { ice: 'closed', connection: 'closed' } })
+      : shouldReconnectOnReturn({ ...base, link })
+    if (!needed) return
+
+    recoverAttemptsRef.current += 1
+    recoveringRef.current = true
+    recoverCooldownUntilRef.current = Date.now() + RECOVER_COOLDOWN_MS
+    relayTriedRef.current = true
+    clearTimers()
+    const previous = pcRef.current
+    pcRef.current = null
+    previous?.close()
+    remoteReadyRef.current = false
+    iceQueueRef.current = new Map()
+    try {
+      const pc = await openPeer(peer, conversationId, me, 'relay', true)
+      const currentPeer = () => pcRef.current
+      if (currentPeer() !== pc) return
+      const offer = await pc.createOffer({ iceRestart: true })
+      await pc.setLocalDescription(offer)
+      await waitForIceCandidate(pc)
+      const local = pc.localDescription
+      if (!local || currentPeer() !== pc) return
+      await deliver(peer, { kind: 'offer', conversationId, from: me, sdp: local.toJSON() })
+      void (async () => {
+        for (let sent = 0; sent < OFFER_RESEND_LIMIT; sent += 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, OFFER_RESEND_MS))
+          if (currentPeer() !== pc) return
+          const ice = pc.iceConnectionState
+          if (ice === 'connected' || ice === 'completed') return
+          const again = pc.localDescription
+          if (!again) return
+          await deliver(peer, { kind: 'offer', conversationId, from: me, sdp: again.toJSON() }).catch(() => {})
+        }
+      })()
+    } catch (error) {
+      if (document.visibilityState === 'hidden') return
+      failFinal(mediaError(error))
+    } finally {
+      recoveringRef.current = false
+      if (document.visibilityState === 'hidden') scheduleBackgroundRecover()
+    }
+  }, [clearTimers, deliver, failFinal, openPeer, scheduleBackgroundRecover])
+  recoverRef.current = recoverCall
 
   const answerOffer = useCallback(
     async (from: Profile, conversationId: string, sdp: RTCSessionDescriptionInit, me: Profile, restart: boolean) => {
@@ -344,11 +491,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
       }
       const policy: IcePolicy = restart ? 'relay' : readIcePolicy()
       let pc = pcRef.current
-      if (!pc || restart) pc = await openPeer(from, conversationId, me, policy)
-      if (!hasLiveAudioSender(pc.getSenders())) throw new Error('The microphone is not on this call.')
+      if (!pc || restart) pc = await openPeer(from, conversationId, me, policy, restart)
+      const microphoneReady = (senders: RTCRtpSender[]) => {
+        const live = senders.some((sender) => sender.track?.kind === 'audio' && sender.track.readyState === 'live')
+        return live && (restart || hasLiveAudioSender(senders))
+      }
+      if (!microphoneReady(pc.getSenders())) throw new Error('The microphone is not on this call.')
       await pc.setRemoteDescription(sdp)
       await flushIce(conversationId)
-      if (!hasLiveAudioSender(pc.getSenders())) throw new Error('The microphone is not on this call.')
+      if (!microphoneReady(pc.getSenders())) throw new Error('The microphone is not on this call.')
       const answer = await pc.createAnswer()
       await pc.setLocalDescription(answer)
       await waitForIceCandidate(pc)
@@ -367,16 +518,37 @@ export function CallProvider({ children }: { children: ReactNode }) {
       const currentId = stateRef.current.conversationId
 
       if (signal.kind === 'offer' && signal.sdp && activeCallRef.current === signal.conversationId) {
-        const remote = pcRef.current?.remoteDescription?.sdp
-        if (remote && remote !== signal.sdp.sdp) {
-          try {
-            await answerOffer(signal.from, signal.conversationId, signal.sdp, me, true)
-          } catch (error) {
-            failFinal(mediaError(error))
+        const pc = pcRef.current
+        const remote = pc?.remoteDescription?.sdp
+        try {
+          if (remote && remote === signal.sdp.sdp && pc) {
+            const ice = pc.iceConnectionState
+            if (ice === 'connected' || ice === 'completed') return
+            if (pc.signalingState === 'have-remote-offer' || !pc.localDescription) {
+              const answer = await pc.createAnswer()
+              await pc.setLocalDescription(answer)
+              await waitForIceCandidate(pc)
+            }
+            const local = pc.localDescription
+            if (local?.type === 'answer') {
+              await deliver(signal.from, {
+                kind: 'answer',
+                conversationId: signal.conversationId,
+                from: me,
+                sdp: local.toJSON(),
+              })
+            }
+            return
           }
-          return
+          if (remote && remote !== signal.sdp.sdp) {
+            if (pc && !shouldAcceptRestartOffer(me.id, signal.from.id, pc.signalingState)) return
+            await answerOffer(signal.from, signal.conversationId, signal.sdp, me, true)
+            return
+          }
+          if (!remote) pendingOfferRef.current = signal.sdp
+        } catch (error) {
+          failFinal(mediaError(error))
         }
-        if (!remote) pendingOfferRef.current = signal.sdp
         return
       }
 
@@ -466,22 +638,158 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (mode !== 'live' || state.phase !== 'connecting') return
-    const deadline = window.setTimeout(() => {
-      const phase = stateRef.current.phase
-      if (phase === 'connecting' || phase === 'outgoing' || phase === 'ringing') failFinal(CONNECT_TIMEOUT_MESSAGE)
-    }, CONNECT_TIMEOUT_MS)
-    const relay = window.setTimeout(() => {
-      if (stateRef.current.phase !== 'connecting') return
-      noteRelay()
-      if (!relayTriedRef.current && policyRef.current !== 'relay' && roleRef.current === 'caller') {
-        void restartRelayRef.current()
-      }
-    }, RELAY_RETRY_MS)
+    let deadline = 0
+    let relay = 0
+    const arm = () => {
+      window.clearTimeout(deadline)
+      window.clearTimeout(relay)
+      deadline = window.setTimeout(() => {
+        if (document.visibilityState === 'hidden') return
+        const phase = stateRef.current.phase
+        if (phase === 'connecting' || phase === 'outgoing' || phase === 'ringing') failFinal(CONNECT_TIMEOUT_MESSAGE)
+      }, CONNECT_TIMEOUT_MS)
+      relay = window.setTimeout(() => {
+        if (document.visibilityState === 'hidden') return
+        if (stateRef.current.phase !== 'connecting') return
+        noteRelay()
+        if (!relayTriedRef.current && policyRef.current !== 'relay' && roleRef.current === 'caller') {
+          void restartRelayRef.current()
+        }
+      }, RELAY_RETRY_MS)
+    }
+    const onVisibility = () => {
+      const change = pageEventChangesCall('visibilitychange')
+      if (change.end || change.mute) return
+      if (document.visibilityState === 'visible') arm()
+    }
+    arm()
+    document.addEventListener('visibilitychange', onVisibility)
     return () => {
       window.clearTimeout(deadline)
       window.clearTimeout(relay)
+      document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [failFinal, mode, noteRelay, state.phase])
+
+  const keepCall = callInProgress(state.phase)
+
+  useEffect(() => {
+    if (!shouldConfirmPageLeave(state.phase)) return
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = 'A call is still in progress.'
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [state.phase])
+
+  useEffect(() => {
+    const session = typeof navigator === 'undefined' ? undefined : navigator.mediaSession
+    if (!session) return
+    const described = describeCallMediaSession(keepCall)
+    const setHandler = (action: string, handler: (() => void) | null) => {
+      session.setActionHandler(action as MediaSessionAction, handler)
+    }
+    if (!described) {
+      session.metadata = null
+      session.playbackState = 'none'
+      bindHangupAction(setHandler, null)
+      return
+    }
+    session.metadata = new MediaMetadata({ title: described.title })
+    session.playbackState = described.playbackState
+    bindHangupAction(setHandler, () => {
+      void hangupRef.current()
+    })
+    return () => {
+      session.metadata = null
+      session.playbackState = 'none'
+      bindHangupAction(setHandler, null)
+    }
+  }, [keepCall])
+
+  useEffect(() => {
+    if (!keepCall) return
+    let cancelled = false
+    let sentinel: WakeLockSentinel | null = null
+
+    const acquire = async () => {
+      if (cancelled) return
+      const supported = typeof navigator !== 'undefined' && 'wakeLock' in navigator
+      if (!shouldRequestWakeLock(supported, document.visibilityState === 'visible', true)) return
+      try {
+        const next = await navigator.wakeLock.request('screen')
+        if (cancelled) {
+          await next.release()
+          return
+        }
+        sentinel = next
+      } catch {
+        // The browser can refuse a wake lock. The call continues either way.
+      }
+    }
+
+    const onVisibility = () => {
+      const change = pageEventChangesCall('visibilitychange')
+      if (change.end || change.mute) return
+      if (document.visibilityState !== 'visible') return
+      setReturnBanner(true)
+      const audio = audioRef.current
+      if (audio && remoteStreamRef.current && audio.srcObject !== remoteStreamRef.current) {
+        audio.srcObject = remoteStreamRef.current
+      }
+      applyOutput()
+      void acquire()
+      const pc = pcRef.current
+      const link = pc ? { ice: pc.iceConnectionState, connection: pc.connectionState } : null
+      if (shouldReconnectOnReturn({
+        phase: stateRef.current.phase,
+        role: roleRef.current,
+        link,
+        live: modeRef.current === 'live',
+        recovering: recoveringRef.current,
+      })) {
+        recoverAttemptsRef.current = 0
+        recoverCooldownUntilRef.current = 0
+        void recoverRef.current()
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibility)
+    void acquire()
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', onVisibility)
+      void sentinel?.release().catch(() => {})
+    }
+  }, [applyOutput, keepCall])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    let resumedWhileHidden = false
+    const onPause = () => {
+      if (!callInProgress(stateRef.current.phase) || document.visibilityState !== 'hidden' || resumedWhileHidden) return
+      const change = pageEventChangesCall('visibilitychange')
+      if (change.end || change.mute) return
+      resumedWhileHidden = true
+      if (remoteStreamRef.current && audio.srcObject !== remoteStreamRef.current) {
+        audio.srcObject = remoteStreamRef.current
+      }
+      applyOutput()
+    }
+    const onVisibility = () => {
+      const change = pageEventChangesCall('visibilitychange')
+      if (change.end || change.mute) return
+      if (document.visibilityState === 'visible') resumedWhileHidden = false
+    }
+    audio.addEventListener('pause', onPause)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      audio.removeEventListener('pause', onPause)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [applyOutput])
 
   const startCall = useCallback(
     async (peer: Profile, conversationId: string) => {
@@ -575,6 +883,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   const reject = useCallback(() => finish('reject'), [finish])
   const hangup = useCallback(() => finish(stateRef.current.phase === 'incoming' ? 'reject' : 'hangup'), [finish])
+  hangupRef.current = hangup
+
+  const returnToCall = useCallback(() => {
+    setReturnBanner(false)
+    const audio = audioRef.current
+    if (audio && remoteStreamRef.current) audio.srcObject = remoteStreamRef.current
+    applyOutput()
+  }, [applyOutput])
 
   const toggleSpeaker = useCallback(() => {
     speakerRef.current = !speakerRef.current
@@ -613,13 +929,16 @@ export function CallProvider({ children }: { children: ReactNode }) {
     speakerOn,
     toggleSpeaker,
     simulateIncoming,
+    returnBanner,
+    returnToCall,
     audioRef,
   }
 
   return (
     <CallContext.Provider value={value}>
       {children}
-      <audio ref={audioRef} autoPlay playsInline data-testid="remote-audio" className="pointer-events-none fixed bottom-0 left-0 h-px w-px" />
+      {/* Not display:none: Chrome keeps a background tab alive while this plays the remote call. */}
+      <audio ref={audioRef} autoPlay controls loop playsInline preload="auto" tabIndex={-1} data-call-audio="live" data-testid="remote-audio" className="pointer-events-none fixed bottom-0 left-0 h-px w-px opacity-0" />
     </CallContext.Provider>
   )
 }

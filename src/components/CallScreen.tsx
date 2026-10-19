@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useCall } from '../context/CallContext'
+import { RETURN_BANNER } from '../lib/callBackground'
 import { callHeadline, RELAY_RETRY_STATUS } from '../lib/callMachine'
 import { cn } from '../lib/cn'
 import { Avatar } from './Avatar'
@@ -8,6 +9,7 @@ import { EndIcon, MicIcon, PhoneIcon, VolumeIcon } from './Icons'
 
 export function CallScreen() {
   const call = useCall()
+  const panelRef = useRef<HTMLDivElement>(null)
   const [now, setNow] = useState(() => Date.now())
   const [details, setDetails] = useState(false)
 
@@ -42,7 +44,20 @@ export function CallScreen() {
   const relayNotice = headline === RELAY_RETRY_STATUS
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-between bg-ink px-6 py-10 text-center" role="dialog" aria-modal="true" aria-label="Voice call">
+    <div ref={panelRef} tabIndex={-1} className="fixed inset-0 z-50 flex flex-col items-center justify-between bg-ink px-6 py-10 text-center outline-none" role="dialog" aria-modal="true" aria-label="Voice call">
+      {call.returnBanner ? (
+        <button
+          type="button"
+          data-testid="call-return-banner"
+          className="absolute inset-x-4 top-4 z-10 rounded-lg border border-line bg-panel px-4 py-2 text-sm shadow-md"
+          onClick={() => {
+            call.returnToCall()
+            panelRef.current?.focus()
+          }}
+        >
+          {RETURN_BANNER}
+        </button>
+      ) : null}
       <p
         className={cn(
           timing

@@ -998,3 +998,12 @@ textarea:-webkit-autofill {
   filter: none;
   box-shadow: none;
 }
+
+/* Chrome hides audio that has no controls, and that can stop the call from counting as playback. */
+audio[data-call-audio] {
+  display: block !important;
+}
+
+audio[data-call-audio]::-webkit-media-controls-enclosure {
+  display: none !important;
+}
