@@ -31,6 +31,15 @@ export type DemoHide = {
   userId: string
 }
 
+export type DemoRequest = {
+  id: string
+  fromId: string
+  toId: string
+  status: 'pending' | 'accepted' | 'declined'
+  createdAt: string
+  updatedAt: string
+}
+
 export type DemoData = {
   version: 1
   currentUserId: string | null
@@ -39,6 +48,7 @@ export type DemoData = {
   conversations: DemoConversation[]
   messages: Message[]
   hides: DemoHide[]
+  requests?: DemoRequest[]
 }
 
 const hour = 60 * 60 * 1000
@@ -82,6 +92,23 @@ export function buildSeed(now = Date.now()): DemoData {
     ],
     messages,
     hides: [],
+    requests: [SAKURA_CHAT, KENJI_CHAT, MIRA_CHAT, REN_CHAT].map((id, index) => {
+      const conversation = [
+        [TAHA_ID, SAKURA_ID],
+        [TAHA_ID, KENJI_ID],
+        [TAHA_ID, MIRA_ID],
+        [TAHA_ID, REN_ID],
+      ][index]
+      const [fromId, toId] = conversation[0] < conversation[1] ? conversation : [conversation[1], conversation[0]]
+      return {
+        id: `req-${id}`,
+        fromId,
+        toId,
+        status: 'accepted' as const,
+        createdAt: at(0),
+        updatedAt: at(0),
+      }
+    }),
   }
 }
 

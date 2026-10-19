@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
 import { cn } from '../lib/cn'
-import { iconButton } from '../lib/styles'
+import { iconButton, primaryButton } from '../lib/styles'
 import { formatListTime } from '../lib/format'
 import { isOnline } from '../lib/presence'
 import { receiptTick } from '../lib/receipts'
-import type { Profile } from '../types'
+import type { SearchPerson } from '../types'
 import { Avatar } from './Avatar'
 import { CheckIcon, GearIcon, PhoneIcon, PlusIcon, SearchIcon, MoreIcon } from './Icons'
 
@@ -17,9 +17,11 @@ export function Sidebar() {
   const chat = useChat()
   const call = useCall()
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const showRequests = params.get('requests') === '1'
   const searchRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<Profile[] | null>(null)
+  const [results, setResults] = useState<SearchPerson[] | null>(null)
   const [searchError, setSearchError] = useState('')
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -65,7 +67,7 @@ export function Sidebar() {
     }
   }
 
-  async function openPerson(userId: string) {
+  async function openAccepted(userId: string) {
     const id = await chat.startChat(userId)
     await chat.refresh()
     setQuery('')
@@ -73,12 +75,35 @@ export function Sidebar() {
     navigate(`/c/${id}`)
   }
 
+  async function addContact(userId: string) {
+    try {
+      await chat.requestContact(userId)
+      setResults(await chat.search(query))
+      setSearchError('')
+      chat.pushToast('Contact request sent')
+    } catch (error) {
+      setSearchError(error instanceof Error ? error.message : 'Could not send the request.')
+    }
+  }
+
   const visible = chat.conversations.filter((item) => filter === 'all' || item.unread > 0)
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-panel">
       <header className="flex h-14 items-center gap-2 px-3">
-        <h1 className="min-w-0 flex-1 text-lg font-semibold tracking-tight">Chats</h1>
+        <h1 className="min-w-0 flex-1 text-lg font-semibold tracking-tight">{showRequests ? 'Requests' : 'Chats'}</h1>
+        <Link
+          to={showRequests ? '/' : '/?requests=1'}
+          className="relative grid h-9 place-items-center rounded-lg px-2 text-sm font-medium text-mist hover:text-paper md:hidden"
+          aria-label={chat.incomingRequests > 0 ? `Requests, ${chat.incomingRequests} incoming` : 'Requests'}
+        >
+          {showRequests ? 'Chats' : 'Requests'}
+          {!showRequests && chat.incomingRequests > 0 ? (
+            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-sakura px-1 text-[10px] font-semibold text-white">
+              {chat.incomingRequests}
+            </span>
+          ) : null}
+        </Link>
         <button type="button" className={iconButton} aria-label="New chat" onClick={() => searchRef.current?.focus()}>
           <PlusIcon className="h-5 w-5" />
         </button>
@@ -123,7 +148,7 @@ export function Sidebar() {
             className="h-10 w-full rounded-lg border border-line bg-elevated pl-9 pr-3 text-sm text-paper outline-none transition placeholder:text-mist/70 focus:border-sakura focus:ring-2 focus:ring-sakura/30"
             value={query}
             onChange={(event) => void onSearch(event.target.value)}
-            placeholder="Search or start a chat"
+            placeholder="Search username"
             aria-label="Search username"
           />
         </label>
@@ -147,30 +172,62 @@ export function Sidebar() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {results ? (
+        {showRequests ? (
+          <RequestsPanel
+            meId={profile?.id ?? ''}
+            onAccept={async (id) => {
+              const conversationId = await chat.acceptRequest(id)
+              navigate(`/c/${conversationId}`)
+            }}
+            onDecline={(id) => chat.declineRequest(id)}
+            onCancel={(id) => chat.cancelRequest(id)}
+          />
+        ) : results ? (
           <div>
             {searchError ? <p className="px-4 py-3 text-sm text-danger">{searchError}</p> : null}
             {results.length === 0 && !searchError ? <p className="px-4 py-8 text-center text-sm text-mist">No one with that username.</p> : null}
             {results.map((person) => (
-              <button
-                key={person.id}
-                type="button"
-                onClick={() => void openPerson(person.id)}
-                className="hover-wash flex w-full items-center gap-3 px-3 py-2.5 text-left"
-              >
-                <Avatar name={person.username} url={person.avatarUrl} size="sm" />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium">{person.username}</span>
-                  {person.favouriteAnime ? <span className="block truncate text-xs text-mist">{person.favouriteAnime}</span> : null}
-                </span>
-              </button>
+              <article key={person.id} className="mx-3 my-2 rounded-xl border border-line bg-panel p-3 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <Avatar name={person.username} url={person.avatarUrl} size="sm" />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">{person.username}</span>
+                    {person.favouriteAnime ? <span className="block truncate text-xs text-mist">{person.favouriteAnime}</span> : null}
+                  </span>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <PersonActions
+                    person={person}
+                    meId={profile?.id ?? ''}
+                    onAdd={() => addContact(person.id)}
+                    onMessage={() => openAccepted(person.id)}
+                    onAccept={async () => {
+                      if (!person.requestId) return
+                      const conversationId = await chat.acceptRequest(person.requestId)
+                      setQuery('')
+                      setResults(null)
+                      navigate(`/c/${conversationId}`)
+                    }}
+                    onDecline={async () => {
+                      if (!person.requestId) return
+                      await chat.declineRequest(person.requestId)
+                      setResults(await chat.search(query))
+                    }}
+                    onCancel={async () => {
+                      if (!person.requestId) return
+                      await chat.cancelRequest(person.requestId)
+                      setResults(await chat.search(query))
+                    }}
+                  />
+                </div>
+              </article>
             ))}
           </div>
         ) : chat.loading ? (
           <ListSkeleton />
         ) : visible.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm leading-6 text-mist">
-            {filter === 'unread' ? 'No unread chats.' : 'No chats yet. Search a username to start one.'}
+            {filter === 'unread' ? 'No unread chats.' : 'No chats yet. Search a username to send a contact request.'}
           </p>
         ) : (
           <ul>
@@ -223,6 +280,118 @@ export function Sidebar() {
         )}
         {chat.error ? <p className="px-4 py-2 text-sm text-danger">{chat.error}</p> : null}
       </div>
+    </div>
+  )
+}
+
+function PersonActions({
+  person,
+  meId,
+  onAdd,
+  onMessage,
+  onAccept,
+  onDecline,
+  onCancel,
+}: {
+  person: SearchPerson
+  meId: string
+  onAdd: () => Promise<void>
+  onMessage: () => Promise<void>
+  onAccept: () => Promise<void>
+  onDecline: () => Promise<void>
+  onCancel: () => Promise<void>
+}) {
+  const incoming = person.requestStatus === 'pending' && person.requestFromId !== meId
+  const outgoing = person.requestStatus === 'pending' && person.requestFromId === meId
+  if (person.requestStatus === 'accepted') {
+    return (
+      <button type="button" className={`${primaryButton} h-9 px-3 text-xs`} onClick={() => void onMessage()}>
+        Message
+      </button>
+    )
+  }
+  if (incoming) {
+    return (
+      <>
+        <button type="button" className={`${primaryButton} h-9 px-3 text-xs`} onClick={() => void onAccept()}>
+          Accept
+        </button>
+        <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium text-paper" onClick={() => void onDecline()}>
+          Decline
+        </button>
+      </>
+    )
+  }
+  if (outgoing) {
+    return (
+      <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium text-mist" onClick={() => void onCancel()}>
+        Requested · Cancel
+      </button>
+    )
+  }
+  return (
+    <button type="button" className={`${primaryButton} h-9 px-3 text-xs`} onClick={() => void onAdd()}>
+      Add contact
+    </button>
+  )
+}
+
+function RequestsPanel({
+  meId,
+  onAccept,
+  onDecline,
+  onCancel,
+}: {
+  meId: string
+  onAccept: (id: string) => Promise<void>
+  onDecline: (id: string) => Promise<void>
+  onCancel: (id: string) => Promise<void>
+}) {
+  const { requests } = useChat()
+  const incoming = requests.filter((request) => request.toId === meId)
+  const outgoing = requests.filter((request) => request.fromId === meId)
+  return (
+    <div className="space-y-5 px-3 py-3">
+      <section aria-label="Incoming requests">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mist">Incoming</h2>
+        {incoming.length === 0 ? <p className="mt-2 text-sm text-mist">No incoming requests.</p> : null}
+        <ul className="mt-2 space-y-2">
+          {incoming.map((request) => (
+            <li key={request.id} className="rounded-xl border border-line bg-panel p-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <Avatar name={request.peer.username} url={request.peer.avatarUrl} size="sm" />
+                <span className="min-w-0 truncate text-sm font-semibold">{request.peer.username}</span>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button type="button" className={`${primaryButton} h-9 px-3 text-xs`} onClick={() => void onAccept(request.id)}>
+                  Accept
+                </button>
+                <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium" onClick={() => void onDecline(request.id)}>
+                  Decline
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section aria-label="Outgoing requests">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mist">Outgoing</h2>
+        {outgoing.length === 0 ? <p className="mt-2 text-sm text-mist">No pending requests.</p> : null}
+        <ul className="mt-2 space-y-2">
+          {outgoing.map((request) => (
+            <li key={request.id} className="flex items-center gap-3 rounded-xl border border-line bg-panel p-3 shadow-sm">
+              <Avatar name={request.peer.username} url={request.peer.avatarUrl} size="sm" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">{request.peer.username}</span>
+                <span className="text-xs text-mist">Pending</span>
+              </span>
+              <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium" onClick={() => void onCancel(request.id)}>
+                Cancel
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   )
 }

@@ -1,5 +1,23 @@
 export type MessageKind = 'text' | 'voice' | 'image'
 
+export type ContactStatus = 'pending' | 'accepted' | 'declined'
+
+export type SearchPerson = Profile & {
+  requestId?: string | null
+  requestStatus?: ContactStatus | null
+  requestFromId?: string | null
+}
+
+export type ContactRequest = {
+  id: string
+  fromId: string
+  toId: string
+  status: ContactStatus
+  createdAt: string
+  updatedAt: string
+  peer: Profile
+}
+
 export type Profile = {
   id: string
   username: string
@@ -79,7 +97,7 @@ export type Conversation = {
 
 export type SignalKind = 'ring' | 'offer' | 'answer' | 'ice' | 'reject' | 'hangup'
 
-// Sent through a Supabase Realtime broadcast channel named inbox:<user id>.
+// Stored as a call_signals row. The database rejects it unless the two people are accepted contacts.
 export type CallSignal = {
   kind: SignalKind
   conversationId: string

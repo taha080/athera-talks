@@ -22,6 +22,7 @@ import {
   Settings,
   Smile,
   Trash2,
+  UserPlus,
   Volume2,
   VolumeX,
   X,
@@ -124,6 +125,10 @@ export function CopyIcon({ className }: IconProps) {
 
 export function PlusIcon({ className }: IconProps) {
   return glyph(Plus, className)
+}
+
+export function AddContactIcon({ className }: IconProps) {
+  return glyph(UserPlus, className)
 }
 
 export function ReplyIcon({ className }: IconProps) {

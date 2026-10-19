@@ -5,7 +5,7 @@ import { messageKind } from '../lib/messages'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform, extensionForMime, parseWaveform } from '../lib/voice'
 import { getSupabase } from '../lib/supabase'
-import type { Conversation, Message, MessageListener, OutgoingMedia, Profile, Reaction, ReactionChange, ReplyTarget } from '../types'
+import type { ContactRequest, ContactStatus, Conversation, Message, MessageListener, OutgoingMedia, Profile, Reaction, ReactionChange, ReplyTarget, SearchPerson } from '../types'
 
 const PROFILE_COLUMNS =
   'id, username, avatar_url, favourite_anime, theme, wallpaper, wallpaper_path, last_seen_at, show_last_seen, show_read_receipts, notify_sound, notify_desktop'
@@ -77,6 +77,11 @@ function client() {
   const supabase = getSupabase()
   if (!supabase) throw new Error('Supabase is not configured.')
   return supabase
+}
+
+function contactStatus(value: string | null | undefined): ContactStatus | null {
+  if (value === 'pending' || value === 'accepted' || value === 'declined') return value
+  return null
 }
 
 export function mapProfile(row: ProfileRow): Profile {
@@ -319,10 +324,77 @@ export const liveChat = {
     return withReactions(await signMessages(((data ?? []) as MessageRow[]).map(mapMessage)))
   },
 
-  async searchUsers(query: string): Promise<Profile[]> {
+  async searchUsers(query: string): Promise<SearchPerson[]> {
     const { data, error } = await client().rpc('search_profiles', { query })
     if (error) throw new Error(error.message)
-    return ((data ?? []) as ProfileRow[]).map(mapProfile)
+    return ((data ?? []) as (ProfileRow & { request_id?: string | null; request_status?: string | null; request_from?: string | null })[]).map((row) => ({
+      ...mapProfile(row),
+      requestId: row.request_id ?? null,
+      requestStatus: contactStatus(row.request_status),
+      requestFromId: row.request_from ?? null,
+    }))
+  },
+
+  async listRequests(): Promise<ContactRequest[]> {
+    const { data, error } = await client().rpc('list_contact_requests')
+    if (error) throw new Error(error.message)
+    return ((data ?? []) as {
+      id: string
+      from_id: string
+      to_id: string
+      status: string
+      created_at: string
+      updated_at: string
+      peer_id: string
+      peer_username: string
+      peer_avatar_url: string | null
+      peer_favourite_anime: string | null
+    }[]).map((row) => ({
+      id: row.id,
+      fromId: row.from_id,
+      toId: row.to_id,
+      status: contactStatus(row.status) ?? 'pending',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      peer: {
+        id: row.peer_id,
+        username: row.peer_username,
+        avatarUrl: row.peer_avatar_url,
+        favouriteAnime: row.peer_favourite_anime,
+      },
+    }))
+  },
+
+  async requestContact(userId: string): Promise<void> {
+    const { error } = await client().rpc('request_contact', { other_id: userId })
+    if (error) throw new Error(error.message)
+  },
+
+  async acceptRequest(requestId: string): Promise<string> {
+    const { data, error } = await client().rpc('accept_contact', { request_id: requestId })
+    if (error) throw new Error(error.message)
+    return String(data)
+  },
+
+  async declineRequest(requestId: string): Promise<void> {
+    const { error } = await client().rpc('decline_contact', { request_id: requestId })
+    if (error) throw new Error(error.message)
+  },
+
+  async cancelRequest(requestId: string): Promise<void> {
+    const { error } = await client().rpc('cancel_contact', { request_id: requestId })
+    if (error) throw new Error(error.message)
+  },
+
+  subscribeRequests(onChange: () => void): () => void {
+    const supabase = client()
+    const channel = supabase
+      .channel('contact-requests')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contact_requests' }, () => onChange())
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
   },
 
   async startConversation(otherUserId: string): Promise<string> {

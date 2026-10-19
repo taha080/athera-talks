@@ -3,7 +3,7 @@ import { parseWallpaper } from '../lib/appearance'
 import { messagePreview } from '../lib/messages'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform } from '../lib/voice'
-import type { Conversation, Message, MessageListener, OutgoingMedia, Profile, ReactionChange, ReplyTarget } from '../types'
+import type { ContactRequest, Conversation, Message, MessageListener, OutgoingMedia, Profile, ReactionChange, ReplyTarget, SearchPerson } from '../types'
 import {
   DEMO_EMAIL,
   TAHA_ID,
@@ -11,9 +11,27 @@ import {
   type DemoAccount,
   type DemoConversation,
   type DemoData,
+  type DemoRequest,
 } from './seed'
 
 const STORAGE_KEY = 'tatalk:demo-data-v1'
+
+function grandfatherRequests(data: DemoData): DemoRequest[] {
+  return data.conversations.flatMap((conversation) => {
+    if (conversation.memberIds.length !== 2) return []
+    const [left, right] = conversation.memberIds
+    const fromId = left < right ? left : right
+    const toId = left < right ? right : left
+    return [{
+      id: `req-${conversation.id}`,
+      fromId,
+      toId,
+      status: 'accepted' as const,
+      createdAt: conversation.updatedAt,
+      updatedAt: conversation.updatedAt,
+    }]
+  })
+}
 
 export type MemoryStorage = {
   getItem: (key: string) => string | null
@@ -42,6 +60,8 @@ export function createDemoBackend(options: Options = {}) {
   let data: DemoData = options.initial ?? load(storage) ?? buildSeed(options.now)
   const listeners = new Set<MessageListener>()
   const reactionListeners = new Set<(change: ReactionChange) => void>()
+  const requestListeners = new Set<() => void>()
+  data.requests = data.requests ?? grandfatherRequests(data)
   const typingListeners = new Map<string, Set<(userId: string) => void>>()
   data.hides = data.hides ?? []
 
@@ -71,6 +91,34 @@ export function createDemoBackend(options: Options = {}) {
     return data.profiles.find((profile) => profile.id === id) ?? null
   }
 
+  function requestBetween(a: string, b: string): DemoRequest | undefined {
+    return (data.requests ?? []).find((request) => {
+      const left = request.fromId < request.toId ? request.fromId : request.toId
+      const right = request.fromId < request.toId ? request.toId : request.fromId
+      const wantLeft = a < b ? a : b
+      const wantRight = a < b ? b : a
+      return left === wantLeft && right === wantRight
+    })
+  }
+
+  function areContacts(a: string, b: string): boolean {
+    return requestBetween(a, b)?.status === 'accepted'
+  }
+
+  function toContactRequest(request: DemoRequest, me: string): ContactRequest {
+    const peerId = request.fromId === me ? request.toId : request.fromId
+    const peer = profileById(peerId) ?? { id: peerId, username: 'fan', avatarUrl: null, favouriteAnime: null }
+    return {
+      id: request.id,
+      fromId: request.fromId,
+      toId: request.toId,
+      status: request.status,
+      createdAt: request.createdAt,
+      updatedAt: request.updatedAt,
+      peer,
+    }
+  }
+
   function accountByEmail(email: string): DemoAccount | undefined {
     return data.accounts.find((account) => account.email === email.trim().toLowerCase())
   }
@@ -78,7 +126,11 @@ export function createDemoBackend(options: Options = {}) {
   function conversationList(): Conversation[] {
     const me = requireUser()
     return data.conversations
-      .filter((conversation) => conversation.memberIds.includes(me))
+      .filter((conversation) => {
+        if (!conversation.memberIds.includes(me)) return false
+        const peerId = conversation.memberIds.find((id) => id !== me)
+        return Boolean(peerId && areContacts(me, peerId))
+      })
       .map((conversation) => toConversation(conversation, me))
       .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
   }
@@ -273,20 +325,90 @@ export function createDemoBackend(options: Options = {}) {
         .map((message) => ({ ...message, reactions: message.reactions ? message.reactions.map((item) => ({ ...item })) : [] }))
     },
 
-    async searchUsers(query: string): Promise<Profile[]> {
+    async searchUsers(query: string): Promise<SearchPerson[]> {
       const me = requireUser()
       const needle = query.trim().toLowerCase()
       if (!needle) return []
       return data.profiles
         .filter((profile) => profile.id !== me && profile.username.includes(needle))
         .slice(0, 20)
-        .map((profile) => ({ ...profile }))
+        .map((profile) => {
+          const request = requestBetween(me, profile.id)
+          return {
+            ...profile,
+            requestId: request?.id ?? null,
+            requestStatus: request?.status ?? null,
+            requestFromId: request?.fromId ?? null,
+          }
+        })
+    },
+
+    async listRequests(): Promise<ContactRequest[]> {
+      const me = requireUser()
+      return (data.requests ?? [])
+        .filter((request) => request.status === 'pending' && (request.fromId === me || request.toId === me))
+        .map((request) => toContactRequest(request, me))
+    },
+
+    async requestContact(userId: string): Promise<void> {
+      const me = requireUser()
+      if (userId === me) throw new Error('You cannot add yourself.')
+      if (!profileById(userId)) throw new Error('User not found.')
+      const existing = requestBetween(me, userId)
+      const now = new Date().toISOString()
+      if (!existing) {
+        data.requests = data.requests ?? []
+        data.requests.unshift({ id: newId('req'), fromId: me, toId: userId, status: 'pending', createdAt: now, updatedAt: now })
+      } else if (existing.status === 'declined') {
+        existing.fromId = me
+        existing.toId = userId
+        existing.status = 'pending'
+        existing.updatedAt = now
+      }
+      save()
+      requestListeners.forEach((listener) => listener())
+    },
+
+    async acceptRequest(requestId: string): Promise<string> {
+      const me = requireUser()
+      const request = (data.requests ?? []).find((item) => item.id === requestId)
+      if (!request || request.toId !== me || request.status !== 'pending') throw new Error('That request is not waiting for you.')
+      request.status = 'accepted'
+      request.updatedAt = new Date().toISOString()
+      save()
+      requestListeners.forEach((listener) => listener())
+      return this.startConversation(request.fromId)
+    },
+
+    async declineRequest(requestId: string): Promise<void> {
+      const me = requireUser()
+      const request = (data.requests ?? []).find((item) => item.id === requestId)
+      if (!request || request.toId !== me || request.status !== 'pending') throw new Error('That request is not waiting for you.')
+      request.status = 'declined'
+      request.updatedAt = new Date().toISOString()
+      save()
+      requestListeners.forEach((listener) => listener())
+    },
+
+    async cancelRequest(requestId: string): Promise<void> {
+      const me = requireUser()
+      const request = (data.requests ?? []).find((item) => item.id === requestId)
+      if (!request || request.fromId !== me || request.status !== 'pending') throw new Error('That request is not yours to cancel.')
+      data.requests = (data.requests ?? []).filter((item) => item.id !== requestId)
+      save()
+      requestListeners.forEach((listener) => listener())
+    },
+
+    subscribeRequests(onChange: () => void): () => void {
+      requestListeners.add(onChange)
+      return () => requestListeners.delete(onChange)
     },
 
     async startConversation(otherUserId: string): Promise<string> {
       const me = requireUser()
       if (otherUserId === me) throw new Error('You cannot start a chat with yourself.')
       if (!profileById(otherUserId)) throw new Error('User not found.')
+      if (!areContacts(me, otherUserId)) throw new Error('Contacts must accept a request before a chat can start.')
       const existing = data.conversations.find((conversation) => {
         const members = conversation.memberIds
         return members.includes(me) && members.includes(otherUserId) && members.length === 2
@@ -308,6 +430,8 @@ export function createDemoBackend(options: Options = {}) {
       if (!conversation || !conversation.memberIds.includes(me)) {
         throw new Error('That chat is not yours.')
       }
+      const peerId = conversation.memberIds.find((id) => id !== me)
+      if (!peerId || !areContacts(me, peerId)) throw new Error('You can only message an accepted contact.')
       const text = body.trim()
       if (!text) throw new Error('Write a message first.')
       const message: Message = {
@@ -336,6 +460,8 @@ export function createDemoBackend(options: Options = {}) {
       if (!conversation || !conversation.memberIds.includes(me)) {
         throw new Error('That chat is not yours.')
       }
+      const peerId = conversation.memberIds.find((id) => id !== me)
+      if (!peerId || !areContacts(me, peerId)) throw new Error('You can only message an accepted contact.')
       let mediaUrl: string | null = null
       if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
         mediaUrl = URL.createObjectURL(input.file)
