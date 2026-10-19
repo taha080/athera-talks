@@ -1,4 +1,33 @@
+import {
+  Check,
+  CheckCheck,
+  ChevronLeft,
+  Image,
+  LogOut,
+  MessageSquare,
+  Mic,
+  MicOff,
+  MoreHorizontal,
+  MoreVertical,
+  Pause,
+  Phone,
+  PhoneOff,
+  Play,
+  Search,
+  Send,
+  Settings,
+  Smile,
+  Volume2,
+  VolumeX,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
+
 type IconProps = { className?: string }
+
+function glyph(Icon: LucideIcon, className?: string) {
+  return <Icon className={className} strokeWidth={1.75} aria-hidden="true" />
+}
 
 export function GoogleIcon({ className }: IconProps) {
   return (
@@ -9,97 +38,73 @@ export function GoogleIcon({ className }: IconProps) {
 }
 
 export function PhoneIcon({ className }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M7 3.8h2.2l1.2 3-1.6 1a12 12 0 0 0 5.4 5.4l1-1.6 3 1.2V17a2 2 0 0 1-2.2 2A15.2 15.2 0 0 1 5 6a2 2 0 0 1 2-2.2z" />
-    </svg>
-  )
+  return glyph(Phone, className)
 }
 
 export function MicIcon({ className, off = false }: IconProps & { off?: boolean }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <path strokeLinecap="round" d="M12 4a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-5 0v-5A2.5 2.5 0 0 1 12 4z" />
-      <path strokeLinecap="round" d="M7 11.5a5 5 0 0 0 10 0M12 16.5V20" />
-      {off ? <path strokeLinecap="round" d="M5 5l14 14" /> : null}
-    </svg>
-  )
+  return glyph(off ? MicOff : Mic, className)
 }
 
 export function EndIcon({ className }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M4.2 13.6c1.8-1.6 4.2-2.6 7.8-2.6s6 .9 7.8 2.6c.4.3.4.9 0 1.3l-1.5 1.4c-.4.3-.9.3-1.2-.1l-.8-1.1a8 8 0 0 0-8.6 0l-.8 1.1c-.3.4-.8.4-1.2.1l-1.5-1.4c-.4-.4-.4-1 0-1.3z" />
-    </svg>
-  )
+  return glyph(PhoneOff, className)
 }
 
 export function BackIcon({ className }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 5l-7 7 7 7" />
-    </svg>
-  )
+  return glyph(ChevronLeft, className)
 }
 
 export function SearchIcon({ className }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <circle cx="11" cy="11" r="6" />
-      <path strokeLinecap="round" d="M16 16l4 4" />
-    </svg>
-  )
+  return glyph(Search, className)
 }
 
 export function SendIcon({ className }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M4 12.4 19.2 5.2c.7-.3 1.4.4 1.1 1.1l-4.6 13.2c-.3.8-1.4.8-1.7 0l-2.2-5.3-5.3-2.2c-.8-.3-.8-1.4 0-1.6z" />
-    </svg>
-  )
+  return glyph(Send, className)
 }
 
 export function ImageIcon({ className }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <rect x="4" y="5" width="16" height="14" rx="2" />
-      <circle cx="9" cy="10" r="1.4" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M7 16l3.2-3.2a1 1 0 0 1 1.4 0L16 17" />
-    </svg>
-  )
+  return glyph(Image, className)
 }
 
 export function SmileIcon({ className }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <circle cx="12" cy="12" r="8" />
-      <path strokeLinecap="round" d="M8.5 13.5c.8 1.4 2 2 3.5 2s2.7-.6 3.5-2" />
-      <path strokeLinecap="round" d="M9 10h.01M15 10h.01" />
-    </svg>
-  )
+  return glyph(Smile, className)
 }
 
 export function GearIcon({ className }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <circle cx="12" cy="12" r="3" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3.5v2.2M12 18.3v2.2M4.8 6.8l1.6 1.6M17.6 15.6l1.6 1.6M3.5 12h2.2M18.3 12h2.2M4.8 17.2l1.6-1.6M17.6 8.4l1.6-1.6" />
-    </svg>
-  )
+  return glyph(Settings, className)
 }
 
 export function CloseIcon({ className }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
-    </svg>
-  )
+  return glyph(X, className)
 }
 
 export function CheckIcon({ className, double = false }: IconProps & { double?: boolean }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d={double ? 'M2 12.5l4 4 6-7M10 13.5l2 2 8-9' : 'M5 12.5l4 4 10-11'} />
-    </svg>
-  )
+  return glyph(double ? CheckCheck : Check, className)
+}
+
+export function MoreIcon({ className }: IconProps) {
+  return glyph(MoreVertical, className)
+}
+
+export function MoreHorizontalIcon({ className }: IconProps) {
+  return glyph(MoreHorizontal, className)
+}
+
+export function VolumeIcon({ className, off = false }: IconProps & { off?: boolean }) {
+  return glyph(off ? VolumeX : Volume2, className)
+}
+
+export function ChatsIcon({ className }: IconProps) {
+  return glyph(MessageSquare, className)
+}
+
+export function SignOutIcon({ className }: IconProps) {
+  return glyph(LogOut, className)
+}
+
+export function PlayIcon({ className }: IconProps) {
+  return glyph(Play, className)
+}
+
+export function PauseIcon({ className }: IconProps) {
+  return glyph(Pause, className)
 }

@@ -3,24 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#09080f" />
-    <meta
-      name="description"
-      content="Athera Talks — real-time chat and voice calls for anime fans. Created by Taha Ahsan."
-    />
+    <meta name="theme-color" content="#0e1116" />
+    <meta name="description" content="Athera Talks — private messages and voice calls. Created by Taha Ahsan." />
+    <meta name="application-name" content="Athera Talks" />
+    <meta property="og:title" content="Athera Talks" />
+    <meta property="og:description" content="Private messages and voice calls." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Athera Talks" />
+    <meta name="twitter:description" content="Private messages and voice calls." />
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <link rel="apple-touch-icon" href="%BASE_URL%favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <meta name="application-name" content="Athera Talks" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>Athera Talks</title>
     <script>
       try {
+        var themes = ['dark','naruto','midnight','sakura','ocean','forest','light','amoled','blush','lavender','peach','rosegold','cotton','mint','blossom','coquette']
         var savedTheme = localStorage.getItem('tatalk:theme')
-        document.documentElement.setAttribute('data-theme', savedTheme === 'naruto' ? 'naruto' : 'dark')
+        document.documentElement.setAttribute('data-theme', themes.indexOf(savedTheme) >= 0 ? savedTheme : 'dark')
       } catch (e) {
         document.documentElement.setAttribute('data-theme', 'dark')
       }

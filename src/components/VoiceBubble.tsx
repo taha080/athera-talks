@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatDuration } from '../lib/format'
-import { MicIcon } from './Icons'
+import { PauseIcon, PlayIcon } from './Icons'
 
 export function VoiceBubble({
   src,
@@ -60,12 +60,12 @@ export function VoiceBubble({
     <div className="flex min-w-[200px] items-center gap-2">
       <button
         type="button"
-        className={mine ? 'grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/20' : 'grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/10'}
+        className={mine ? 'grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/20' : 'grid h-9 w-9 shrink-0 place-items-center rounded-full bg-sakura/15 text-sakura'}
         aria-label={playing ? 'Pause voice message' : 'Play voice message'}
         onClick={() => void toggle()}
         disabled={!src}
       >
-        {playing ? <span className="h-3 w-3 rounded-sm bg-current" /> : <MicIcon className="h-4 w-4" />}
+        {playing ? <PauseIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
       </button>
       <div className="min-w-0 flex-1">
         <div className="flex h-8 items-end gap-[3px]" aria-hidden="true">

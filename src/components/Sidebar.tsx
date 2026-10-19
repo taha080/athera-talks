@@ -3,21 +3,16 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
-import { APP_NAME } from '../lib/brand'
 import { cn } from '../lib/cn'
 import { formatListTime } from '../lib/format'
 import { fieldClass } from '../lib/styles'
 import type { Profile } from '../types'
 import { isOnline } from '../lib/presence'
-import { useTheme } from '../context/ThemeContext'
 import { Avatar } from './Avatar'
-import { Credit } from './Credit'
-import { GearIcon, PhoneIcon, SearchIcon } from './Icons'
-import { KunaiMark } from './KunaiMark'
+import { PhoneIcon, SearchIcon } from './Icons'
 
 export function Sidebar() {
-  const { profile, signOut, mode } = useSession()
-  const { theme } = useTheme()
+  const { mode } = useSession()
   const chat = useChat()
   const call = useCall()
   const navigate = useNavigate()
@@ -40,7 +35,7 @@ export function Sidebar() {
     }
   }
 
-  async function openFan(userId: string) {
+  async function openPerson(userId: string) {
     const id = await chat.startChat(userId)
     await chat.refresh()
     setQuery('')
@@ -49,25 +44,16 @@ export function Sidebar() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-panel/80">
-      <header className="flex items-center justify-between gap-3 px-4 py-4">
-        <div className="flex items-center gap-2">
-          {theme === 'naruto' ? <KunaiMark className="h-8 w-8 text-sakura" /> : null}
-          <div>
-            <p className="text-lg font-semibold tracking-tight">{APP_NAME}</p>
-            <p className="text-xs text-mist">@{profile?.username}</p>
-          </div>
-        </div>
-        <Link to="/settings" aria-label="Open settings" className="rounded-full ring-sakura/40 focus-visible:ring-2">
-          <Avatar name={profile?.username ?? 'you'} url={profile?.avatarUrl} size="sm" online={isOnline(profile?.lastSeenAt)} />
-        </Link>
+    <div className="flex h-full min-h-0 flex-col bg-panel">
+      <header className="flex h-14 items-center px-4">
+        <h1 className="text-base font-semibold tracking-tight">Chats</h1>
       </header>
 
-      <div className="px-4">
+      <div className="px-3 pb-2">
         <label className="relative block">
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-mist" />
           <input
-            className={`${fieldClass} pl-10`}
+            className={`${fieldClass} bg-ink/40 pl-9`}
             value={query}
             onChange={(event) => void onSearch(event.target.value)}
             placeholder="Search username"
@@ -76,62 +62,65 @@ export function Sidebar() {
         </label>
       </div>
 
-      <div className="mt-3 min-h-0 flex-1 overflow-y-auto px-2">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         {results ? (
-          <div className="space-y-1 px-1">
-            {searchError ? <p className="px-2 py-3 text-sm text-sakura">{searchError}</p> : null}
+          <div className="space-y-0.5">
+            {searchError ? <p className="px-3 py-3 text-sm text-danger">{searchError}</p> : null}
             {results.length === 0 && !searchError ? (
-              <p className="px-2 py-6 text-center text-sm text-mist">No fans with that username.</p>
+              <p className="px-3 py-8 text-center text-sm text-mist">No one with that username.</p>
             ) : null}
-            {results.map((fan) => (
+            {results.map((person) => (
               <button
-                key={fan.id}
+                key={person.id}
                 type="button"
-                onClick={() => void openFan(fan.id)}
-                className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left hover:bg-white/5"
+                onClick={() => void openPerson(person.id)}
+                className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-white/5"
               >
-                <Avatar name={fan.username} url={fan.avatarUrl} size="sm" />
-                <span>
-                  <span className="block text-sm font-medium">@{fan.username}</span>
-                  <span className="block text-xs text-mist">{fan.favouriteAnime ?? 'No favourite yet'}</span>
+                <Avatar name={person.username} url={person.avatarUrl} size="sm" />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium">@{person.username}</span>
+                  {person.favouriteAnime ? <span className="block truncate text-xs text-mist">{person.favouriteAnime}</span> : null}
                 </span>
               </button>
             ))}
           </div>
         ) : chat.loading ? (
-          <p className="px-3 py-6 text-sm text-mist">Loading chats…</p>
+          <ListSkeleton />
         ) : chat.conversations.length === 0 ? (
-          <p className="px-3 py-6 text-sm leading-6 text-mist">
-            No chats yet. Search a username to start one.
-          </p>
+          <p className="px-3 py-8 text-center text-sm leading-6 text-mist">No chats yet. Search a username to start one.</p>
         ) : (
           <ul>
             {chat.conversations.map((conversation) => {
               const active = chat.activeId === conversation.id
-              const preview = conversation.lastMessage?.body ?? 'Say hello'
+              const preview = conversation.lastMessage?.body ?? 'No messages yet'
               return (
                 <li key={conversation.id}>
                   <Link
                     to={`/c/${conversation.id}`}
+                    aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'flex items-center gap-3 rounded-2xl px-2 py-3',
+                      'flex items-center gap-3 rounded-lg px-2 py-2.5 transition',
                       active ? 'bg-white/10' : 'hover:bg-white/5',
                     )}
                   >
-                    <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} online={isOnline(conversation.peer.lastSeenAt)} />
+                    <Avatar
+                      name={conversation.peer.username}
+                      url={conversation.peer.avatarUrl}
+                      online={isOnline(conversation.peer.lastSeenAt)}
+                    />
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-2">
-                        <span className="truncate font-medium">@{conversation.peer.username}</span>
+                        <span className="truncate text-sm font-medium">@{conversation.peer.username}</span>
                         {conversation.lastMessage ? (
-                          <span className="shrink-0 text-[11px] text-mist">
+                          <time className="shrink-0 text-[11px] text-mist" dateTime={conversation.lastMessage.createdAt}>
                             {formatListTime(conversation.lastMessage.createdAt)}
-                          </span>
+                          </time>
                         ) : null}
                       </span>
                       <span className="mt-0.5 flex items-center justify-between gap-2">
                         <span className="truncate text-sm text-mist">{preview}</span>
                         {conversation.unread > 0 ? (
-                          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-sakura px-1 text-[11px] font-semibold text-white">
+                          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-sakura px-1.5 text-[11px] font-semibold text-white">
                             {conversation.unread}
                           </span>
                         ) : null}
@@ -143,32 +132,40 @@ export function Sidebar() {
             })}
           </ul>
         )}
-        {chat.error ? <p className="px-3 py-2 text-sm text-sakura">{chat.error}</p> : null}
+        {chat.error ? <p className="px-3 py-2 text-sm text-danger">{chat.error}</p> : null}
       </div>
 
-      <footer className="space-y-3 border-t border-line px-4 py-4">
-        {mode === 'demo' ? (
+      {mode === 'demo' ? (
+        <footer className="border-t border-line px-3 py-2">
           <button
             type="button"
-            className="flex w-full items-center justify-center gap-2 rounded-full border border-line px-3 py-2 text-xs font-medium text-mist hover:text-paper"
+            className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-mist transition hover:bg-white/5 hover:text-paper"
             onClick={() => {
               const target = chat.conversations.find((item) => item.peer.username === 'sakura') ?? chat.conversations[0]
               if (target) call.simulateIncoming(target.peer, target.id)
             }}
           >
             <PhoneIcon className="h-4 w-4" />
-            Preview incoming call
+            Preview call
           </button>
-        ) : null}
-        <Link to="/settings" className="flex w-full items-center justify-center gap-2 rounded-full bg-white/5 px-3 py-2 text-sm font-medium text-paper hover:bg-white/10">
-          <GearIcon className="h-4 w-4" />
-          Settings
-        </Link>
-        <button type="button" onClick={() => void signOut().then(() => navigate('/login'))} className="w-full rounded-full bg-white/5 px-3 py-2 text-sm font-medium text-paper hover:bg-white/10">
-          Sign out
-        </button>
-        <Credit />
-      </footer>
+        </footer>
+      ) : null}
+    </div>
+  )
+}
+
+function ListSkeleton() {
+  return (
+    <div className="space-y-1 px-1" aria-hidden="true">
+      {Array.from({ length: 6 }, (_, index) => (
+        <div key={index} className="flex items-center gap-3 px-2 py-2.5">
+          <span className="skeleton h-12 w-12 rounded-full" />
+          <span className="min-w-0 flex-1 space-y-2">
+            <span className="skeleton block h-3 w-2/5 rounded" />
+            <span className="skeleton block h-3 w-4/5 rounded" />
+          </span>
+        </div>
+      ))}
     </div>
   )
 }

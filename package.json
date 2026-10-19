@@ -1,6 +1,6 @@
 {
   "name": "athera-talks",
-  "description": "Athera Talks — real-time chat and voice calls for anime fans. Created by Taha Ahsan.",
+  "description": "Athera Talks — private messages and voice calls. Created by Taha Ahsan.",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.47.10",
+    "lucide-react": "^1.59.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.1"
