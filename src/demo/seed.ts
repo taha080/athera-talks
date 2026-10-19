@@ -24,6 +24,7 @@ export type DemoConversation = {
   id: string
   memberIds: [string, string]
   updatedAt: string
+  pinnedFor?: string[]
 }
 
 export type DemoHide = {
