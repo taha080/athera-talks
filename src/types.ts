@@ -32,6 +32,7 @@ export type Profile = {
   showReadReceipts?: boolean
   notifySound?: boolean
   notifyDesktop?: boolean
+  isCreator?: boolean
 }
 
 export type ReplyTarget = {

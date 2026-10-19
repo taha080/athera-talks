@@ -4,6 +4,7 @@ import { callHeadline } from '../lib/callMachine'
 import { cn } from '../lib/cn'
 import { useCallClock } from '../lib/useCallClock'
 import { Avatar } from './Avatar'
+import { DisplayName } from './CreatorBadge'
 import { EndIcon, MicIcon, PhoneIcon, VolumeIcon } from './Icons'
 
 export function ReturnToCallBar() {
@@ -83,7 +84,9 @@ export function CallScreen() {
           ) : null}
           <Avatar name={peer?.username ?? 'caller'} url={peer?.avatarUrl} size="xl" />
         </div>
-        <h2 className="mt-6 text-3xl font-semibold tracking-tight">@{peer?.username}</h2>
+        <h2 className="mt-6 flex items-center justify-center gap-1.5 text-3xl font-semibold tracking-tight">
+          <DisplayName name={`@${peer?.username ?? 'caller'}`} creator={peer?.isCreator} />
+        </h2>
         {call.error ? <p className="mx-auto mt-4 max-w-sm text-sm text-danger">{call.error}</p> : null}
         {call.demo && call.phase === 'connected' ? (
           <p className="mt-3 text-xs text-mist">Preview only. Your microphone stays off.</p>

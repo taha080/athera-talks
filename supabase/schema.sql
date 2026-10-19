@@ -18,6 +18,7 @@ create table if not exists public.profiles (
   favourite_anime text check (
     favourite_anime is null or char_length(btrim(favourite_anime)) between 1 and 60
   ),
+  is_creator boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -742,6 +743,7 @@ returns table (
   peer_username text,
   peer_avatar_url text,
   peer_favourite_anime text,
+  peer_is_creator boolean,
   peer_last_seen timestamptz,
   peer_receipts boolean,
   last_body text,
@@ -770,6 +772,7 @@ begin
     peer.username,
     peer.avatar_url,
     peer.favourite_anime,
+    peer.is_creator,
     case when peer.show_last_seen then peer.last_seen_at else null end,
     peer.show_read_receipts,
     case
@@ -1279,7 +1282,9 @@ begin
 end;
 $$;
 
-create or replace function public.list_contact_requests()
+drop function if exists public.list_contact_requests();
+
+create function public.list_contact_requests()
 returns table (
   id uuid,
   from_id uuid,
@@ -1290,7 +1295,8 @@ returns table (
   peer_id uuid,
   peer_username text,
   peer_avatar_url text,
-  peer_favourite_anime text
+  peer_favourite_anime text,
+  peer_is_creator boolean
 )
 language plpgsql
 stable
@@ -1313,7 +1319,8 @@ begin
     peer.id,
     peer.username,
     peer.avatar_url,
-    peer.favourite_anime
+    peer.favourite_anime,
+    peer.is_creator
   from public.contact_requests r
   join public.profiles peer
     on peer.id = case when r.from_id = auth.uid() then r.to_id else r.from_id end
@@ -1390,6 +1397,7 @@ returns table (
   username text,
   avatar_url text,
   favourite_anime text,
+  is_creator boolean,
   request_id uuid,
   request_status text,
   request_from uuid
@@ -1433,6 +1441,7 @@ begin
     p.username,
     p.avatar_url,
     p.favourite_anime,
+    p.is_creator,
     r.id,
     r.status,
     r.from_id
@@ -1456,6 +1465,7 @@ returns table (
   peer_username text,
   peer_avatar_url text,
   peer_favourite_anime text,
+  peer_is_creator boolean,
   peer_last_seen timestamptz,
   peer_receipts boolean,
   last_body text,
@@ -1484,6 +1494,7 @@ begin
     peer.username,
     peer.avatar_url,
     peer.favourite_anime,
+    peer.is_creator,
     case when peer.show_last_seen then peer.last_seen_at else null end,
     peer.show_read_receipts,
     case
@@ -1824,3 +1835,56 @@ create policy "Read visible profiles"
   on public.profiles for select
   to authenticated
   using (public.can_read_profile(id));
+
+-- Creator status is not a profile field people can edit. The service role and
+-- the database owner can set it. Everyone else is rejected.
+revoke update on table public.profiles from public, anon, authenticated;
+grant update (
+  username,
+  avatar_url,
+  favourite_anime,
+  theme,
+  wallpaper,
+  wallpaper_path,
+  last_seen_at,
+  show_last_seen,
+  show_read_receipts,
+  notify_sound,
+  notify_desktop,
+  updated_at
+) on public.profiles to authenticated;
+revoke insert (is_creator) on public.profiles from public, anon, authenticated;
+
+create or replace function public.protect_creator_flag()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  actor text;
+begin
+  actor := coalesce(auth.role(), '');
+  if tg_op = 'UPDATE' and new.is_creator is not distinct from old.is_creator then
+    return new;
+  end if;
+  if tg_op = 'INSERT' and new.is_creator = false then
+    return new;
+  end if;
+  if actor = 'service_role' or (actor = '' and current_user in ('postgres', 'supabase_admin', 'service_role')) then
+    return new;
+  end if;
+  raise exception 'Creator status cannot be changed';
+end;
+$$;
+
+drop trigger if exists profiles_protect_creator on public.profiles;
+create trigger profiles_protect_creator
+  before insert or update on public.profiles
+  for each row execute function public.protect_creator_flag();
+
+update public.profiles
+set is_creator = true
+where username = 'taha'
+  and id in (
+    select id from auth.users where email = 'ahsantaha16@gmail.com'
+  );
