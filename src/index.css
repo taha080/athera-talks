@@ -343,6 +343,32 @@ body {
   background: linear-gradient(180deg, #fbe08a 0%, #c8901a 100%);
 }
 
+.bubble-creator::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: -45%;
+  bottom: -45%;
+  left: 0;
+  width: 40%;
+  pointer-events: none;
+  background: linear-gradient(
+    112deg,
+    transparent 0%,
+    rgb(255 255 255 / 0) 38%,
+    rgb(255 255 255 / 0.3) 50%,
+    rgb(255 255 255 / 0) 62%,
+    transparent 100%
+  );
+  transform: translateX(-180%) skewX(-18deg);
+  animation: creator-bubble-shine 3s ease-in-out infinite;
+}
+
+.bubble-creator > * {
+  position: relative;
+  z-index: 1;
+}
+
 .creator-bubble-head {
   color: #9a6b0b;
   font-size: 11.5px;
@@ -712,6 +738,18 @@ textarea:-webkit-autofill {
   }
 }
 
+@keyframes creator-bubble-shine {
+  0% {
+    transform: translateX(-180%) skewX(-18deg);
+  }
+  40% {
+    transform: translateX(380%) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(380%) skewX(-18deg);
+  }
+}
+
 @keyframes creator-ring-pulse {
   0%,
   100% {
@@ -732,7 +770,8 @@ textarea:-webkit-autofill {
   }
 
   .creator-shine,
-  .creator-ring {
+  .creator-ring,
+  .bubble-creator::after {
     animation: none;
   }
 }
