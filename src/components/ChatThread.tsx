@@ -1,23 +1,27 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
 import { wallpaperClass } from '../lib/appearance'
+import { chatTitle, isGroup } from '../lib/chatList'
 import { QUICK_REACTIONS, groupPosition, groupedReactions, linkHost, linkParts, type GroupPos } from '../lib/chatView'
 import { dayKey, formatDayLabel, formatMessageTime } from '../lib/format'
 import { messagePreview } from '../lib/messages'
 import { isOnline, presenceLabel } from '../lib/presence'
 import { receiptTick } from '../lib/receipts'
 import { iconButton } from '../lib/styles'
-import type { Conversation, Message, ReplyTarget } from '../types'
+import type { Conversation, GroupMember, Message, ReplyTarget } from '../types'
 import { Avatar } from './Avatar'
 import { CreatorMessageHeader, DisplayName } from './CreatorBadge'
 import { Composer } from './Composer'
+import { GroupPanel } from './GroupPanel'
+import { ReportDialog } from './ReportDialog'
 import { VoiceBubble } from './VoiceBubble'
 import { BackIcon, CheckIcon, CloseIcon, CopyIcon, DownIcon, MoreIcon, PhoneIcon, ReplyIcon, SearchIcon, SmileIcon, TrashIcon } from './Icons'
 
 export function ChatThread({ conversation }: { conversation: Conversation | undefined }) {
+  const navigate = useNavigate()
   const { profile } = useSession()
   const chat = useChat()
   const call = useCall()
@@ -26,6 +30,9 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
   const [reactId, setReactId] = useState<string | null>(null)
   const [actionsId, setActionsId] = useState<string | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
+  const [editing, setEditing] = useState<{ id: string; body: string } | null>(null)
+  const [reporting, setReporting] = useState(false)
+  const [members, setMembers] = useState<GroupMember[]>([])
   const [searchOpen, setSearchOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [matchIndex, setMatchIndex] = useState(0)
@@ -123,13 +130,33 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
 
   const peerId = conversation?.peer.id
   const conversationId = conversation?.id
+  const groupChat = conversation ? isGroup(conversation) : false
   const subscribeTyping = useRef(chat.subscribeTyping)
   subscribeTyping.current = chat.subscribeTyping
+  const listMembers = useRef(chat.listMembers)
+  listMembers.current = chat.listMembers
+
+  useEffect(() => {
+    if (!conversationId) return
+    let cancel = false
+    void listMembers.current(conversationId)
+      .then((rows) => {
+        if (!cancel) setMembers(rows)
+      })
+      .catch(() => {
+        if (!cancel) setMembers([])
+      })
+    return () => {
+      cancel = true
+    }
+  }, [conversationId, conversation?.memberCount, conversation?.title])
 
   useEffect(() => {
     if (!conversationId || !peerId) return
     const stop = subscribeTyping.current(conversationId, (userId) => {
-      if (userId !== peerId) return
+      if (groupChat) {
+        if (userId === profile?.id) return
+      } else if (userId !== peerId) return
       setTyping(true)
       if (typingTimer.current) window.clearTimeout(typingTimer.current)
       typingTimer.current = window.setTimeout(() => setTyping(false), 3000)
@@ -138,7 +165,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
       stop()
       if (typingTimer.current) window.clearTimeout(typingTimer.current)
     }
-  }, [conversationId, peerId])
+  }, [conversationId, groupChat, peerId, profile?.id])
 
   useEffect(() => {
     const id = matches[matchIndex]?.id
@@ -156,8 +183,13 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
 
   const wallpaper = profile?.wallpaper ?? 'plain'
   const customImage = wallpaper === 'custom' && profile?.wallpaperUrl ? profile.wallpaperUrl.replace(/"/g, '') : ''
-  const online = isOnline(conversation.peer.lastSeenAt)
-  const status = typing ? 'typing…' : presenceLabel(conversation.peer.lastSeenAt) || 'offline'
+  const group = isGroup(conversation)
+  const title = chatTitle(conversation)
+  const online = group ? false : isOnline(conversation.peer.lastSeenAt)
+  const status = typing ? 'typing…' : group ? `${conversation.memberCount ?? members.length} members` : presenceLabel(conversation.peer.lastSeenAt) || 'offline'
+  const contacts = chat.conversations
+    .filter((item) => !isGroup(item) && !item.blocked)
+    .map((item) => item.peer)
   let lastDay = ''
 
   function onScroll() {
@@ -209,14 +241,16 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
         <Link to="/" className={`${iconButton} md:hidden`} aria-label="Back to chats">
           <BackIcon className="h-5 w-5" />
         </Link>
-        <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} size="sm" online={online} creator={conversation.peer.isCreator} />
+        <Avatar name={title} url={group ? conversation.photoUrl ?? null : conversation.peer.avatarUrl} size="sm" online={online} creator={group ? false : conversation.peer.isCreator} />
         <div className="min-w-0 flex-1">
-          <DisplayName name={conversation.peer.username} creator={conversation.peer.isCreator} className="chat-title text-sm font-semibold" />
+          <DisplayName name={title} creator={group ? false : conversation.peer.isCreator} className="chat-title text-sm font-semibold" />
           <p className={`chat-status truncate text-xs ${typing || online ? 'text-foam' : 'text-mist'}`}>{status}</p>
         </div>
-        <button type="button" className={iconButton} aria-label="Start voice call" onClick={() => void call.startCall(conversation.peer, conversation.id)}>
-          <PhoneIcon className="h-5 w-5" />
-        </button>
+        {group || conversation.blocked ? null : (
+          <button type="button" className={iconButton} aria-label="Start voice call" onClick={() => void call.startCall(conversation.peer, conversation.id)}>
+            <PhoneIcon className="h-5 w-5" />
+          </button>
+        )}
         <button
           type="button"
           className={iconButton}
@@ -233,7 +267,31 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
         <button type="button" className={iconButton} aria-label="Conversation details" aria-expanded={infoOpen} aria-haspopup="dialog" onClick={() => setInfoOpen((open) => !open)}>
           <MoreIcon className="h-5 w-5" />
         </button>
-        {infoOpen ? (
+        {infoOpen && group ? (
+          <GroupPanel
+            conversation={conversation}
+            meId={profile?.id ?? ''}
+            members={members}
+            contacts={contacts}
+            onClose={() => setInfoOpen(false)}
+            onRename={(next) => chat.renameGroup(conversation.id, next)}
+            onPhoto={(file) => chat.setGroupPhoto(conversation.id, file)}
+            onAdd={(userId) => chat.addMember(conversation.id, userId)}
+            onRemove={(userId) => chat.removeMember(conversation.id, userId)}
+            onRole={(userId, role) => chat.setMemberRole(conversation.id, userId, role)}
+            onLeave={async () => {
+              await chat.leaveGroup(conversation.id)
+              setInfoOpen(false)
+              navigate('/')
+            }}
+            onDelete={async () => {
+              await chat.deleteGroup(conversation.id)
+              setInfoOpen(false)
+              navigate('/')
+            }}
+          />
+        ) : null}
+        {infoOpen && !group ? (
           <div className="absolute right-2 top-14 z-20 w-64 rounded-xl border border-line bg-panel p-3 text-left shadow-md" role="dialog" aria-label="Conversation details">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
@@ -243,6 +301,18 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
               </div>
               <button type="button" className={iconButton} aria-label="Close details" onClick={() => setInfoOpen(false)}>
                 <CloseIcon className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                className="h-9 flex-1 rounded-lg border border-line px-2 text-xs font-medium"
+                onClick={() => void act(conversation.blockedByMe ? chat.unblockUser(conversation.peer.id) : chat.blockUser(conversation.peer.id))}
+              >
+                {conversation.blockedByMe ? 'Unblock' : 'Block'}
+              </button>
+              <button type="button" className="h-9 flex-1 rounded-lg border border-line px-2 text-xs font-medium" onClick={() => setReporting(true)}>
+                Report
               </button>
             </div>
           </div>
@@ -280,6 +350,9 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
           const showDay = day !== lastDay
           lastDay = day
           const mine = message.senderId === profile?.id
+          const sender = members.find((member) => member.id === message.senderId)
+          const senderName = mine ? profile?.username ?? '' : sender?.username ?? (group ? 'member' : conversation.peer.username)
+          const senderCreator = mine ? Boolean(profile?.isCreator) : Boolean(sender ? sender.isCreator : group ? false : conversation.peer.isCreator)
           const pos = groupPosition(chat.messages, index)
           const hit = Boolean(query) && !message.deletedAt && message.body.toLowerCase().includes(query)
           return (
@@ -299,8 +372,9 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
                 mine={mine}
                 pos={pos}
                 meId={profile?.id ?? ''}
-                senderName={mine ? profile?.username ?? '' : conversation.peer.username}
-                senderCreator={mine ? Boolean(profile?.isCreator) : Boolean(conversation.peer.isCreator)}
+                senderName={senderName}
+                senderCreator={senderCreator}
+                showSender={!mine && (group || !senderCreator)}
                 highlighted={hit}
                 receiptsShared={conversation.peer.showReadReceipts !== false}
                 menuOpen={menuId === message.id}
@@ -324,6 +398,12 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
                 onCopy={() => void copyMessage(message)}
                 onHide={() => void act(chat.hideMessage(message.id))}
                 onDelete={() => void act(chat.deleteForEveryone(message))}
+                onEdit={() => {
+                  setEditing({ id: message.id, body: message.body })
+                  setReply(null)
+                  setMenuId(null)
+                  setActionsId(null)
+                }}
                 onToggleReaction={(emoji) => {
                   setReactId(null)
                   void act(chat.react(message.id, emoji))
@@ -358,14 +438,35 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
         </button>
       ) : null}
       {actionError ? <p className="px-4 pb-1 text-sm text-danger">{actionError}</p> : null}
+      {conversation.blocked ? (
+        <div className="border-t border-line bg-panel px-4 py-3 text-sm leading-6 text-mist">
+          {conversation.blockedByMe ? (
+            <>
+              You blocked @{conversation.peer.username}. Messages and calls stay off until you unblock them.{' '}
+              <button type="button" className="font-medium text-paper underline-offset-2 hover:underline" onClick={() => void act(chat.unblockUser(conversation.peer.id))}>
+                Unblock
+              </button>
+            </>
+          ) : (
+            <>You can&apos;t message or call @{conversation.peer.username}.</>
+          )}
+        </div>
+      ) : (
       <div className="composer-dock px-2 pb-2 pt-1 sm:px-4">
         <Composer
-          peerName={conversation.peer.username}
+          peerName={group ? title : `@${conversation.peer.username}`}
           reply={reply}
+          editing={editing}
+          onCancelEdit={() => setEditing(null)}
           onClearReply={() => setReply(null)}
           onTyping={() => chat.broadcastTyping(conversation.id)}
           onSendText={async (body) => {
             nearBottom.current = true
+            if (editing) {
+              await chat.editMessage(editing.id, body)
+              setEditing(null)
+              return
+            }
             await chat.send(conversation.id, body, reply)
             setReply(null)
           }}
@@ -376,6 +477,17 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
           }}
         />
       </div>
+      )}
+      {reporting && !group ? (
+        <ReportDialog
+          username={conversation.peer.username}
+          onClose={() => setReporting(false)}
+          onSubmit={async (reason, details) => {
+            await chat.reportUser(conversation.peer.id, reason, details, conversation.id)
+            chat.pushToast('Report sent')
+          }}
+        />
+      ) : null}
       {lightbox ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4" role="dialog" aria-modal="true" aria-label="Photo" data-testid="lightbox" onClick={() => setLightbox(null)}>
           <button type="button" className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white" aria-label="Close photo" onClick={() => setLightbox(null)}>
@@ -395,6 +507,7 @@ function MessageRow({
   meId,
   senderName,
   senderCreator,
+  showSender,
   highlighted,
   receiptsShared,
   menuOpen,
@@ -407,6 +520,7 @@ function MessageRow({
   onCopy,
   onHide,
   onDelete,
+  onEdit,
   onToggleReaction,
   onOpenImage,
 }: {
@@ -416,6 +530,7 @@ function MessageRow({
   meId: string
   senderName: string
   senderCreator: boolean
+  showSender: boolean
   highlighted: boolean
   receiptsShared: boolean
   menuOpen: boolean
@@ -428,6 +543,7 @@ function MessageRow({
   onCopy: () => void
   onHide: () => void
   onDelete: () => void
+  onEdit: () => void
   onToggleReaction: (emoji: string) => void
   onOpenImage: (src: string) => void
 }) {
@@ -482,7 +598,7 @@ function MessageRow({
       onPointerDown={onPointerDown}
       onContextMenu={(event) => event.preventDefault()}
     >
-      {(pos === 'start' || pos === 'single') && !senderCreator ? (
+      {(pos === 'start' || pos === 'single') && showSender ? (
         <DisplayName name={senderName} creator={senderCreator} className="msg-sender mb-0.5 px-1 text-[11px] font-medium text-mist" />
       ) : null}
       {!deleted ? (
@@ -501,7 +617,7 @@ function MessageRow({
               {message.replyPreview}
             </p>
           ) : null}
-          {deleted ? <p className="px-1 text-sm italic opacity-80">Message deleted</p> : null}
+          {deleted ? <p className="px-1 text-sm italic opacity-80">This message was deleted</p> : null}
           {image ? (
             message.mediaUrl ? (
               <button type="button" className="block" aria-label="Open photo" onClick={() => onOpenImage(message.mediaUrl as string)}>
@@ -526,7 +642,7 @@ function MessageRow({
                     <span key={`${index}-${part.value.slice(0, 8)}`}>{part.value}</span>
                   ),
                 )}
-                <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine && !deleted} floated />
+                <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine && !deleted} edited={Boolean(message.editedAt)} floated />
               </p>
               {firstLink ? (
                 <a href={firstLink} target="_blank" rel="noreferrer" className={ownTone ? 'mt-1 block rounded-lg bg-black/15 px-2 py-1.5 text-xs text-white/90' : 'mt-1 block rounded-lg bg-black/[0.04] px-2 py-1.5 text-xs text-mist'}>
@@ -536,7 +652,7 @@ function MessageRow({
               ) : null}
             </div>
           ) : (
-            <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine && !deleted} />
+            <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine && !deleted} edited={Boolean(message.editedAt)} />
           )}
         </div>
         {reactions.length > 0 ? (
@@ -565,6 +681,9 @@ function MessageRow({
         ) : null}
         {menuOpen && !deleted ? (
           <div className={`absolute z-20 mt-1 w-44 rounded-xl border border-line bg-panel p-1 shadow-md ${mine ? 'right-0' : 'left-0'}`} role="menu">
+            {mine && (!message.kind || message.kind === 'text') ? (
+              <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onEdit}>Edit</button>
+            ) : null}
             <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onReply}>Reply</button>
             <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onCopy}>Copy</button>
             <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onHide}>Delete for me</button>
@@ -583,16 +702,19 @@ function Meta({
   createdAt,
   tick,
   showTick,
+  edited = false,
   floated = false,
 }: {
   mine: boolean
   createdAt: string
   tick: string
   showTick: boolean
+  edited?: boolean
   floated?: boolean
 }) {
   return (
     <span className={`msg-meta ${floated ? 'float-right ml-2 mt-1.5' : 'mt-0.5 flex justify-end'} inline-flex items-center gap-1 px-0.5 text-[11px] leading-none ${mine ? 'text-white/75' : 'text-mist'}`}>
+      {edited ? <span>edited</span> : null}
       <time dateTime={createdAt}>{formatMessageTime(createdAt)}</time>
       {showTick ? (
         <span title={tick} aria-label={tick}>

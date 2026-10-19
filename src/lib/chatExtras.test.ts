@@ -59,7 +59,7 @@ describe('message preview', () => {
     expect(messagePreview({ body: 'hi', kind: 'text', deletedAt: null })).toBe('hi')
     expect(messagePreview({ body: '', kind: 'voice', deletedAt: null })).toBe('Voice message')
     expect(messagePreview({ body: '', kind: 'image', deletedAt: null })).toBe('Photo')
-    expect(messagePreview({ body: 'secret', kind: 'text', deletedAt: '2026-10-19T00:00:00Z' })).toBe('Message deleted')
+    expect(messagePreview({ body: 'secret', kind: 'text', deletedAt: '2026-10-19T00:00:00Z' })).toBe('This message was deleted')
     expect(messageKind('voice')).toBe('voice')
     expect(messageKind('nope')).toBe('text')
   })

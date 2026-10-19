@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { DisplayName, OfficialCreatorCard } from '../components/CreatorBadge'
@@ -20,6 +20,8 @@ import {
 import { cn } from '../lib/cn'
 import { type ThemeName } from '../lib/theme'
 import { dangerButton, fieldClass, ghostButton, primaryButton } from '../lib/styles'
+import type { BlockedPerson, UserReport } from '../types'
+import { formatListTime } from '../lib/format'
 
 const SUGGESTIONS = ['Attack on Titan', 'Demon Slayer', 'Jujutsu Kaisen', 'Frieren', 'One Piece', 'Spy x Family']
 const SECTIONS = [
@@ -32,7 +34,9 @@ type Section = (typeof SECTIONS)[number]['id']
 
 export function SettingsPage() {
   const { section } = useParams()
-  const current: Section = section === 'appearance' || section === 'privacy' ? section : 'profile'
+  const { profile } = useSession()
+  const sections = profile?.isCreator ? [...SECTIONS, { id: 'reports' as const, label: 'Reports' }] : SECTIONS
+  const current: Section | 'reports' = section === 'appearance' || section === 'privacy' || (section === 'reports' && profile?.isCreator) ? section : 'profile'
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex h-14 items-center gap-2 border-b border-line bg-panel px-2">
@@ -43,7 +47,7 @@ export function SettingsPage() {
       </header>
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <nav className="flex gap-1 overflow-x-auto border-b border-line px-3 py-3 md:w-48 md:flex-col md:border-b-0 md:border-r" aria-label="Settings">
-          {SECTIONS.map((item) => (
+          {sections.map((item) => (
             <Link
               key={item.id}
               to={item.id === 'profile' ? '/settings' : `/settings/${item.id}`}
@@ -61,6 +65,7 @@ export function SettingsPage() {
           {current === 'profile' ? <ProfileSection /> : null}
           {current === 'appearance' ? <AppearanceSection /> : null}
           {current === 'privacy' ? <PrivacySection /> : null}
+          {current === 'reports' ? <ReportsSection /> : null}
         </div>
       </div>
     </div>
@@ -310,10 +315,33 @@ function AppearanceSection() {
 
 function PrivacySection() {
   const session = useSession()
+  const chat = useChat()
   const navigate = useNavigate()
   const profile = session.profile
   const [error, setError] = useState('')
+  const [blocked, setBlocked] = useState<BlockedPerson[]>([])
+  useEffect(() => {
+    let cancel = false
+    void chat.listBlocked().then((rows) => {
+      if (!cancel) setBlocked(rows)
+    }).catch(() => {
+      if (!cancel) setBlocked([])
+    })
+    return () => {
+      cancel = true
+    }
+  }, [chat])
   if (!profile) return null
+
+  async function unblock(userId: string) {
+    setError('')
+    try {
+      await chat.unblockUser(userId)
+      setBlocked((current) => current.filter((person) => person.id !== userId))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not unblock that person.')
+    }
+  }
 
   async function toggle(patch: Parameters<typeof session.saveAppearance>[0]) {
     setError('')
@@ -354,6 +382,22 @@ function PrivacySection() {
       <p className="px-1 text-xs leading-5 text-mist">
         Note: the app creator (Taha Ahsan) can always see last seen and read receipts.
       </p>
+      <section className="rounded-lg border border-line px-4 py-3">
+        <h2 className="text-sm font-medium">Blocked</h2>
+        <p className="mt-1 text-xs leading-5 text-mist">Blocked people cannot message or call you, and you cannot message or call them.</p>
+        {blocked.length === 0 ? <p className="mt-3 text-sm text-mist">You have not blocked anyone.</p> : null}
+        <ul className="mt-3 space-y-2">
+          {blocked.map((person) => (
+            <li key={person.id} className="flex items-center gap-3">
+              <Avatar name={person.username} url={person.avatarUrl} size="sm" creator={person.isCreator} />
+              <DisplayName name={person.username} creator={person.isCreator} className="min-w-0 flex-1 text-sm" />
+              <button type="button" className={ghostButton} onClick={() => void unblock(person.id)}>
+                Unblock
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
       <Toggle
         label="Message sound"
         detail="A short tone plays when a new message arrives."
@@ -373,6 +417,46 @@ function PrivacySection() {
       <button type="button" className={`${dangerButton} w-full`} onClick={() => void session.signOut().then(() => navigate('/login'))}>
         Sign out
       </button>
+    </div>
+  )
+}
+
+function ReportsSection() {
+  const chat = useChat()
+  const [reports, setReports] = useState<UserReport[]>([])
+  const [error, setError] = useState('')
+  useEffect(() => {
+    let cancel = false
+    void chat.listReports()
+      .then((rows) => {
+        if (!cancel) setReports(rows)
+      })
+      .catch((err: unknown) => {
+        if (!cancel) setError(err instanceof Error ? err.message : 'Could not load reports.')
+      })
+    return () => {
+      cancel = true
+    }
+  }, [chat])
+
+  return (
+    <div className="mx-auto max-w-lg space-y-3 px-5 py-8">
+      <h2 className="text-sm font-semibold">Reports</h2>
+      <p className="text-xs leading-5 text-mist">Only the creator account can read these.</p>
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {reports.length === 0 && !error ? <p className="text-sm text-mist">No reports yet.</p> : null}
+      <ul className="space-y-2">
+        {reports.map((report) => (
+          <li key={report.id} className="rounded-lg border border-line px-4 py-3 text-sm">
+            <p className="font-medium">{report.reason}</p>
+            <p className="mt-1 text-mist">
+              @{report.reporterUsername} reported @{report.reportedUsername}
+            </p>
+            {report.details ? <p className="mt-2 whitespace-pre-wrap">{report.details}</p> : null}
+            <p className="mt-2 text-xs text-mist">{formatListTime(report.createdAt)}</p>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

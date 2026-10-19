@@ -1,17 +1,20 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
+import { archivedChats, chatTitle, inboxChats, isGroup } from '../lib/chatList'
 import { cn } from '../lib/cn'
 import { iconButton, primaryButton } from '../lib/styles'
 import { formatListTime } from '../lib/format'
 import { isOnline } from '../lib/presence'
 import { receiptTick } from '../lib/receipts'
-import type { SearchPerson } from '../types'
+import type { Conversation, SearchPerson } from '../types'
 import { Avatar } from './Avatar'
 import { DisplayName } from './CreatorBadge'
-import { CheckIcon, GearIcon, PhoneIcon, PlusIcon, SearchIcon, MoreIcon } from './Icons'
+import { NewGroup } from './NewGroup'
+import { ReportDialog } from './ReportDialog'
+import { ArchiveIcon, CheckIcon, GearIcon, PhoneIcon, PinIcon, PlusIcon, SearchIcon, MoreIcon, VolumeIcon } from './Icons'
 
 export function Sidebar() {
   const { mode, profile } = useSession()
@@ -26,6 +29,11 @@ export function Sidebar() {
   const [searchError, setSearchError] = useState('')
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [plusOpen, setPlusOpen] = useState(false)
+  const [groupOpen, setGroupOpen] = useState(false)
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [rowMenu, setRowMenu] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [reportUser, setReportUser] = useState<SearchPerson | null>(null)
   const [typing, setTyping] = useState<Record<string, boolean>>({})
   const peers = useRef(new Map<string, string>())
   peers.current = new Map(chat.conversations.map((item) => [item.id, item.peer.id]))
@@ -37,7 +45,10 @@ export function Sidebar() {
     const timers = new Map<string, number>()
     const stops = ids.split(',').filter(Boolean).map((id) =>
       subscribeTyping.current(id, (userId) => {
-        if (peers.current.get(id) !== userId) return
+        const conversation = chat.conversations.find((item) => item.id === id)
+        if (conversation && isGroup(conversation)) {
+          if (userId === profile?.id) return
+        } else if (peers.current.get(id) !== userId) return
         setTyping((current) => ({ ...current, [id]: true }))
         const previous = timers.get(id)
         if (previous) window.clearTimeout(previous)
@@ -51,7 +62,7 @@ export function Sidebar() {
       stops.forEach((stop) => stop())
       timers.forEach((timer) => window.clearTimeout(timer))
     }
-  }, [ids])
+  }, [ids, profile?.id, chat.conversations])
 
   async function onSearch(value: string) {
     setQuery(value)
@@ -65,6 +76,14 @@ export function Sidebar() {
       setSearchError('')
     } catch (error) {
       setSearchError(error instanceof Error ? error.message : 'Search failed.')
+    }
+  }
+
+  async function runPref(id: string, patch: { pinned?: boolean; muted?: boolean; archived?: boolean }) {
+    try {
+      await chat.setChatPref(id, patch)
+    } catch (error) {
+      chat.pushToast(error instanceof Error ? error.message : 'Could not update that chat.')
     }
   }
 
@@ -87,7 +106,14 @@ export function Sidebar() {
     }
   }
 
-  const visible = chat.conversations.filter((item) => filter === 'all' || item.unread > 0)
+  const archived = archivedChats(chat.conversations)
+  const inbox = inboxChats(chat.conversations).filter((item) => filter === 'all' || item.unread > 0)
+  const archivedVisible = archived.filter((item) => filter === 'all' || item.unread > 0)
+  const visible = archiveOpen ? archivedVisible : inbox
+  const contacts = chat.conversations
+    .filter((item) => !isGroup(item) && !item.blocked)
+    .map((item) => item.peer)
+    .filter((person, index, list) => list.findIndex((item) => item.id === person.id) === index)
 
   return (
     <div className="chat-list relative flex h-full min-h-0 flex-col bg-panel">
@@ -105,7 +131,13 @@ export function Sidebar() {
             </span>
           ) : null}
         </Link>
-        <button type="button" className={iconButton} aria-label="New chat" onClick={() => searchRef.current?.focus()}>
+        <button
+          type="button"
+          className={iconButton}
+          aria-label="New chat"
+          aria-expanded={plusOpen}
+          onClick={() => setPlusOpen((open) => !open)}
+        >
           <PlusIcon className="h-5 w-5" />
         </button>
         <button
@@ -118,6 +150,34 @@ export function Sidebar() {
           <MoreIcon className="h-5 w-5" />
         </button>
       </header>
+      {plusOpen ? (
+        <div className="absolute right-14 top-12 z-30 w-44 rounded-xl border border-line bg-panel p-1 shadow-md" role="menu">
+          <button
+            type="button"
+            role="menuitem"
+            className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm"
+            onClick={() => {
+              setPlusOpen(false)
+              setGroupOpen(false)
+              searchRef.current?.focus()
+            }}
+          >
+            New chat
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm"
+            onClick={() => {
+              setPlusOpen(false)
+              setArchiveOpen(false)
+              setGroupOpen(true)
+            }}
+          >
+            New group
+          </button>
+        </div>
+      ) : null}
       {menuOpen ? (
         <div className="absolute right-3 top-12 z-30 w-48 rounded-xl border border-line bg-panel p-1 shadow-md" role="menu">
           <Link to="/settings" className="hover-wash flex items-center gap-2 rounded-lg px-3 py-2 text-sm" onClick={() => setMenuOpen(false)}>
@@ -173,7 +233,17 @@ export function Sidebar() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {showRequests ? (
+        {groupOpen ? (
+          <NewGroup
+            contacts={contacts}
+            onClose={() => setGroupOpen(false)}
+            onCreate={async (title, memberIds) => {
+              const id = await chat.createGroup(title, memberIds)
+              setGroupOpen(false)
+              navigate(`/c/${id}`)
+            }}
+          />
+        ) : showRequests ? (
           <RequestsPanel
             meId={profile?.id ?? ''}
             onAccept={async (id) => {
@@ -219,6 +289,16 @@ export function Sidebar() {
                       await chat.cancelRequest(person.requestId)
                       setResults(await chat.search(query))
                     }}
+                    blocked={chat.conversations.some((item) => !isGroup(item) && item.peer.id === person.id && item.blockedByMe)}
+                    onBlock={async () => {
+                      await chat.blockUser(person.id)
+                      chat.pushToast(`Blocked @${person.username}`)
+                    }}
+                    onUnblock={async () => {
+                      await chat.unblockUser(person.id)
+                      chat.pushToast(`Unblocked @${person.username}`)
+                    }}
+                    onReport={() => setReportUser(person)}
                   />
                 </div>
               </article>
@@ -226,59 +306,37 @@ export function Sidebar() {
           </div>
         ) : chat.loading ? (
           <ListSkeleton />
-        ) : visible.length === 0 ? (
+        ) : visible.length === 0 && (archiveOpen || archived.length === 0) ? (
           <p className="px-4 py-10 text-center text-sm leading-6 text-mist">
-            {filter === 'unread' ? 'No unread chats.' : 'No chats yet. Search a username to send a contact request.'}
+            {archiveOpen ? 'No archived chats.' : filter === 'unread' ? 'No unread chats.' : 'No chats yet. Search a username to send a contact request.'}
           </p>
         ) : (
           <ul>
-            {visible.map((conversation) => {
-              const active = chat.activeId === conversation.id
-              const mine = conversation.lastMessage?.senderId === profile?.id
-              const tick = conversation.lastMessage && mine ? receiptTick(conversation.lastMessage, conversation.peer.showReadReceipts !== false) : null
-              const preview = typing[conversation.id] ? 'typing…' : conversation.lastMessage?.body ?? 'No messages yet'
-              return (
-                <li key={conversation.id}>
-                  <Link
-                    to={`/c/${conversation.id}`}
-                    aria-current={active ? 'page' : undefined}
-                    className={cn(
-                      'flex items-center gap-3 border-b border-line/70 px-3 py-2.5 transition',
-                      active ? 'is-active bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]' : 'hover-wash',
-                    )}
-                  >
-                    <Avatar name={conversation.peer.username} url={conversation.peer.avatarUrl} online={isOnline(conversation.peer.lastSeenAt)} creator={conversation.peer.isCreator} />
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-baseline justify-between gap-2">
-                        <DisplayName
-                          name={conversation.peer.username}
-                          creator={conversation.peer.isCreator}
-                          className={cn('text-sm', conversation.unread > 0 ? 'font-semibold' : 'font-medium')}
-                        />
-                        {conversation.lastMessage ? (
-                          <time className={cn('shrink-0 text-[11px]', conversation.unread > 0 ? 'text-sakura' : 'text-mist')} dateTime={conversation.lastMessage.createdAt}>
-                            {formatListTime(conversation.lastMessage.createdAt)}
-                          </time>
-                        ) : null}
-                      </span>
-                      <span className="mt-0.5 flex items-center justify-between gap-2">
-                        <span className={cn('flex min-w-0 items-center gap-1 text-sm', typing[conversation.id] ? 'text-foam' : 'text-mist')}>
-                          {tick ? (
-                            <CheckIcon className={cn('h-3.5 w-3.5 shrink-0', tick === 'seen' ? 'text-sakura' : '')} double={tick !== 'sent'} />
-                          ) : null}
-                          <span className="truncate">{preview}</span>
-                        </span>
-                        {conversation.unread > 0 ? (
-                          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-sakura px-1.5 text-[11px] font-semibold text-white">
-                            {conversation.unread}
-                          </span>
-                        ) : null}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              )
-            })}
+            {archiveOpen ? (
+              <li>
+                <button type="button" className="flex w-full items-center gap-3 border-b border-line/70 px-3 py-2.5 text-left text-sm font-medium" onClick={() => setArchiveOpen(false)}>
+                  Back to chats
+                </button>
+              </li>
+            ) : archived.length > 0 ? (
+              <li>
+                <button type="button" className="flex w-full items-center gap-3 border-b border-line/70 px-3 py-2.5 text-left" onClick={() => setArchiveOpen(true)}>
+                  <ArchiveIcon className="h-5 w-5 text-mist" />
+                  <span className="min-w-0 flex-1 text-sm font-medium">Archived</span>
+                  <span className="text-xs text-mist">{archived.length}</span>
+                </button>
+              </li>
+            ) : null}
+            {visible.map((conversation) => (
+              <ChatRow
+                key={conversation.id}
+                conversation={conversation}
+                active={chat.activeId === conversation.id}
+                mine={conversation.lastMessage?.senderId === profile?.id}
+                typing={Boolean(typing[conversation.id])}
+                onOpenMenu={(x, y) => setRowMenu({ id: conversation.id, x, y })}
+              />
+            ))}
           </ul>
         )}
         {chat.error ? <p className="px-4 py-2 text-sm text-danger">{chat.error}</p> : null}
@@ -294,6 +352,201 @@ export function Sidebar() {
           Taha Ahsan
         </a>
       </footer>
+      {rowMenu ? (
+        <ChatRowMenu
+          conversation={chat.conversations.find((item) => item.id === rowMenu.id)}
+          x={rowMenu.x}
+          y={rowMenu.y}
+          onClose={() => setRowMenu(null)}
+          onPin={() => runPref(rowMenu.id, { pinned: !chat.conversations.find((item) => item.id === rowMenu.id)?.pinned })}
+          onMute={() => runPref(rowMenu.id, { muted: !chat.conversations.find((item) => item.id === rowMenu.id)?.muted })}
+          onArchive={() => runPref(rowMenu.id, { archived: !chat.conversations.find((item) => item.id === rowMenu.id)?.archived })}
+        />
+      ) : null}
+      {reportUser ? (
+        <ReportDialog
+          username={reportUser.username}
+          onClose={() => setReportUser(null)}
+          onSubmit={async (reason, details) => {
+            await chat.reportUser(reportUser.id, reason, details, null)
+            chat.pushToast('Report sent')
+          }}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function ChatRow({
+  conversation,
+  active,
+  mine,
+  typing,
+  onOpenMenu,
+}: {
+  conversation: Conversation
+  active: boolean
+  mine: boolean
+  typing: boolean
+  onOpenMenu: (x: number, y: number) => void
+}) {
+  const group = isGroup(conversation)
+  const title = chatTitle(conversation)
+  const tick = conversation.lastMessage && mine ? receiptTick(conversation.lastMessage, conversation.peer.showReadReceipts !== false) : null
+  const preview = typing ? 'typing…' : conversation.lastMessage?.body ?? 'No messages yet'
+  const suppress = useRef(false)
+  const cancelPress = useRef<(() => void) | null>(null)
+
+  useEffect(() => () => cancelPress.current?.(), [])
+
+  function openMenu(x: number, y: number) {
+    suppress.current = true
+    onOpenMenu(Math.min(x, window.innerWidth - 180), Math.min(y, window.innerHeight - 160))
+  }
+
+  function onPointerDown(event: ReactPointerEvent<HTMLAnchorElement>) {
+    if (event.button !== 0) return
+    const startX = event.clientX
+    const startY = event.clientY
+    const timer = window.setTimeout(() => openMenu(startX, startY), 450)
+    function stop() {
+      window.clearTimeout(timer)
+      window.removeEventListener('pointerup', stop)
+      window.removeEventListener('pointercancel', stop)
+      window.removeEventListener('pointermove', move)
+      cancelPress.current = null
+    }
+    function move(moveEvent: PointerEvent) {
+      if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) > 12) stop()
+    }
+    cancelPress.current = stop
+    window.addEventListener('pointerup', stop)
+    window.addEventListener('pointercancel', stop)
+    window.addEventListener('pointermove', move)
+  }
+
+  return (
+    <li>
+      <Link
+        to={`/c/${conversation.id}`}
+        aria-current={active ? 'page' : undefined}
+        className={cn(
+          'flex items-center gap-3 border-b border-line/70 px-3 py-2.5 transition',
+          active ? 'is-active bg-[color-mix(in_oklab,var(--accent)_14%,transparent)]' : 'hover-wash',
+        )}
+        onPointerDown={onPointerDown}
+        onClick={(event) => {
+          if (!suppress.current) return
+          event.preventDefault()
+          suppress.current = false
+        }}
+        onContextMenu={(event) => {
+          event.preventDefault()
+          openMenu(event.clientX, event.clientY)
+        }}
+      >
+        <Avatar
+          name={title}
+          url={group ? conversation.photoUrl ?? null : conversation.peer.avatarUrl}
+          online={group ? false : isOnline(conversation.peer.lastSeenAt)}
+          creator={group ? false : conversation.peer.isCreator}
+        />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline justify-between gap-2">
+            <span className="flex min-w-0 items-center gap-1">
+              <DisplayName
+                name={title}
+                creator={group ? false : conversation.peer.isCreator}
+                className={cn('text-sm', conversation.unread > 0 ? 'font-semibold' : 'font-medium')}
+              />
+              {conversation.pinned ? (
+                <span role="img" aria-label="Pinned">
+                  <PinIcon className="h-3.5 w-3.5 shrink-0 text-mist" />
+                </span>
+              ) : null}
+            </span>
+            {conversation.lastMessage ? (
+              <time className={cn('shrink-0 text-[11px]', conversation.unread > 0 ? 'text-sakura' : 'text-mist')} dateTime={conversation.lastMessage.createdAt}>
+                {formatListTime(conversation.lastMessage.createdAt)}
+              </time>
+            ) : null}
+          </span>
+          <span className="mt-0.5 flex items-center justify-between gap-2">
+            <span className={cn('flex min-w-0 items-center gap-1 text-sm', typing ? 'text-foam' : 'text-mist')}>
+              {conversation.muted ? (
+                <span role="img" aria-label="Muted">
+                  <VolumeIcon className="h-3.5 w-3.5 shrink-0" off />
+                </span>
+              ) : null}
+              {tick ? <CheckIcon className={cn('h-3.5 w-3.5 shrink-0', tick === 'seen' ? 'text-sakura' : '')} double={tick !== 'sent'} /> : null}
+              <span className="truncate">{preview}</span>
+            </span>
+            {conversation.unread > 0 ? (
+              <span className="grid h-5 min-w-5 place-items-center rounded-full bg-sakura px-1.5 text-[11px] font-semibold text-white">
+                {conversation.unread}
+              </span>
+            ) : null}
+          </span>
+        </span>
+      </Link>
+    </li>
+  )
+}
+
+function ChatRowMenu({
+  conversation,
+  x,
+  y,
+  onClose,
+  onPin,
+  onMute,
+  onArchive,
+}: {
+  conversation: Conversation | undefined
+  x: number
+  y: number
+  onClose: () => void
+  onPin: () => Promise<void>
+  onMute: () => Promise<void>
+  onArchive: () => Promise<void>
+}) {
+  useEffect(() => {
+    function close() {
+      onClose()
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('pointerdown', close)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointerdown', close)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [onClose])
+
+  if (!conversation) return null
+  async function choose(task: () => Promise<void>) {
+    await task()
+    onClose()
+  }
+  return (
+    <div
+      className="fixed z-40 w-44 rounded-xl border border-line bg-panel p-1 shadow-md"
+      style={{ left: x, top: y }}
+      role="menu"
+      aria-label="Chat actions"
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={() => void choose(onPin)}>
+        {conversation.pinned ? 'Unpin' : 'Pin'}
+      </button>
+      <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={() => void choose(onMute)}>
+        {conversation.muted ? 'Unmute' : 'Mute'}
+      </button>
+      <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={() => void choose(onArchive)}>
+        {conversation.archived ? 'Unarchive' : 'Archive'}
+      </button>
     </div>
   )
 }
@@ -306,6 +559,10 @@ function PersonActions({
   onAccept,
   onDecline,
   onCancel,
+  blocked,
+  onBlock,
+  onUnblock,
+  onReport,
 }: {
   person: SearchPerson
   meId: string
@@ -314,14 +571,31 @@ function PersonActions({
   onAccept: () => Promise<void>
   onDecline: () => Promise<void>
   onCancel: () => Promise<void>
+  blocked: boolean
+  onBlock: () => Promise<void>
+  onUnblock: () => Promise<void>
+  onReport: () => void
 }) {
   const incoming = person.requestStatus === 'pending' && person.requestFromId !== meId
   const outgoing = person.requestStatus === 'pending' && person.requestFromId === meId
+  const safety = (
+    <>
+      <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium text-paper" onClick={() => void (blocked ? onUnblock() : onBlock())}>
+        {blocked ? 'Unblock' : 'Block'}
+      </button>
+      <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium text-paper" onClick={onReport}>
+        Report
+      </button>
+    </>
+  )
   if (person.requestStatus === 'accepted') {
     return (
-      <button type="button" className={`${primaryButton} h-9 px-3 text-xs`} onClick={() => void onMessage()}>
-        Message
-      </button>
+      <>
+        <button type="button" className={`${primaryButton} h-9 px-3 text-xs`} onClick={() => void onMessage()}>
+          Message
+        </button>
+        {safety}
+      </>
     )
   }
   if (incoming) {
@@ -333,20 +607,27 @@ function PersonActions({
         <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium text-paper" onClick={() => void onDecline()}>
           Decline
         </button>
+        {safety}
       </>
     )
   }
   if (outgoing) {
     return (
-      <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium text-mist" onClick={() => void onCancel()}>
-        Requested · Cancel
-      </button>
+      <>
+        <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium text-mist" onClick={() => void onCancel()}>
+          Requested · Cancel
+        </button>
+        {safety}
+      </>
     )
   }
   return (
-    <button type="button" className={`${primaryButton} h-9 px-3 text-xs`} onClick={() => void onAdd()}>
-      Add contact
-    </button>
+    <>
+      <button type="button" className={`${primaryButton} h-9 px-3 text-xs`} onClick={() => void onAdd()}>
+        Add contact
+      </button>
+      {safety}
+    </>
   )
 }
 

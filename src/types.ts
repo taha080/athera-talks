@@ -79,8 +79,12 @@ export type Message = {
   replyTo?: string | null
   replyPreview?: string | null
   deletedAt?: string | null
+  editedAt?: string | null
   reactions?: Reaction[]
 }
+
+export type ConversationKind = 'direct' | 'group'
+export type MemberRole = 'admin' | 'member'
 
 export type Conversation = {
   id: string
@@ -94,6 +98,51 @@ export type Conversation = {
     deliveredAt?: string | null
   } | null
   unread: number
+  kind?: ConversationKind
+  title?: string | null
+  photoUrl?: string | null
+  memberCount?: number
+  myRole?: MemberRole
+  pinned?: boolean
+  muted?: boolean
+  archived?: boolean
+  blocked?: boolean
+  blockedByMe?: boolean
+}
+
+export type GroupMember = {
+  id: string
+  username: string
+  avatarUrl: string | null
+  favouriteAnime: string | null
+  isCreator: boolean
+  role: MemberRole
+}
+
+export type BlockedPerson = {
+  id: string
+  username: string
+  avatarUrl: string | null
+  isCreator: boolean
+  blockedAt: string
+}
+
+export type UserReport = {
+  id: string
+  reporterId: string
+  reporterUsername: string
+  reportedId: string
+  reportedUsername: string
+  conversationId: string | null
+  reason: string
+  details: string | null
+  createdAt: string
+}
+
+export type ChatPrefPatch = {
+  pinned?: boolean
+  muted?: boolean
+  archived?: boolean
 }
 
 export type SignalKind = 'ring' | 'offer' | 'answer' | 'ice' | 'reject' | 'hangup'

@@ -43,7 +43,7 @@ describe('chat list updates', () => {
     expect(voice?.[0].lastMessage?.body).toBe('Voice message')
     const removed = foldConversation([conversation], message({ id: 'm3', deletedAt: '2026-10-19T11:05:00.000Z' }), 'taha', null)
     expect(removed?.[0].unread).toBe(0)
-    expect(removed?.[0].lastMessage?.body).toBe('Message deleted')
+    expect(removed?.[0].lastMessage?.body).toBe('This message was deleted')
     expect(foldConversation([conversation], message({ conversationId: 'missing' }), 'taha', null)).toBeNull()
   })
 })
