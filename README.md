@@ -16,7 +16,7 @@ If Supabase keys are missing, the app shows a setup screen instead of crashing. 
 - One-to-one chat: search, conversation list, timestamps, read check marks
 - Voice calls: start, incoming accept or decline, mute, hang up, call timer
 - Profile: username, avatar upload, favourite anime
-- Dark theme by default, plus a Naruto theme (orange, black, and leaf-village blue) saved in this browser
+- Dark theme by default, plus a Naruto night-village theme (navy, lantern orange, geometric kunai) saved in this browser
 
 ## Screenshots
 
@@ -33,6 +33,10 @@ If Supabase keys are missing, the app shows a setup screen instead of crashing. 
 ![Incoming call](docs/screenshots/incoming-call.png)
 
 ![Profile](docs/screenshots/profile.png)
+
+![Naruto setup](docs/screenshots/naruto-setup.png)
+
+![Naruto sign up](docs/screenshots/naruto-sign-up.png)
 
 ![Naruto sign in](docs/screenshots/naruto-sign-in.png)
 
@@ -150,7 +154,7 @@ Nothing in demo mode is stored on a server.
 
 ## Themes
 
-The landing page, chat list, and profile include a **Dark / Naruto** switch. Dark is the sakura and violet look. Naruto shifts the background toward black, buttons and your bubbles toward orange with a leaf-blue edge, and the logo to an original leaf-and-ring mark. The choice is stored in `localStorage` under `tatalk:theme`, so a refresh keeps it. The leaf icon and background pattern are original SVG and CSS, not official artwork.
+The setup screen, landing page, chat list, and profile include a **Dark / Naruto** switch. Dark is the plain sakura and violet look. With Naruto selected, the missing-keys setup card and the sign-in / sign-up pages share a night-village scene: original mountain and roof silhouettes, mist, lantern glow, a glass card with an orange edge, and a geometric kunai mark. Chat uses the same night navy and lantern orange. The choice is stored in `localStorage` under `tatalk:theme`, so a refresh keeps it. The village, lanterns, and kunai are original SVG and CSS, not official artwork.
 
 ## How chat and calls work
 

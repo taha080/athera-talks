@@ -11,7 +11,7 @@ import { useTheme } from '../context/ThemeContext'
 import { Avatar } from './Avatar'
 import { Credit } from './Credit'
 import { PhoneIcon, SearchIcon } from './Icons'
-import { LeafMark } from './LeafMark'
+import { KunaiMark } from './KunaiMark'
 import { ThemeSwitcher } from './ThemeSwitcher'
 
 export function Sidebar() {
@@ -51,7 +51,7 @@ export function Sidebar() {
     <div className="flex h-full min-h-0 flex-col bg-panel/80">
       <header className="flex items-center justify-between gap-3 px-4 py-4">
         <div className="flex items-center gap-2">
-          {theme === 'naruto' ? <LeafMark className="h-9 w-9 text-sakura" /> : null}
+          {theme === 'naruto' ? <KunaiMark className="h-8 w-8 text-sakura" /> : null}
           <div>
             <p className="text-lg font-semibold tracking-tight">T.A.Talk</p>
             <p className="text-xs text-mist">@{profile?.username}</p>
