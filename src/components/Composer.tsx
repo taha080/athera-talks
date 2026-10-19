@@ -228,7 +228,7 @@ export function Composer({
   return (
     <div
       ref={shell}
-      className="rounded-xl border border-line bg-panel px-2 py-1.5 shadow-md"
+      className="composer-shell rounded-xl border border-line bg-panel px-2 py-1.5 shadow-md"
       onPointerUp={onMicUp}
       onPointerMove={(event) => {
         if (phase !== 'recording' || locked.current) return
@@ -277,7 +277,7 @@ export function Composer({
             Cancel
           </button>
           {phase === 'locked' ? (
-            <button type="button" className="grid h-10 w-10 place-items-center rounded-full bg-sakura text-white" aria-label="Send voice message" onClick={() => void finish(true)}>
+            <button type="button" className="send-button grid h-10 w-10 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label="Send voice message" onClick={() => void finish(true)}>
               <SendIcon className="h-5 w-5" />
             </button>
           ) : null}
@@ -327,13 +327,13 @@ export function Composer({
             />
           </label>
           {draft.trim() ? (
-            <button type="submit" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label="Send message">
+            <button type="submit" className="send-button grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label="Send message">
               <SendIcon className="h-5 w-5" />
             </button>
           ) : (
             <button
               type="button"
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110"
+              className="send-button grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110"
               aria-label="Record voice message"
               onPointerDown={(event) => void onMicDown(event)}
             >

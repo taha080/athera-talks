@@ -395,17 +395,25 @@ body {
   clear: both;
 }
 
-@media (hover: hover) {
-  .msg-actions {
-    opacity: 0;
-    pointer-events: none;
-  }
+/* Message actions stay hidden until a long-press marks the one open group.
+   Hover and tap must not reveal them, including on a mouse or an installed PWA. */
+.msg-actions {
+  opacity: 0;
+  pointer-events: none;
+}
 
-  .msg-group:hover .msg-actions,
-  .msg-group:focus-within .msg-actions {
-    opacity: 1;
-    pointer-events: auto;
-  }
+.msg-group.is-actions-open {
+  padding-top: 2.75rem;
+}
+
+.msg-group.is-actions-open .msg-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.msg-reactions {
+  margin-top: 6px;
+  line-height: 1;
 }
 
 .tail-own::after,
@@ -483,25 +491,41 @@ textarea:-webkit-autofill {
 }
 
 [data-theme='light'] .app-canvas,
-[data-theme='light'] .wallpaper-plain {
-  background-color: #f3ebf9;
+[data-theme='light'] .wallpaper-plain,
+[data-theme='light'] .chat-column.wallpaper-plain {
+  background-color: #f7f6f9;
   background-image: none;
 }
 
-/* Default light theme only: flat logo lavender, no gloss. Other themes stay as they are. */
+/* Default light chat only. Near-white, flat, and matte. Other themes stay as they are. */
 [data-theme='light'] .chat-header {
-  background-color: #d4b3f8;
-  color: #2a1840;
-  border-color: #d4b3f8;
+  height: 3.75rem;
+  background-color: #ffffff;
+  color: #1c1428;
+  border-color: #ececf1;
+  box-shadow: none;
 }
 
 [data-theme='light'] .chat-header .text-mist {
-  color: #3d2758;
+  color: #6e6878;
 }
 
 [data-theme='light'] .chat-header .hover-wash:hover {
-  background-color: rgb(42 24 64 / 0.08);
-  color: #2a1840;
+  background-color: rgb(28 20 40 / 0.06);
+  color: #1c1428;
+}
+
+[data-theme='light'] .chat-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+[data-theme='light'] .chat-status {
+  margin-top: 1px;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 [data-theme='light'] .chat-list a.is-active {
@@ -530,8 +554,9 @@ textarea:-webkit-autofill {
 }
 
 [data-theme='light'] .bubble-own {
-  background: #efe4fc;
-  color: #2a1840;
+  background: #d4b3f8;
+  color: #241830;
+  box-shadow: 0 1px 1px rgb(36 24 48 / 0.05);
 }
 
 [data-theme='light'] .bubble-own [class*='text-white'] {
@@ -550,17 +575,15 @@ textarea:-webkit-autofill {
   border-color: rgb(42 24 64 / 0.35);
 }
 
-[data-theme='light'] .tail-own::after {
-  background: linear-gradient(135deg, transparent 50%, #efe4fc 50%);
-}
-
 [data-theme='light'] .bubble-other {
-  background: #ffffff;
-  color: #241830;
+  background: #f3f3f5;
+  color: #1c1424;
+  box-shadow: 0 1px 1px rgb(28 20 40 / 0.04);
 }
 
+[data-theme='light'] .tail-own::after,
 [data-theme='light'] .tail-other::after {
-  background: linear-gradient(225deg, transparent 50%, #ffffff 50%);
+  content: none;
 }
 
 .wallpaper-ink {
@@ -734,7 +757,6 @@ textarea:-webkit-autofill {
   }
 }
 
-[data-theme='light'] .bubble-other,
 [data-theme='blush'] .bubble-other,
 [data-theme='lavender'] .bubble-other,
 [data-theme='peach'] .bubble-other,
@@ -858,4 +880,121 @@ textarea:-webkit-autofill {
   .bubble-creator::after {
     animation: none;
   }
+}
+
+/* Light open-chat polish. Scoped so Naruto, Mint, and the other themes stay put. */
+[data-theme='light'] .chat-stream {
+  padding: 18px 16px 8px;
+}
+
+[data-theme='light'] .msg-cluster {
+  margin-top: 14px;
+}
+
+[data-theme='light'] .msg-cluster:first-child {
+  margin-top: 0;
+}
+
+[data-theme='light'] .msg-follow {
+  margin-top: 2px;
+}
+
+[data-theme='light'] .msg-group {
+  max-width: min(78%, 28rem);
+}
+
+[data-theme='light'] .msg-sender {
+  display: none;
+}
+
+[data-theme='light'] .bubble-own,
+[data-theme='light'] .bubble-other,
+[data-theme='light'] .bubble-creator {
+  border-radius: 22px;
+}
+
+[data-theme='light'] .bubble-pad {
+  padding: 9px 13px 7px;
+}
+
+[data-theme='light'] .bubble-own {
+  background: #d4b3f8;
+  color: #241830;
+  box-shadow: 0 1px 1px rgb(36 24 48 / 0.05);
+}
+
+[data-theme='light'] .bubble-other {
+  background: #f3f3f5;
+  color: #1c1424;
+  box-shadow: 0 1px 1px rgb(28 20 40 / 0.04);
+}
+
+[data-theme='light'] .bubble-creator {
+  border-radius: 22px;
+  box-shadow: 0 1px 2px rgb(61 46 18 / 0.08);
+}
+
+[data-theme='light'] .bubble-creator::after {
+  content: none;
+}
+
+[data-theme='light'] .tail-own::after,
+[data-theme='light'] .tail-other::after {
+  content: none;
+}
+
+[data-theme='light'] .msg-copy {
+  font-size: 15px;
+  line-height: 1.47;
+  letter-spacing: -0.011em;
+}
+
+[data-theme='light'] .bubble-own .msg-meta {
+  color: rgb(36 24 48 / 0.62);
+}
+
+[data-theme='light'] .bubble-other .msg-meta,
+[data-theme='light'] .bubble-creator .msg-meta {
+  color: #8b8496;
+}
+
+[data-theme='light'] .day-chip {
+  border-color: #ececf1;
+  background: #ffffff;
+  color: #7a7386;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+[data-theme='light'] .msg-reactions {
+  margin-top: 6px;
+}
+
+[data-theme='light'] .composer-dock {
+  padding: 8px 12px 14px;
+  background: transparent;
+}
+
+[data-theme='light'] .composer-shell {
+  border: 1px solid #ece8f2;
+  border-radius: 28px;
+  background: #ffffff;
+  box-shadow:
+    0 8px 28px rgb(36 24 48 / 0.07),
+    0 1px 2px rgb(36 24 48 / 0.04);
+}
+
+[data-theme='light'] .composer-shell textarea {
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+[data-theme='light'] .send-button,
+[data-theme='light'] .send-button:hover,
+[data-theme='light'] .composer-shell .bg-sakura,
+[data-theme='light'] .composer-shell .bg-sakura:hover {
+  background-color: #d4b3f8;
+  color: #2a1840;
+  filter: none;
+  box-shadow: none;
 }
