@@ -726,7 +726,7 @@ textarea:-webkit-autofill {
   0% {
     transform: translateX(-180%) skewX(-18deg);
   }
-  40% {
+  30% {
     transform: translateX(380%) skewX(-18deg);
   }
   100% {
