@@ -160,9 +160,35 @@ The setup screen, landing page, chat list, and profile include a **Dark / Naruto
 
 Chat writes a row in `messages`. The browser listens on Supabase Realtime for inserts in conversations you belong to.
 
-A voice call does not go through a media server. Each browser opens a WebRTC peer connection and exchanges the offer, answer, and network candidates on a Realtime broadcast channel named `inbox:<user id>`. Both people need Athera Talks open. Google STUN finds a direct path. When that path is still down after a few seconds, the caller retries through TURN and the screen says it is retrying via relay. If the call is still down after 25 seconds, it stops with a clear failure. Details lists the ICE candidate types that were gathered (`host`, `srflx`, `prflx`, `relay`) and the path that was selected.
+A voice call does not go through a media server. Each browser opens a WebRTC peer connection and exchanges the offer, answer, and network candidates on a Realtime broadcast channel named `inbox:<user id>`. Both people need Athera Talks open. Before every call the browser asks the `turn-credentials` Edge Function for Metered ICE servers. When that path is still down after a few seconds, the caller retries through TURN and the screen says "Couldn't connect, retrying via relay…". If the call is still down after 25 seconds, it stops with "Couldn't connect. The voice relay did not come up within 25 seconds. Check the network and try again." The timer starts when the peers connect and counts from that moment. Details lists the ICE candidate types that were gathered (`host`, `srflx`, `prflx`, `relay`) and the path that was selected.
 
-The relay credentials come from the `turn-credentials` Edge Function, which asks Cloudflare Realtime for a short-lived set that includes TURN over TCP and `turns:` on port 443. The Cloudflare API token stays in the function secrets `CF_TURN_KEY_ID` and `CF_TURN_API_TOKEN`. Credentials last about 24 hours. It is not a `VITE_` variable. Set `VITE_TURN_URLS=none` to stay on STUN only, or set `VITE_TURN_URLS`, `VITE_TURN_USERNAME`, and `VITE_TURN_CREDENTIAL` to point a local build at another relay. The call screen shows Calling, Ringing, Connecting, Connected, or Call failed with the reason. A blocked microphone is reported on that screen. The call timer, mute, and hang-up controls still work in the demo without a microphone. Signaling does not use a database table, so no extra SQL is required. `public.messages` is already in the `supabase_realtime` publication.
+The function reads the secret `METERED_API_KEY` and requests `https://taha-turn-996755.metered.live/api/v1/turn/credentials`. It returns `{ iceServers }`. The API key is not a `VITE_` variable and is not in the client. If that request fails, the client uses these static Metered servers, with username `8c806b1e87da68a6d13d1051` and credential `CWOTQy7sg1frPlo+` on the TURN entries:
+
+- `stun:stun.relay.metered.ca:80`
+- `turn:global.relay.metered.ca:80`
+- `turn:global.relay.metered.ca:80?transport=tcp`
+- `turn:global.relay.metered.ca:443`
+- `turns:global.relay.metered.ca:443?transport=tcp`
+
+Set `VITE_TURN_URLS=none` to stay on STUN only, or set `VITE_TURN_URLS`, `VITE_TURN_USERNAME`, and `VITE_TURN_CREDENTIAL` to point a local build at another relay. The call screen shows Calling, Ringing, Connecting, Connected, or Call failed with the reason. A blocked microphone is reported on that screen. The call timer, mute, and hang-up controls still work in the demo without a microphone. Signaling does not use a database table, so no extra SQL is required. `public.messages` is already in the `supabase_realtime` publication.
+
+### Deploy the voice relay
+
+The function source is `supabase/functions/turn-credentials/index.ts`. Deploy it with the Supabase MCP tool `deploy_edge_function`:
+
+- `project_id`: `jvjgouivqzklfzshmdti`
+- `name`: `turn-credentials`
+- `entrypoint_path`: `index.ts`
+- `verify_jwt`: `true`
+- `files`: one file named `index.ts` whose content is that source
+
+Then store the Metered API key as an Edge Function secret named `METERED_API_KEY`. The MCP tool list cannot write secrets. In the Supabase dashboard open **Edge Functions → Secrets** and add `METERED_API_KEY`, or with the CLI:
+
+```bash
+supabase secrets set METERED_API_KEY=<your Metered API key> --project-ref jvjgouivqzklfzshmdti
+```
+
+Do not commit the key. Until the secret is set, a signed-in call gets `503` from the function and uses the static servers above.
 
 ## Deploy to GitHub Pages
 

@@ -1,12 +1,22 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
+// Deploy: Supabase MCP deploy_edge_function, project jvjgouivqzklfzshmdti,
+// name turn-credentials, verify_jwt true, entrypoint index.ts.
+// Secret (never a VITE_ var): METERED_API_KEY
+
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const TTL_SECONDS = 86_400
+const METERED_CREDENTIALS_URL = 'https://taha-turn-996755.metered.live/api/v1/turn/credentials'
+
+type IceServer = {
+  urls: string | string[]
+  username?: string
+  credential?: string
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -15,9 +25,34 @@ function json(body: unknown, status = 200): Response {
   })
 }
 
-// Browsers time out on Cloudflare's alternate port 53. 5349 is a real TURNS port.
+// Some relays advertise port 53. Browsers time out on it. 5349 is a real TURNS port.
 function usable(url: string): boolean {
   return !/:53(?:\?|$)/.test(url)
+}
+
+function asList(body: unknown): unknown[] {
+  if (Array.isArray(body)) return body
+  if (body && typeof body === 'object' && Array.isArray((body as { iceServers?: unknown }).iceServers)) {
+    return (body as { iceServers: unknown[] }).iceServers
+  }
+  return []
+}
+
+function normalizeIceServers(body: unknown): IceServer[] {
+  const iceServers: IceServer[] = []
+  for (const item of asList(body)) {
+    if (!item || typeof item !== 'object') continue
+    const server = item as { urls?: unknown; username?: unknown; credential?: unknown }
+    const urls = (Array.isArray(server.urls) ? server.urls : server.urls ? [server.urls] : []).filter(
+      (url): url is string => typeof url === 'string' && usable(url),
+    )
+    if (!urls.length) continue
+    const next: IceServer = { urls: urls.length === 1 ? urls[0] : urls }
+    if (typeof server.username === 'string' && server.username) next.username = server.username
+    if (typeof server.credential === 'string' && server.credential) next.credential = server.credential
+    iceServers.push(next)
+  }
+  return iceServers
 }
 
 Deno.serve(async (req) => {
@@ -33,30 +68,13 @@ Deno.serve(async (req) => {
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError || !userData.user) return json({ error: 'Sign in required.' }, 401)
 
-  const keyId = Deno.env.get('CF_TURN_KEY_ID') ?? ''
-  const token = Deno.env.get('CF_TURN_API_TOKEN') ?? ''
-  if (!keyId || !token) return json({ error: 'TURN relay is not configured.' }, 503)
+  const apiKey = Deno.env.get('METERED_API_KEY') ?? ''
+  if (!apiKey) return json({ error: 'TURN relay is not configured.' }, 503)
 
-  const response = await fetch(
-    `https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(keyId)}/credentials/generate-ice-servers`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ ttl: TTL_SECONDS }),
-    },
-  )
+  const response = await fetch(`${METERED_CREDENTIALS_URL}?apiKey=${encodeURIComponent(apiKey)}`)
   if (!response.ok) return json({ error: 'Could not get a voice relay.' }, 502)
 
-  const body = (await response.json()) as { iceServers?: { urls?: string | string[] }[] }
-  const iceServers = (body.iceServers ?? [])
-    .map((server) => {
-      const urls = (Array.isArray(server.urls) ? server.urls : server.urls ? [server.urls] : []).filter(usable)
-      return { ...server, urls }
-    })
-    .filter((server) => server.urls.length > 0)
-
+  const iceServers = normalizeIceServers(await response.json())
+  if (!iceServers.length) return json({ error: 'Could not get a voice relay.' }, 502)
   return json({ iceServers })
 })
