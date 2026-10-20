@@ -23,7 +23,7 @@ import { startMode } from '../lib/mode'
 import { prepareAvatar } from '../lib/avatarFile'
 import { blobToDataUrl, fitImage } from '../lib/image'
 import { getSupabase } from '../lib/supabase'
-import { appUrl } from '../lib/url'
+import { PASSWORD_RESET_REDIRECT, appUrl, isPasswordRecoveryUrl } from '../lib/url'
 import {
   clearWallpaper,
   fetchProfile,
@@ -85,7 +85,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   )
   const [email, setEmail] = useState<string | null>(() => (mode === 'demo' ? demoBackend.currentEmail() : null))
   const [recovery, setRecovery] = useState(
-    () => typeof sessionStorage !== 'undefined' && sessionStorage.getItem(RECOVERY_KEY) === '1',
+    () =>
+      (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(RECOVERY_KEY) === '1') ||
+      (typeof window !== 'undefined' && isPasswordRecoveryUrl(window.location.href)),
   )
 
   const google = googleAuthMode(import.meta.env.VITE_SUPABASE_GOOGLE_ENABLED, mode === 'demo')
@@ -115,6 +117,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (!supabase) {
       setReady(true)
       return
+    }
+
+    if (isPasswordRecoveryUrl(window.location.href)) {
+      sessionStorage.setItem(RECOVERY_KEY, '1')
+      setRecovery(true)
+      window.setTimeout(() => navigate('/reset-password'), 0)
     }
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
@@ -210,7 +218,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return { demoReset: true }
       }
       const { error } = await getSupabase()!.auth.resetPasswordForEmail(cleaned, {
-        redirectTo: appUrl('/reset-password'),
+        redirectTo: PASSWORD_RESET_REDIRECT,
       })
       if (error) throw new Error(error.message)
       return { demoReset: false }
