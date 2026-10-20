@@ -24,12 +24,12 @@ export function Avatar({
 }: {
   name: string
   url?: string | null
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'call'
   online?: boolean
   creator?: boolean
 }) {
-  const px = { sm: 'h-10 w-10 text-xs', md: 'h-12 w-12 text-sm', lg: 'h-16 w-16 text-lg', xl: 'h-36 w-36 text-3xl' }[size]
-  const ring = creator ? (size === 'xl' ? 'creator-ring creator-ring-lg' : 'creator-ring') : ''
+  const px = { sm: 'h-10 w-10 text-xs', md: 'h-12 w-12 text-sm', lg: 'h-16 w-16 text-lg', xl: 'h-36 w-36 text-3xl', call: 'h-60 w-60 text-4xl' }[size]
+  const ring = creator ? (size === 'xl' || size === 'call' ? 'creator-ring creator-ring-lg' : 'creator-ring') : ''
   const initials = name.slice(0, 2).toUpperCase()
   const face = url ? (
     <img src={url} alt="" className={cn('block shrink-0 rounded-full bg-panel object-cover', px)} />
