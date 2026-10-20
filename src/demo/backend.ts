@@ -1,6 +1,6 @@
 import { normalizeUsername, passwordIssue, usernameIssue } from '../lib/auth'
 import { parseWallpaper } from '../lib/appearance'
-import { messagePreview } from '../lib/messages'
+import { messagePreview, newestFirstPage } from '../lib/messages'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform } from '../lib/voice'
 import { byChatOrder, REPORT_REASONS } from '../lib/chatList'
@@ -414,10 +414,11 @@ export function createDemoBackend(options: Options = {}) {
         throw new Error('That chat is not yours.')
       }
       const visible = receiptsVisible(me, conversation)
-      return data.messages
-        .filter((message) => message.conversationId === conversationId && !hidden(message.id, me))
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-        .map((message) => presentMessage(message, visible))
+      return newestFirstPage(
+        data.messages
+          .filter((message) => message.conversationId === conversationId && !hidden(message.id, me))
+          .map((message) => presentMessage(message, visible)),
+      )
     },
 
     async listCalls(conversationId: string): Promise<CallLog[]> {
