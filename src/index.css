@@ -1019,6 +1019,8 @@ textarea:-webkit-autofill {
   background-image: none;
 }
 
+/* midnight message surface stays flat navy */
+[data-theme='midnight'] .chat-column,
 [data-theme='midnight'].wallpaper-plain,
 [data-theme='midnight'] .wallpaper-plain,
 [data-theme='midnight'] .chat-column.wallpaper-plain {
