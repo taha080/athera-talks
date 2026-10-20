@@ -4,7 +4,7 @@ import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
 import { wallpaperClass } from '../lib/appearance'
-import { chatTitle, isGroup } from '../lib/chatList'
+import { chatTitle, isGroup, showSenderName } from '../lib/chatList'
 import { QUICK_REACTIONS, groupPosition, groupedReactions, linkHost, linkParts, type GroupPos } from '../lib/chatView'
 import { dayKey, formatDayLabel, formatMessageTime } from '../lib/format'
 import { messagePreview } from '../lib/messages'
@@ -374,7 +374,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
                 meId={profile?.id ?? ''}
                 senderName={senderName}
                 senderCreator={senderCreator}
-                showSender={!mine && (group || !senderCreator)}
+                showSender={showSenderName(mine, group)}
                 highlighted={hit}
                 receiptsShared={conversation.peer.showReadReceipts !== false}
                 menuOpen={menuId === message.id}

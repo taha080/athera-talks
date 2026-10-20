@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { archivedChats, byChatOrder, chatTitle, inboxChats, PIN_LIMIT } from './chatList'
+import { archivedChats, byChatOrder, chatTitle, inboxChats, PIN_LIMIT, showSenderName } from './chatList'
 import { foldConversation } from './conversations'
 import type { Conversation } from '../types'
 
@@ -26,6 +26,13 @@ describe('chat list order', () => {
     expect(inboxChats(rows).map((item) => item.id)).toEqual(['pinned-new', 'pinned-old', 'fresh', 'old'])
     expect(archivedChats(rows).map((item) => item.id)).toEqual(['away'])
     expect(byChatOrder(rows[1], rows[2])).toBeLessThan(0)
+  })
+
+  it('shows a sender name only on someone else’s group message', () => {
+    expect(showSenderName(false, true)).toBe(true)
+    expect(showSenderName(true, true)).toBe(false)
+    expect(showSenderName(false, false)).toBe(false)
+    expect(showSenderName(true, false)).toBe(false)
   })
 
   it('names a group by its title', () => {

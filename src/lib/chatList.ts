@@ -15,6 +15,11 @@ export function chatTitle(conversation: Pick<Conversation, 'kind' | 'title' | 'p
   return conversation.peer.username
 }
 
+/** Above-bubble names belong on other people's messages in a group. */
+export function showSenderName(mine: boolean, group: boolean): boolean {
+  return !mine && group
+}
+
 export function byChatOrder(a: Conversation, b: Conversation): number {
   if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1
   if (a.updatedAt === b.updatedAt) return 0
