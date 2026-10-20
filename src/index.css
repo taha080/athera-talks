@@ -356,9 +356,36 @@ body {
   z-index: 1;
 }
 
+/* Same diagonal line sweep as the creator badge, narrowed to a matte gold streak. */
+.bubble-creator::after {
+  content: '';
+  position: absolute;
+  top: -55%;
+  bottom: -55%;
+  left: 0;
+  z-index: 2;
+  width: 26%;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgb(255 236 190 / 0) 40%,
+    rgb(255 236 190 / 0.18) 46%,
+    rgb(255 246 220 / 0.48) 50%,
+    rgb(255 236 190 / 0.18) 54%,
+    rgb(255 236 190 / 0) 60%,
+    transparent 100%
+  );
+  transform: translateX(-180%) skewX(-18deg);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .bubble-creator::before {
     animation: plum-dust-fall 7.6s linear infinite;
+  }
+
+  .bubble-creator::after {
+    animation: creator-shine 2.5s linear infinite;
   }
 }
 
@@ -817,7 +844,7 @@ textarea:-webkit-autofill {
   animation: creator-shine 2.5s linear infinite;
 }
 
-/* Soft diagonal sweep on the verified tick. The creator bubble stays matte. */
+/* Soft diagonal sweep on the verified tick. */
 .verified-tick {
   position: relative;
   display: inline-flex;
@@ -905,7 +932,8 @@ textarea:-webkit-autofill {
   .creator-shine,
   .creator-ring,
   .verified-tick::after,
-  .bubble-creator::before {
+  .bubble-creator::before,
+  .bubble-creator::after {
     animation: none;
   }
 }
