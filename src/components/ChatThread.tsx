@@ -35,6 +35,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
   const call = useCall()
   const [reply, setReply] = useState<ReplyTarget | null>(null)
   const [menuId, setMenuId] = useState<string | null>(null)
+  const [menuPoint, setMenuPoint] = useState<{ x: number; y: number } | null>(null)
   const [reactId, setReactId] = useState<string | null>(null)
   const [actionsId, setActionsId] = useState<string | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
@@ -95,6 +96,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
   useEffect(() => {
     setReply(null)
     setMenuId(null)
+    setMenuPoint(null)
     setReactId(null)
     setActionsId(null)
     setInfoOpen(false)
@@ -139,17 +141,19 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
   }, [chat.messages, chat.messagesLoading, profile?.id])
 
   useEffect(() => {
-    if (!actionsId) return
+    if (!actionsId && !menuId) return
     function onPointerDown(event: PointerEvent) {
-      const row = document.querySelector(`[data-message-id="${actionsId}"]`)
+      const id = actionsId ?? menuId
+      const row = id ? document.querySelector(`[data-message-id="${id}"]`) : null
       if (event.target instanceof Node && row?.contains(event.target)) return
       setActionsId(null)
       setMenuId(null)
+      setMenuPoint(null)
       setReactId(null)
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [actionsId])
+  }, [actionsId, menuId])
 
   useEffect(() => {
     if (!infoOpen && !lightbox) return
@@ -521,20 +525,24 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
                 highlighted={hit}
                 receiptsShared={conversation.peer.showReadReceipts !== false}
                 menuOpen={menuId === message.id}
+                menuAnchor={menuId === message.id ? menuPoint : null}
                 reactOpen={reactId === message.id}
                 actionsOpen={actionsId === message.id}
-                onOpenActions={() => {
-                  setActionsId(message.id)
-                  setMenuId(null)
-                  setReactId(null)
-                }}
                 onOpenMenu={() => {
                   setMenuId((current) => (current === message.id ? null : message.id))
+                  setMenuPoint(null)
+                  setReactId(null)
+                }}
+                onShowMenu={(x, y) => {
+                  setMenuId(message.id)
+                  setMenuPoint({ x, y })
+                  setActionsId(null)
                   setReactId(null)
                 }}
                 onReply={() => {
                   setReply({ id: message.id, preview: messagePreview(message).slice(0, 80) })
                   setMenuId(null)
+                  setMenuPoint(null)
                   setActionsId(null)
                 }}
                 onReact={() => setReactId((current) => (current === message.id ? null : message.id))}
@@ -545,6 +553,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
                   setEditing({ id: message.id, body: message.body })
                   setReply(null)
                   setMenuId(null)
+                  setMenuPoint(null)
                   setActionsId(null)
                 }}
                 onToggleReaction={(emoji) => {
@@ -659,6 +668,14 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
   )
 }
 
+function placeMenu(x: number, y: number, canEdit: boolean): { position: 'fixed'; top: number; left: number } {
+  const width = 208
+  const height = (canEdit ? 6 : 5) * 40 + 8
+  const left = Math.max(8, Math.min(x, window.innerWidth - width - 8))
+  const top = y + height > window.innerHeight - 8 ? Math.max(8, y - height) : y
+  return { position: 'fixed', top, left }
+}
+
 function MessageRow({
   message,
   mine,
@@ -671,10 +688,11 @@ function MessageRow({
   highlighted,
   receiptsShared,
   menuOpen,
+  menuAnchor,
   reactOpen,
   actionsOpen,
-  onOpenActions,
   onOpenMenu,
+  onShowMenu,
   onReply,
   onReact,
   onCopy,
@@ -696,10 +714,11 @@ function MessageRow({
   highlighted: boolean
   receiptsShared: boolean
   menuOpen: boolean
+  menuAnchor: { x: number; y: number } | null
   reactOpen: boolean
   actionsOpen: boolean
-  onOpenActions: () => void
   onOpenMenu: () => void
+  onShowMenu: (x: number, y: number) => void
   onReply: () => void
   onReact: () => void
   onCopy: () => void
@@ -731,13 +750,13 @@ function MessageRow({
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.button !== 0 || deleted) return
     const target = event.target
-    if (!(target instanceof Element) || target.closest('a, button, input, textarea, label')) return
+    if (!(target instanceof Element) || target.closest('a, input, textarea, label, [role="menuitem"], .msg-actions')) return
     const startX = event.clientX
     const startY = event.clientY
     const timer = window.setTimeout(() => {
       stop()
       window.getSelection()?.removeAllRanges()
-      onOpenActions()
+      onShowMenu(startX, startY)
     }, 450)
     function stop() {
       window.clearTimeout(timer)
@@ -759,7 +778,11 @@ function MessageRow({
     <div
       className={`msg-group relative flex max-w-[min(78%,26rem)] flex-col ${mine ? 'ml-auto items-end' : 'mr-auto items-start'} ${actionsOpen ? 'is-actions-open' : ''}`}
       onPointerDown={onPointerDown}
-      onContextMenu={(event) => event.preventDefault()}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        if (deleted) return
+        onShowMenu(event.clientX, event.clientY)
+      }}
     >
       {(pos === 'start' || pos === 'single') && showSender ? (
         onOpenSender ? (
@@ -848,11 +871,17 @@ function MessageRow({
           </div>
         ) : null}
         {menuOpen && !deleted ? (
-          <div className={`absolute z-20 mt-1 w-44 rounded-xl border border-line bg-panel p-1 shadow-md ${mine ? 'right-0' : 'left-0'}`} role="menu">
+          <div
+            className={`z-40 w-52 rounded-xl border border-line bg-panel p-1 shadow-md ${menuAnchor ? '' : `absolute mt-1 ${mine ? 'right-0' : 'left-0'}`}`}
+            style={menuAnchor ? placeMenu(menuAnchor.x, menuAnchor.y, mine && (!message.kind || message.kind === 'text')) : undefined}
+            role="menu"
+            data-message-menu="true"
+          >
             {mine && (!message.kind || message.kind === 'text') ? (
               <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onEdit}>Edit</button>
             ) : null}
             <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onReply}>Reply</button>
+            <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onReact}>React</button>
             <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onCopy}>Copy</button>
             <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onHide}>Delete for me</button>
             {mine ? (
