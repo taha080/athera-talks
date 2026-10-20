@@ -24,6 +24,8 @@ export function Sidebar() {
   const [params] = useSearchParams()
   const showRequests = params.get('requests') === '1'
   const searchRef = useRef<HTMLInputElement>(null)
+  const searchSeq = useRef(0)
+  const searchTimer = useRef<number | null>(null)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchPerson[] | null>(null)
   const [searchError, setSearchError] = useState('')
@@ -64,19 +66,33 @@ export function Sidebar() {
     }
   }, [ids, profile?.id, chat.conversations])
 
-  async function onSearch(value: string) {
+  useEffect(() => () => {
+    if (searchTimer.current) window.clearTimeout(searchTimer.current)
+  }, [])
+
+  function onSearch(value: string) {
     setQuery(value)
+    if (searchTimer.current) window.clearTimeout(searchTimer.current)
+    const seq = ++searchSeq.current
     if (!value.trim()) {
       setResults(null)
       setSearchError('')
       return
     }
-    try {
-      setResults(await chat.search(value))
-      setSearchError('')
-    } catch (error) {
-      setSearchError(error instanceof Error ? error.message : 'Search failed.')
-    }
+    searchTimer.current = window.setTimeout(() => {
+      void chat.search(value).then(
+        (found) => {
+          if (seq !== searchSeq.current) return
+          setResults(found)
+          setSearchError('')
+        },
+        (error: unknown) => {
+          if (seq !== searchSeq.current) return
+          setResults([])
+          setSearchError(error instanceof Error ? error.message : 'Search failed.')
+        },
+      )
+    }, 160)
   }
 
   async function runPref(id: string, patch: { pinned?: boolean; muted?: boolean; archived?: boolean }) {
@@ -254,15 +270,15 @@ export function Sidebar() {
             onCancel={(id) => chat.cancelRequest(id)}
           />
         ) : results ? (
-          <div>
+          <div data-username-search="true">
             {searchError ? <p className="px-4 py-3 text-sm text-danger">{searchError}</p> : null}
-            {results.length === 0 && !searchError ? <p className="px-4 py-8 text-center text-sm text-mist">No one with that username.</p> : null}
+            {results.length === 0 && !searchError ? <p className="px-4 py-8 text-center text-sm text-mist" data-search-empty="true">No one with that username.</p> : null}
             {results.map((person) => (
               <article key={person.id} className="mx-3 my-2 rounded-xl border border-line bg-panel p-3 shadow-sm">
                 <div className="flex items-center gap-3">
                   <Avatar name={person.username} url={person.avatarUrl} size="sm" creator={person.isCreator} />
                   <span className="min-w-0">
-                    <DisplayName name={person.username} creator={person.isCreator} className="text-sm font-semibold" />
+                    <DisplayName name={`@${person.username}`} creator={person.isCreator} className="text-sm font-semibold" />
                     {person.favouriteAnime ? <span className="block truncate text-xs text-mist">{person.favouriteAnime}</span> : null}
                   </span>
                 </div>
@@ -293,6 +309,7 @@ export function Sidebar() {
                     onBlock={async () => {
                       await chat.blockUser(person.id)
                       chat.pushToast(`Blocked @${person.username}`)
+                      setResults(await chat.search(query))
                     }}
                     onUnblock={async () => {
                       await chat.unblockUser(person.id)

@@ -1917,6 +1917,7 @@ begin
     on least(r.from_id, r.to_id) = least(auth.uid(), p.id)
    and greatest(r.from_id, r.to_id) = greatest(auth.uid(), p.id)
   where p.id <> auth.uid()
+    and not private.users_blocked(auth.uid(), p.id)
     and p.username ilike '%' || cleaned || '%' escape '\'
   order by p.username
   limit 20;
