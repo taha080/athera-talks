@@ -64,16 +64,16 @@
 }
 
 [data-theme='midnight'] {
-  --ink: #070b16;
-  --panel: #10182b;
-  --elevated: #18233c;
-  --line: #2c3b5c;
-  --accent: #7aa2ff;
-  --accent-2: #9b7bff;
-  --mist: #a9b4cc;
+  --ink: #0f1626;
+  --panel: #151e31;
+  --elevated: #1f2937;
+  --line: #2a3548;
+  --accent: #5b4b9a;
+  --accent-2: #c4b5fd;
+  --mist: #9ca3af;
   --foam: #5ee0b5;
-  --paper: #f4f7ff;
-  --scrollbar: #31425f;
+  --paper: #e5e7eb;
+  --scrollbar: #2a3548;
   --pattern: none;
 }
 
@@ -1015,111 +1015,103 @@ textarea:-webkit-autofill {
   box-shadow: none;
 }
 
-/* Midnight Blue. Navy chat, readable accent text, and the same creator badges. */
+/* Midnight. Flat navy chat. Gold creator bubbles keep their own shine. */
 [data-theme='midnight'] .app-canvas {
-  background-color: #070b16;
+  background-color: #0f1626;
   background-image: none;
 }
 
+[data-theme='midnight'].wallpaper-plain,
 [data-theme='midnight'] .wallpaper-plain,
 [data-theme='midnight'] .chat-column.wallpaper-plain {
-  background-color: #070b16;
-  background-image:
-    radial-gradient(circle at 12% 18%, rgb(244 247 255 / 0.7) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 68% 26%, rgb(122 162 255 / 0.85) 0 1.1px, transparent 1.7px),
-    radial-gradient(circle at 36% 72%, rgb(244 247 255 / 0.45) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 84% 78%, rgb(155 123 255 / 0.75) 0 1px, transparent 1.6px);
-  background-size: 180px 200px;
+  background-color: #0f1626;
+  background-image: none;
 }
 
 [data-theme='midnight'] .chat-header {
-  background-color: #10182b;
-  color: #f4f7ff;
-  border-color: #2c3b5c;
+  background-color: #151e31;
+  color: #e5e7eb;
+  border-color: #2a3548;
+  box-shadow: none;
+}
+
+[data-theme='midnight'] .chat-header .text-mist {
+  color: #9ca3af;
 }
 
 [data-theme='midnight'] .chat-list a.is-active {
-  background-color: #1c2c4e;
+  background-color: #1c2740;
 }
 
-[data-theme='midnight'] .bg-sakura {
-  color: #0b1224;
-}
-
-[data-theme='midnight'] .bg-sakura:hover {
-  filter: none;
-  background-color: #9bb6ff;
-  color: #0b1224;
+[data-theme='midnight'] .app-canvas .text-sakura {
+  color: #c4b5fd;
 }
 
 [data-theme='midnight'] .bubble-own {
-  background: #7aa2ff;
-  color: #0b1224;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.28);
-}
-
-[data-theme='midnight'] .bubble-own [class*='text-white'] {
-  color: #0b1224;
-}
-
-[data-theme='midnight'] .bubble-own [class~='bg-white'] {
-  background-color: #0b1224;
-}
-
-[data-theme='midnight'] .bubble-own [class~='bg-white/20'] {
-  background-color: rgb(11 18 36 / 0.14);
-}
-
-[data-theme='midnight'] .bubble-own [class*='border-white'] {
-  border-color: rgb(11 18 36 / 0.35);
+  background: #5b4b9a;
+  color: #fff;
+  box-shadow: none;
 }
 
 [data-theme='midnight'] .bubble-other {
-  background: #1a2744;
-  color: #f4f7ff;
-  box-shadow: inset 0 0 0 1px #2c3b5c;
+  background: #1f2937;
+  color: #e5e7eb;
+  box-shadow: none;
 }
 
-[data-theme='midnight'] .bubble-own .msg-meta {
-  color: rgb(11 18 36 / 0.62);
+[data-theme='midnight'] .bubble-own,
+[data-theme='midnight'] .bubble-other {
+  border-radius: 18px;
+}
+
+[data-theme='midnight'] .tail-own::after,
+[data-theme='midnight'] .tail-other::after {
+  content: none;
+}
+
+[data-theme='midnight'] .bubble-own .msg-meta,
+[data-theme='midnight'] .bubble-own .msg-meta svg {
+  color: #ddd6fe;
 }
 
 [data-theme='midnight'] .bubble-other .msg-meta {
-  color: #c5d0e6;
+  color: #9ca3af;
 }
 
-[data-theme='midnight'] .bubble-creator .msg-meta,
-[data-theme='midnight'] .bubble-creator .creator-bubble-head {
+[data-theme='midnight'] .bubble-creator .msg-meta {
   color: #6b4300;
 }
 
 [data-theme='midnight'] .msg-sender {
-  color: #c5d0e6;
+  color: #9ca3af;
 }
 
 [data-theme='midnight'] .day-chip {
-  border-color: #2c3b5c;
-  background: #10182b;
-  color: #c5d0e6;
+  border-color: transparent;
+  background: #1f2937;
+  color: #9ca3af;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 [data-theme='midnight'] .composer-dock {
-  background: transparent;
+  background: #151e31;
+  padding: 8px 10px 14px;
 }
 
 [data-theme='midnight'] .composer-shell {
-  border: 1px solid #2c3b5c;
-  border-radius: 28px;
-  background: #10182b;
+  border-color: transparent;
+  border-radius: 24px;
+  background: #121a2c;
+  box-shadow: none;
 }
 
 [data-theme='midnight'] .send-button,
-[data-theme='midnight'] .send-button:hover,
-[data-theme='midnight'] .composer-shell .bg-sakura,
-[data-theme='midnight'] .composer-shell .bg-sakura:hover {
-  background-color: #7aa2ff;
-  color: #0b1224;
+[data-theme='midnight'] .send-button:hover {
+  background-color: #5b4b9a;
+  color: #fff;
   filter: none;
+  box-shadow: none;
 }
 
 /* Chrome hides audio that has no controls, and that can stop the call from counting as playback. */

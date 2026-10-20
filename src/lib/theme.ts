@@ -21,13 +21,13 @@ export const THEMES = [
 
 export type ThemeName = (typeof THEMES)[number]
 
-/** Signed-in default. Flat lavender from the Lavender Infinity mark. */
-export const DEFAULT_THEME: ThemeName = 'light'
+/** Signed-in default. Flat Midnight chat. */
+export const DEFAULT_THEME: ThemeName = 'midnight'
 
 const THEME_COLOR: Record<ThemeName, string> = {
   dark: '#0c1016',
   naruto: '#070d18',
-  midnight: '#070b16',
+  midnight: '#0f1626',
   sakura: '#1a0d14',
   ocean: '#04161a',
   forest: '#0c1410',
@@ -58,6 +58,7 @@ export function readStoredTheme(storage: { getItem: (key: string) => string | nu
 export function applyTheme(theme: ThemeName): void {
   if (typeof document === 'undefined') return
   document.documentElement.setAttribute('data-theme', theme)
+  if (document.documentElement.dataset.auth === 'true') return
   const meta = document.querySelector('meta[name="theme-color"]')
   meta?.setAttribute('content', THEME_COLOR[theme])
 }

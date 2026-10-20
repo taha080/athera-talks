@@ -530,7 +530,9 @@ create policy "Users delete their own avatar"
 -- Safe to run again on a database that already has the base Athera Talks schema.
 
 alter table public.profiles
-  add column if not exists theme text not null default 'light',
+  add column if not exists theme text not null default 'midnight',
+
+alter table public.profiles alter column theme set default 'midnight';
   add column if not exists wallpaper text not null default 'plain',
   add column if not exists wallpaper_path text,
   add column if not exists last_seen_at timestamptz,
