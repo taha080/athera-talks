@@ -70,12 +70,12 @@ export function CallScreen() {
       >
         {headline}
       </p>
-      <div>
-        <div className="relative mx-auto grid h-44 w-44 place-items-center">
+      <div className="flex flex-1 flex-col items-center justify-center">
+        <div className="relative grid h-64 w-64 place-items-center">
           {call.phase !== 'connected' && call.phase !== 'failed' ? (
-            <span className="absolute inset-4 animate-ping rounded-full bg-sakura/20" />
+            <span className="absolute inset-3 animate-ping rounded-full bg-sakura/20" />
           ) : null}
-          <Avatar name={peer?.username ?? 'caller'} url={peer?.avatarUrl} size="xl" creator={peer?.isCreator} />
+          <CallPortrait name={peer?.username ?? 'caller'} url={peer?.avatarUrl} creator={peer?.isCreator} />
         </div>
         <h2 className="mt-6 flex items-center justify-center gap-1.5 text-3xl font-semibold tracking-tight">
           <DisplayName name={`@${peer?.username ?? 'caller'}`} creator={peer?.isCreator} />
@@ -129,6 +129,17 @@ export function CallScreen() {
       </div>
     </div>
   )
+}
+
+function CallPortrait({ name, url, creator }: { name: string; url?: string | null; creator?: boolean }) {
+  if (url) {
+    return (
+      <span className={cn('inline-flex overflow-hidden rounded-full', creator ? 'creator-ring creator-ring-lg' : 'ring-1 ring-white/15')}>
+        <img src={url} alt="" draggable={false} className="block h-60 w-60 object-cover" />
+      </span>
+    )
+  }
+  return <Avatar name={name} size="call" creator={creator} />
 }
 
 function RoundButton({
