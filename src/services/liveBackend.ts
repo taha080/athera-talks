@@ -1,7 +1,7 @@
 import { normalizeUsername, usernameIssue } from '../lib/auth'
 import { parseWallpaper } from '../lib/appearance'
 import { baseMime, mediaBucket } from '../lib/media'
-import { messageKind } from '../lib/messages'
+import { MESSAGE_PAGE, messageKind, newestFirstPage } from '../lib/messages'
 import { isDuplicateCallInsert } from '../lib/callLog'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform, extensionForMime, parseWaveform } from '../lib/voice'
@@ -460,10 +460,11 @@ export const liveChat = {
       .from('messages')
       .select(MESSAGE_COLUMNS)
       .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true })
-      .limit(200)
+      .order('created_at', { ascending: false })
+      .limit(MESSAGE_PAGE)
     if (error) throw new Error(error.message)
-    const messages = await attachReceipts(conversationId, ((data ?? []) as MessageRow[]).map(mapMessage))
+    const page = newestFirstPage(((data ?? []) as MessageRow[]).map(mapMessage))
+    const messages = await attachReceipts(conversationId, page)
     return withReactions(await signMessages(messages))
   },
 
