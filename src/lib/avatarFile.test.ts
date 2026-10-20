@@ -26,8 +26,11 @@ describe('creator gif avatars', () => {
     expect(prepared.blob.type).toBe('image/gif')
   })
 
-  it('rejects a creator gif over 5 MB', () => {
-    expect(() => avatarKind(file('big.gif', 'image/gif', 5 * 1024 * 1024 + 1), true)).toThrow(/5 MB/)
+  it('accepts a creator gif up to 30 MB and rejects anything larger', () => {
+    expect(avatarKind({ name: 'dance.gif', type: 'image/gif', size: 31_457_280 }, true)).toBe('gif')
+    expect(() => avatarKind({ name: 'big.gif', type: 'image/gif', size: 31_457_281 }, true)).toThrow(/30 MB/)
+    expect(avatarKind({ name: 'face.png', type: 'image/png', size: 3_000_000 }, false)).toBe('still')
+    expect(() => avatarKind({ name: 'face.png', type: 'image/png', size: 31_457_281 }, false)).toThrow(/30 MB/)
   })
 
   it('still accepts a normal photo for everyone else', () => {
