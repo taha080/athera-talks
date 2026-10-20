@@ -17,6 +17,7 @@ import { receiptTick } from '../lib/receipts'
 import { iconButton } from '../lib/styles'
 import type { CallLog, Conversation, GroupMember, Message, ReplyTarget } from '../types'
 import { Avatar } from './Avatar'
+import { hasPremium } from '../lib/premium'
 import { DisplayName } from './CreatorBadge'
 import { Composer } from './Composer'
 import { GroupPanel } from './GroupPanel'
@@ -286,6 +287,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
       avatarUrl: peer.avatarUrl,
       favouriteAnime: peer.favouriteAnime,
       isCreator: Boolean(peer.isCreator),
+      isPremium: hasPremium(peer),
       lastSeenAt: peer.lastSeenAt ?? null,
     }
   }
@@ -297,6 +299,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
       avatarUrl: member.avatarUrl,
       favouriteAnime: member.favouriteAnime,
       isCreator: member.isCreator,
+      isPremium: hasPremium(member),
       lastSeenAt: member.lastSeenAt ?? null,
     }
   }
@@ -349,9 +352,9 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
             aria-label={`View @${conversation.peer.username}`}
             onClick={() => openProfile(profileFromPeer(conversation.peer), 'direct')}
           >
-            <Avatar name={title} url={conversation.peer.avatarUrl} size="sm" online={online} creator={conversation.peer.isCreator} />
+            <Avatar name={title} url={conversation.peer.avatarUrl} size="sm" online={online} creator={conversation.peer.isCreator} premium={hasPremium(conversation.peer)} />
             <span className="min-w-0 flex-1">
-              <DisplayName name={title} creator={conversation.peer.isCreator} className="chat-title text-sm font-semibold" />
+              <DisplayName name={title} creator={conversation.peer.isCreator} premium={hasPremium(conversation.peer)} className="chat-title text-sm font-semibold" />
               <p className={`chat-status truncate text-xs ${typing || online ? 'text-foam' : 'text-mist'}`}>{status}</p>
             </span>
           </button>
@@ -406,7 +409,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
           <div className="absolute right-2 top-14 z-20 w-64 rounded-xl border border-line bg-panel p-3 text-left shadow-md" role="dialog" aria-label="Conversation details">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <DisplayName name={conversation.peer.username} creator={conversation.peer.isCreator} className="text-sm font-semibold" />
+                <DisplayName name={conversation.peer.username} creator={conversation.peer.isCreator} premium={hasPremium(conversation.peer)} className="text-sm font-semibold" />
                 <p className="mt-1 text-xs text-mist">{status}</p>
                 {conversation.peer.favouriteAnime ? <p className="mt-2 text-xs text-mist">{conversation.peer.favouriteAnime}</p> : null}
               </div>
@@ -491,6 +494,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
           const sender = members.find((member) => member.id === message.senderId)
           const senderName = mine ? profile?.username ?? '' : sender?.username ?? (group ? 'member' : conversation.peer.username)
           const senderCreator = mine ? Boolean(profile?.isCreator) : Boolean(sender ? sender.isCreator : group ? false : conversation.peer.isCreator)
+          const senderPremium = mine ? hasPremium(profile) : sender ? hasPremium(sender) : group ? false : hasPremium(conversation.peer)
           const pos = groupPosition(chat.messages, index)
           const hit = Boolean(query) && !message.deletedAt && message.body.toLowerCase().includes(query)
           return (
@@ -512,6 +516,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
                 meId={profile?.id ?? ''}
                 senderName={senderName}
                 senderCreator={senderCreator}
+                senderPremium={senderPremium}
                 showSender={showSenderName(mine, group)}
                 highlighted={hit}
                 receiptsShared={conversation.peer.showReadReceipts !== false}
@@ -661,6 +666,7 @@ function MessageRow({
   meId,
   senderName,
   senderCreator,
+  senderPremium,
   showSender,
   highlighted,
   receiptsShared,
@@ -685,6 +691,7 @@ function MessageRow({
   meId: string
   senderName: string
   senderCreator: boolean
+  senderPremium: boolean
   showSender: boolean
   highlighted: boolean
   receiptsShared: boolean
@@ -710,13 +717,13 @@ function MessageRow({
     ? tailed ? 'rounded-[18px] rounded-br-[5px]' : 'rounded-[18px]'
     : tailed ? 'rounded-[18px] rounded-bl-[5px]' : 'rounded-[18px]'
   const image = !deleted && message.kind === 'image'
-  const creator = senderCreator && !deleted
-  const ownTone = mine || creator
+  const gold = (senderCreator || senderPremium) && !deleted
+  const ownTone = mine || gold
   const reactions = groupedReactions(message.reactions, meId)
   const parts = linkParts(message.body)
   const firstLink = parts.find((part) => part.type === 'link')?.value
-  const bubble = creator ? 'bubble-creator' : mine ? 'bubble-own' : 'bubble-other'
-  const tail = !creator && tailed ? (mine ? 'tail-own' : 'tail-other') : ''
+  const bubble = gold ? 'bubble-creator' : mine ? 'bubble-own' : 'bubble-other'
+  const tail = !gold && tailed ? (mine ? 'tail-own' : 'tail-other') : ''
   const cancelPress = useRef<(() => void) | null>(null)
 
   useEffect(() => () => cancelPress.current?.(), [])
@@ -757,10 +764,10 @@ function MessageRow({
       {(pos === 'start' || pos === 'single') && showSender ? (
         onOpenSender ? (
           <button type="button" className="msg-sender mb-0.5 px-1 text-left text-[11px] font-medium" aria-label={`View @${senderName}`} onClick={onOpenSender}>
-            <DisplayName name={senderName} creator={senderCreator} className="text-[11px] font-medium" />
+            <DisplayName name={senderName} creator={senderCreator} premium={senderPremium} className="text-[11px] font-medium" />
           </button>
         ) : (
-          <DisplayName name={senderName} creator={senderCreator} className="msg-sender mb-0.5 px-1 text-[11px] font-medium text-mist" />
+          <DisplayName name={senderName} creator={senderCreator} premium={senderPremium} className="msg-sender mb-0.5 px-1 text-[11px] font-medium text-mist" />
         )
       ) : null}
       {!deleted ? (
@@ -772,7 +779,7 @@ function MessageRow({
         </div>
       ) : null}
       <div className={`relative min-w-0 ${highlighted ? 'rounded-[18px] ring-2 ring-sakura/70' : ''}`}>
-        <div data-creator-bubble={creator ? 'true' : undefined} className={`${bubble} bubble-in relative text-left ${radius} ${image && !creator ? 'overflow-hidden p-1' : 'bubble-pad px-2.5 py-1.5'} ${tail}`}>
+        <div data-creator-bubble={gold ? 'true' : undefined} className={`${bubble} bubble-in relative text-left ${radius} ${image && !gold ? 'overflow-hidden p-1' : 'bubble-pad px-2.5 py-1.5'} ${tail}`}>
           {message.replyPreview && !deleted ? (
             <p className={ownTone ? 'mb-1 truncate rounded-md border-l-2 border-white/70 bg-black/10 px-2 py-1 text-xs text-white/85' : 'mb-1 truncate rounded-md border-l-2 border-sakura bg-black/5 px-2 py-1 text-xs text-mist'}>
               {message.replyPreview}

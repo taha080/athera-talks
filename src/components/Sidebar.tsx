@@ -4,6 +4,7 @@ import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
 import { archivedChats, chatTitle, inboxChats, isGroup } from '../lib/chatList'
+import { hasPremium } from '../lib/premium'
 import { TYPING_TTL_MS } from '../lib/typing'
 import { cn } from '../lib/cn'
 import { iconButton, primaryButton } from '../lib/styles'
@@ -312,9 +313,9 @@ export function Sidebar() {
             {results.map((person) => (
               <article key={person.id} className="mx-3 my-2 rounded-xl border border-line bg-panel p-3 shadow-sm">
                 <div className="flex items-center gap-3">
-                  <Avatar name={person.username} url={person.avatarUrl} size="sm" creator={person.isCreator} />
+                  <Avatar name={person.username} url={person.avatarUrl} size="sm" creator={person.isCreator} premium={hasPremium(person)} />
                   <span className="min-w-0">
-                    <DisplayName name={`@${person.username}`} creator={person.isCreator} className="text-sm font-semibold" />
+                    <DisplayName name={`@${person.username}`} creator={person.isCreator} premium={hasPremium(person)} className="text-sm font-semibold" />
                     {person.favouriteAnime ? <span className="block truncate text-xs text-mist">{person.favouriteAnime}</span> : null}
                   </span>
                 </div>
@@ -504,6 +505,7 @@ function ChatRow({
           url={group ? conversation.photoUrl ?? null : conversation.peer.avatarUrl}
           online={group ? false : isOnline(conversation.peer.lastSeenAt)}
           creator={group ? false : conversation.peer.isCreator}
+          premium={group ? false : hasPremium(conversation.peer)}
         />
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline justify-between gap-2">
@@ -511,6 +513,7 @@ function ChatRow({
               <DisplayName
                 name={title}
                 creator={group ? false : conversation.peer.isCreator}
+                premium={group ? false : hasPremium(conversation.peer)}
                 className={cn('text-sm', conversation.unread > 0 ? 'font-semibold' : 'font-medium')}
               />
               {conversation.pinned ? (
@@ -708,8 +711,8 @@ function RequestsPanel({
           {incoming.map((request) => (
             <li key={request.id} className="rounded-xl border border-line bg-panel p-3 shadow-sm">
               <div className="flex items-center gap-3">
-                <Avatar name={request.peer.username} url={request.peer.avatarUrl} size="sm" creator={request.peer.isCreator} />
-                <DisplayName name={request.peer.username} creator={request.peer.isCreator} className="text-sm font-semibold" />
+                <Avatar name={request.peer.username} url={request.peer.avatarUrl} size="sm" creator={request.peer.isCreator} premium={hasPremium(request.peer)} />
+                <DisplayName name={request.peer.username} creator={request.peer.isCreator} premium={hasPremium(request.peer)} className="text-sm font-semibold" />
               </div>
               <div className="mt-3 flex gap-2">
                 <button type="button" className={`${primaryButton} h-9 px-3 text-xs`} onClick={() => void onAccept(request.id)}>
@@ -729,9 +732,9 @@ function RequestsPanel({
         <ul className="mt-2 space-y-2">
           {outgoing.map((request) => (
             <li key={request.id} className="flex items-center gap-3 rounded-xl border border-line bg-panel p-3 shadow-sm">
-              <Avatar name={request.peer.username} url={request.peer.avatarUrl} size="sm" creator={request.peer.isCreator} />
+              <Avatar name={request.peer.username} url={request.peer.avatarUrl} size="sm" creator={request.peer.isCreator} premium={hasPremium(request.peer)} />
               <span className="min-w-0 flex-1">
-                <DisplayName name={request.peer.username} creator={request.peer.isCreator} className="text-sm font-semibold" />
+                <DisplayName name={request.peer.username} creator={request.peer.isCreator} premium={hasPremium(request.peer)} className="text-sm font-semibold" />
                 <span className="text-xs text-mist">Pending</span>
               </span>
               <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium" onClick={() => void onCancel(request.id)}>

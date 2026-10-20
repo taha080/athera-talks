@@ -6,6 +6,7 @@ import { useSession } from '../context/SessionContext'
 import { cn } from '../lib/cn'
 import { dangerButton, iconButton } from '../lib/styles'
 import { isOnline } from '../lib/presence'
+import { hasPremium } from '../lib/premium'
 import { Avatar } from './Avatar'
 import { CallScreen } from './CallScreen'
 import { AddContactIcon, ChatsIcon, GearIcon, SignOutIcon } from './Icons'
@@ -78,7 +79,7 @@ function NavRail() {
           <SignOutIcon className="h-5 w-5" />
         </button>
         <Link to="/settings" aria-label="Your profile" className="rounded-full">
-          <Avatar name={profile?.username ?? 'you'} url={profile?.avatarUrl} size="sm" online={isOnline(profile?.lastSeenAt)} creator={profile?.isCreator} />
+          <Avatar name={profile?.username ?? 'you'} url={profile?.avatarUrl} size="sm" online={isOnline(profile?.lastSeenAt)} creator={profile?.isCreator} premium={hasPremium(profile)} />
         </Link>
       </div>
     </nav>

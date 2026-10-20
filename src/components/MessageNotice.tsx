@@ -35,6 +35,7 @@ function NoticeCard({
     id: string
     senderName: string
     senderCreator: boolean
+    senderPremium?: boolean
     avatarUrl: string | null
     preview: string
     groupTitle: string | null
@@ -82,9 +83,9 @@ function NoticeCard({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
     >
-      <Avatar name={notice.senderName} url={notice.avatarUrl} size="sm" creator={notice.senderCreator} />
+      <Avatar name={notice.senderName} url={notice.avatarUrl} size="sm" creator={notice.senderCreator} premium={notice.senderPremium} />
       <div className="min-w-0 flex-1 pt-0.5">
-        <DisplayName name={notice.senderName} creator={notice.senderCreator} className="text-sm font-semibold" />
+        <DisplayName name={notice.senderName} creator={notice.senderCreator} premium={notice.senderPremium} className="text-sm font-semibold" />
         {notice.groupTitle ? <p className="notice-group truncate text-xs">{notice.groupTitle}</p> : null}
         <p className="notice-preview truncate text-sm">{notice.preview}</p>
       </div>

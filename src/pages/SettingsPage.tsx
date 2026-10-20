@@ -8,6 +8,7 @@ import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
 import { useTheme } from '../context/ThemeContext'
 import { usernameIssue } from '../lib/auth'
+import { hasPremium } from '../lib/premium'
 import {
   THEME_CHOICES,
   THEME_GROUPS,
@@ -128,14 +129,14 @@ function ProfileSection() {
   return (
     <form onSubmit={save} className="mx-auto max-w-lg space-y-6 px-5 py-8">
       <div className="flex flex-col items-center gap-3">
-        <Avatar name={profile.username} url={profile.avatarUrl} size="xl" creator={profile.isCreator} />
-        <DisplayName name={`@${profile.username}`} creator={profile.isCreator} className="text-base font-semibold" />
+        <Avatar name={profile.username} url={profile.avatarUrl} size="xl" creator={profile.isCreator} premium={hasPremium(profile)} />
+        <DisplayName name={`@${profile.username}`} creator={profile.isCreator} premium={hasPremium(profile)} className="text-base font-semibold" />
         {profile.isCreator ? <OfficialCreatorCard /> : null}
         <label className={`${ghostButton} cursor-pointer`}>
           Upload avatar
           <input
             type="file"
-            accept={profile.isCreator ? 'image/png,image/jpeg,image/webp,image/gif' : 'image/png,image/jpeg,image/webp'}
+            accept={profile.isCreator || hasPremium(profile) ? 'image/png,image/jpeg,image/webp,image/gif' : 'image/png,image/jpeg,image/webp'}
             className="sr-only"
             onChange={(event) => void onFile(event.target.files?.[0])}
           />
@@ -389,8 +390,8 @@ function PrivacySection() {
         <ul className="mt-3 space-y-2">
           {blocked.map((person) => (
             <li key={person.id} className="flex items-center gap-3">
-              <Avatar name={person.username} url={person.avatarUrl} size="sm" creator={person.isCreator} />
-              <DisplayName name={person.username} creator={person.isCreator} className="min-w-0 flex-1 text-sm" />
+              <Avatar name={person.username} url={person.avatarUrl} size="sm" creator={person.isCreator} premium={hasPremium(person)} />
+              <DisplayName name={person.username} creator={person.isCreator} premium={hasPremium(person)} className="min-w-0 flex-1 text-sm" />
               <button type="button" className={ghostButton} onClick={() => void unblock(person.id)}>
                 Unblock
               </button>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { hasPremium } from '../lib/premium'
 import { fieldClass, ghostButton, primaryButton } from '../lib/styles'
 import type { Profile } from '../types'
 import { Avatar } from './Avatar'
@@ -60,8 +61,8 @@ export function NewGroup({
                   aria-pressed={on}
                   onClick={() => toggle(person.id)}
                 >
-                  <Avatar name={person.username} url={person.avatarUrl} size="sm" creator={person.isCreator} />
-                  <DisplayName name={person.username} creator={person.isCreator} className="min-w-0 flex-1 text-sm" />
+                  <Avatar name={person.username} url={person.avatarUrl} size="sm" creator={person.isCreator} premium={hasPremium(person)} />
+                  <DisplayName name={person.username} creator={person.isCreator} premium={hasPremium(person)} className="min-w-0 flex-1 text-sm" />
                   <span className={`grid h-5 w-5 place-items-center rounded-md border text-[11px] ${on ? 'border-sakura bg-sakura text-white' : 'border-line text-transparent'}`}>✓</span>
                 </button>
               </li>

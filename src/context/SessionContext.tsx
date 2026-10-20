@@ -21,6 +21,7 @@ import {
 import { readSupabaseEnv } from '../lib/config'
 import { startMode } from '../lib/mode'
 import { prepareAvatar } from '../lib/avatarFile'
+import { hasPremium } from '../lib/premium'
 import { blobToDataUrl, fitImage } from '../lib/image'
 import { getSupabase } from '../lib/supabase'
 import { PASSWORD_RESET_REDIRECT, appUrl, isPasswordRecoveryUrl } from '../lib/url'
@@ -308,7 +309,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const uploadAvatarFile = useCallback(
     async (file: File) => {
       if (!profile) throw new Error('Sign in first.')
-      const prepared = await prepareAvatar(file, profile.isCreator === true)
+      const prepared = await prepareAvatar(file, profile.isCreator === true || hasPremium(profile))
       const next =
         mode === 'demo'
           ? await demoBackend.uploadAvatar(await blobToDataUrl(prepared.blob))

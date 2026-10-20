@@ -12,7 +12,7 @@ describe('creator gif avatars', () => {
     expect(isGifAvatar(file('photo.jpg', 'image/jpeg'))).toBe(false)
   })
 
-  it('rejects a gif from anyone who is not the creator', () => {
+  it('rejects a gif unless the account is the creator or premium', () => {
     expect(() => avatarKind(file('dance.gif', 'image/gif'), false)).toThrow(CREATOR_GIF_MESSAGE)
     expect(() => avatarKind(file('dance.GIF', 'application/octet-stream'), false)).toThrow(CREATOR_GIF_MESSAGE)
   })

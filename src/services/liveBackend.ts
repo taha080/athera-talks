@@ -2,6 +2,7 @@ import { normalizeUsername, usernameIssue } from '../lib/auth'
 import { parseWallpaper } from '../lib/appearance'
 import { baseMime, mediaBucket } from '../lib/media'
 import { MESSAGE_PAGE, messageKind, newestFirstPage } from '../lib/messages'
+import { isPremiumWindow } from '../lib/premium'
 import { isDuplicateCallInsert } from '../lib/callLog'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform, extensionForMime, parseWaveform } from '../lib/voice'
@@ -9,7 +10,7 @@ import { getSupabase } from '../lib/supabase'
 import type { BlockedPerson, CallLog, CallStatus, CallType, ChatPrefPatch, ContactRequest, ContactStatus, Conversation, GroupMember, MemberRole, Message, MessageListener, MessageReceipt, OutgoingMedia, Profile, Reaction, ReactionChange, ReplyTarget, SearchPerson, UserReport } from '../types'
 
 const PROFILE_COLUMNS =
-  'id, username, avatar_url, favourite_anime, theme, wallpaper, wallpaper_path, last_seen_at, show_last_seen, show_read_receipts, notify_sound, notify_desktop, is_creator'
+  'id, username, avatar_url, favourite_anime, theme, wallpaper, wallpaper_path, last_seen_at, show_last_seen, show_read_receipts, notify_sound, notify_desktop, is_creator, premium_from, premium_until'
 
 // read_at and delivered_at stay off this list. The API role cannot select
 // them; visible copies come from message_receipts.
@@ -30,6 +31,9 @@ type ProfileRow = {
   notify_sound?: boolean | null
   notify_desktop?: boolean | null
   is_creator?: boolean | null
+  is_premium?: boolean | null
+  premium_from?: string | null
+  premium_until?: string | null
 }
 
 type MessageRow = {
@@ -59,6 +63,7 @@ type ConversationRow = {
   peer_avatar_url: string | null
   peer_favourite_anime: string | null
   peer_is_creator?: boolean | null
+  peer_is_premium?: boolean | null
   peer_last_seen?: string | null
   peer_receipts?: boolean | null
   last_body: string | null
@@ -115,6 +120,12 @@ export function mapProfile(row: ProfileRow): Profile {
     notifySound: row.notify_sound ?? true,
     notifyDesktop: row.notify_desktop ?? true,
     isCreator: Boolean(row.is_creator),
+    premiumFrom: row.premium_from ?? null,
+    premiumUntil: row.premium_until ?? null,
+    isPremium:
+      row.premium_until != null || row.premium_from != null
+        ? isPremiumWindow(row.premium_from, row.premium_until)
+        : Boolean(row.is_premium),
   }
 }
 
@@ -206,6 +217,7 @@ function mapConversation(row: ConversationRow): Conversation {
           avatarUrl: photoUrl,
           favouriteAnime: null,
           isCreator: false,
+          isPremium: false,
           showReadReceipts: true,
         }
       : {
@@ -214,6 +226,7 @@ function mapConversation(row: ConversationRow): Conversation {
           avatarUrl: row.peer_avatar_url,
           favouriteAnime: row.peer_favourite_anime,
           isCreator: Boolean(row.peer_is_creator),
+          isPremium: Boolean(row.peer_is_premium),
           lastSeenAt: row.peer_last_seen ?? null,
           showReadReceipts: row.peer_receipts ?? true,
         },
@@ -499,6 +512,7 @@ export const liveChat = {
       peer_avatar_url: string | null
       peer_favourite_anime: string | null
       peer_is_creator?: boolean | null
+      peer_is_premium?: boolean | null
     }[]).map((row) => ({
       id: row.id,
       fromId: row.from_id,
@@ -512,6 +526,7 @@ export const liveChat = {
         avatarUrl: row.peer_avatar_url,
         favouriteAnime: row.peer_favourite_anime,
         isCreator: Boolean(row.peer_is_creator),
+        isPremium: Boolean(row.peer_is_premium),
       },
     }))
   },
@@ -631,11 +646,12 @@ export const liveChat = {
   async listBlocked(): Promise<BlockedPerson[]> {
     const { data, error } = await client().rpc('list_blocked')
     if (error) throw new Error(error.message)
-    return ((data ?? []) as { id: string; username: string; avatar_url: string | null; is_creator?: boolean | null; blocked_at: string }[]).map((row) => ({
+    return ((data ?? []) as { id: string; username: string; avatar_url: string | null; is_creator?: boolean | null; is_premium?: boolean | null; blocked_at: string }[]).map((row) => ({
       id: row.id,
       username: row.username,
       avatarUrl: row.avatar_url,
       isCreator: Boolean(row.is_creator),
+      isPremium: Boolean(row.is_premium),
       blockedAt: row.blocked_at,
     }))
   },
@@ -713,6 +729,7 @@ export const liveChat = {
       avatar_url: string | null
       favourite_anime: string | null
       is_creator?: boolean | null
+      is_premium?: boolean | null
       role: string
       last_seen?: string | null
     }[]).map((row) => ({
@@ -721,6 +738,7 @@ export const liveChat = {
       avatarUrl: row.avatar_url,
       favouriteAnime: row.favourite_anime,
       isCreator: Boolean(row.is_creator),
+      isPremium: Boolean(row.is_premium),
       role: memberRole(row.role),
       lastSeenAt: row.last_seen ?? null,
     }))

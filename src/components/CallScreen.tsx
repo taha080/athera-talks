@@ -4,6 +4,7 @@ import { RETURN_BANNER } from '../lib/callBackground'
 import { callHeadline, RELAY_RETRY_STATUS } from '../lib/callMachine'
 import { cn } from '../lib/cn'
 import { Avatar } from './Avatar'
+import { avatarAnimates, hasPremium } from '../lib/premium'
 import { DisplayName } from './CreatorBadge'
 import { EndIcon, MicIcon, PhoneIcon, VolumeIcon } from './Icons'
 
@@ -75,10 +76,10 @@ export function CallScreen() {
           {call.phase !== 'connected' && call.phase !== 'failed' ? (
             <span className="absolute inset-3 animate-ping rounded-full bg-sakura/20" />
           ) : null}
-          <CallPortrait name={peer?.username ?? 'caller'} url={peer?.avatarUrl} creator={peer?.isCreator} />
+          <CallPortrait name={peer?.username ?? 'caller'} url={peer?.avatarUrl} creator={peer?.isCreator} premium={hasPremium(peer)} />
         </div>
         <h2 className="mt-6 flex items-center justify-center gap-1.5 text-3xl font-semibold tracking-tight">
-          <DisplayName name={`@${peer?.username ?? 'caller'}`} creator={peer?.isCreator} />
+          <DisplayName name={`@${peer?.username ?? 'caller'}`} creator={peer?.isCreator} premium={hasPremium(peer)} />
         </h2>
         {call.error ? <p className="mx-auto mt-4 max-w-sm text-sm text-danger">{call.error}</p> : null}
         {call.demo && call.phase === 'connected' ? (
@@ -131,15 +132,16 @@ export function CallScreen() {
   )
 }
 
-function CallPortrait({ name, url, creator }: { name: string; url?: string | null; creator?: boolean }) {
-  if (url) {
+function CallPortrait({ name, url, creator, premium }: { name: string; url?: string | null; creator?: boolean; premium?: boolean }) {
+  const gold = Boolean(creator || premium)
+  if (url && avatarAnimates(url, Boolean(creator), Boolean(premium))) {
     return (
-      <span className={cn('inline-flex overflow-hidden rounded-full', creator ? 'creator-ring creator-ring-lg' : 'ring-1 ring-white/15')}>
+      <span className={cn('inline-flex overflow-hidden rounded-full', gold ? 'creator-ring creator-ring-lg' : 'ring-1 ring-white/15')}>
         <img src={url} alt="" draggable={false} className="block h-60 w-60 object-cover" />
       </span>
     )
   }
-  return <Avatar name={name} size="call" creator={creator} />
+  return <Avatar name={name} url={url} size="call" creator={creator} premium={premium} />
 }
 
 function RoundButton({

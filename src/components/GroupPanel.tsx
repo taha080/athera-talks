@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AVATAR_BYTES } from '../lib/avatarFile'
+import { hasPremium } from '../lib/premium'
 import { squareAvatar } from '../lib/image'
 import { fieldClass, ghostButton } from '../lib/styles'
 import type { Conversation, GroupMember, Profile } from '../types'
@@ -123,9 +124,9 @@ export function GroupPanel({
           <li key={member.id} className="flex items-center gap-2">
             {member.id === meId ? (
               <>
-                <Avatar name={member.username} url={member.avatarUrl} size="sm" creator={member.isCreator} />
+                <Avatar name={member.username} url={member.avatarUrl} size="sm" creator={member.isCreator} premium={hasPremium(member)} />
                 <span className="min-w-0 flex-1">
-                  <DisplayName name={member.username} creator={member.isCreator} className="text-sm" />
+                  <DisplayName name={member.username} creator={member.isCreator} premium={hasPremium(member)} className="text-sm" />
                   <span className="block text-[11px] text-mist">{member.role === 'admin' ? 'Admin' : 'Member'}</span>
                 </span>
               </>
@@ -136,9 +137,9 @@ export function GroupPanel({
                 aria-label={`View @${member.username}`}
                 onClick={() => onOpenProfile(member)}
               >
-                <Avatar name={member.username} url={member.avatarUrl} size="sm" creator={member.isCreator} />
+                <Avatar name={member.username} url={member.avatarUrl} size="sm" creator={member.isCreator} premium={hasPremium(member)} />
                 <span className="min-w-0 flex-1">
-                  <DisplayName name={member.username} creator={member.isCreator} className="text-sm" />
+                  <DisplayName name={member.username} creator={member.isCreator} premium={hasPremium(member)} className="text-sm" />
                   <span className="block text-[11px] text-mist">{member.role === 'admin' ? 'Admin' : 'Member'}</span>
                 </span>
               </button>
