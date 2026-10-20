@@ -35,3 +35,15 @@ export function endedCallStatus(input: {
   if (input.reason === 'timeout') return 'missed'
   return input.role === 'caller' ? 'cancelled' : 'missed'
 }
+
+// The caller writes the row. The callee writes it only when the caller never sent hangup
+// (they declined, hung up, or the caller's phone dropped). A shared client id still collapses a race.
+export function shouldRecordCall(input: { role: 'caller' | 'callee'; callerSentHangup: boolean }): boolean {
+  if (input.role === 'caller') return true
+  return !input.callerSentHangup
+}
+
+export function isDuplicateCallInsert(error: { code?: string; message?: string }): boolean {
+  if (error.code === '23505') return true
+  return /duplicate key|calls_client_id/i.test(error.message ?? '')
+}

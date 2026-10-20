@@ -13,6 +13,7 @@ export type CallLog = {
   endedAt: string
   status: CallStatus
   durationSeconds: number
+  clientId?: string | null
 }
 
 export type ContactStatus = 'pending' | 'accepted' | 'declined'
@@ -169,6 +170,7 @@ export type CallSignal = {
   from: Profile
   sdp?: RTCSessionDescriptionInit
   candidate?: RTCIceCandidateInit
+  callId?: string
 }
 
 export type MessageReceipt = {
