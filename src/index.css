@@ -345,13 +345,6 @@ body {
   background: linear-gradient(180deg, #fbe08a 0%, #c8901a 100%);
 }
 
-.creator-bubble-head {
-  color: #9a6b0b;
-  font-size: 11.5px;
-  font-weight: 650;
-  line-height: 1.2;
-}
-
 .typing-dot {
   display: inline-block;
   width: 6px;
@@ -768,6 +761,18 @@ textarea:-webkit-autofill {
 [data-theme='blossom'] .bubble-other,
 [data-theme='coquette'] .bubble-other {
   box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.creator-seal {
+  filter: drop-shadow(0 0 3px #f7c94899);
+}
+
+[data-theme='midnight'] .verified-tick {
+  filter: drop-shadow(0 0 1px #f7fbff) drop-shadow(0 0 3px rgb(76 195 255 / 0.95));
+}
+
+[data-theme='midnight'] .creator-seal {
+  filter: drop-shadow(0 0 1px #fff6cc) drop-shadow(0 0 3px rgb(247 201 72 / 0.95));
 }
 
 .creator-shine {

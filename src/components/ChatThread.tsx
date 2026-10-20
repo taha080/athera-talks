@@ -13,7 +13,7 @@ import { receiptTick } from '../lib/receipts'
 import { iconButton } from '../lib/styles'
 import type { Conversation, GroupMember, Message, ReplyTarget } from '../types'
 import { Avatar } from './Avatar'
-import { CreatorMessageHeader, DisplayName } from './CreatorBadge'
+import { DisplayName } from './CreatorBadge'
 import { Composer } from './Composer'
 import { GroupPanel } from './GroupPanel'
 import { ReportDialog } from './ReportDialog'
@@ -611,7 +611,6 @@ function MessageRow({
       ) : null}
       <div className={`relative min-w-0 ${highlighted ? 'rounded-[18px] ring-2 ring-sakura/70' : ''}`}>
         <div data-creator-bubble={creator ? 'true' : undefined} className={`${bubble} bubble-in relative text-left ${radius} ${image && !creator ? 'overflow-hidden p-1' : 'bubble-pad px-2.5 py-1.5'} ${tail}`}>
-          {creator ? <CreatorMessageHeader /> : null}
           {message.replyPreview && !deleted ? (
             <p className={ownTone ? 'mb-1 truncate rounded-md border-l-2 border-white/70 bg-black/10 px-2 py-1 text-xs text-white/85' : 'mb-1 truncate rounded-md border-l-2 border-sakura bg-black/5 px-2 py-1 text-xs text-mist'}>
               {message.replyPreview}
