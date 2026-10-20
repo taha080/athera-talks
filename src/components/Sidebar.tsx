@@ -4,6 +4,7 @@ import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
 import { archivedChats, chatTitle, inboxChats, isGroup } from '../lib/chatList'
+import { TYPING_TTL_MS } from '../lib/typing'
 import { cn } from '../lib/cn'
 import { iconButton, primaryButton } from '../lib/styles'
 import { formatListTime } from '../lib/format'
@@ -43,28 +44,59 @@ export function Sidebar() {
   const subscribeTyping = useRef(chat.subscribeTyping)
   subscribeTyping.current = chat.subscribeTyping
 
+  const conversationsRef = useRef(chat.conversations)
+  conversationsRef.current = chat.conversations
+  const seenMessage = useRef(new Map<string, string>())
+
+  useEffect(() => {
+    setTyping((current) => {
+      let changed = false
+      const next = { ...current }
+      for (const conversation of conversationsRef.current) {
+        const stamp = conversation.lastMessage ? `${conversation.lastMessage.senderId}:${conversation.lastMessage.createdAt}` : ''
+        const previous = seenMessage.current.get(conversation.id)
+        if (previous && stamp !== previous && conversation.lastMessage && conversation.lastMessage.senderId !== profile?.id && next[conversation.id]) {
+          next[conversation.id] = false
+          changed = true
+        }
+        seenMessage.current.set(conversation.id, stamp)
+      }
+      return changed ? next : current
+    })
+  }, [chat.conversations, profile?.id])
+
   useEffect(() => {
     const timers = new Map<string, number>()
+    function clearTimer(id: string) {
+      const previous = timers.get(id)
+      if (previous) window.clearTimeout(previous)
+      timers.delete(id)
+    }
     const stops = ids.split(',').filter(Boolean).map((id) =>
-      subscribeTyping.current(id, (userId) => {
-        const conversation = chat.conversations.find((item) => item.id === id)
+      subscribeTyping.current(id, (userId, active) => {
+        const conversation = conversationsRef.current.find((item) => item.id === id)
         if (conversation && isGroup(conversation)) {
           if (userId === profile?.id) return
         } else if (peers.current.get(id) !== userId) return
+        if (!active) {
+          clearTimer(id)
+          setTyping((current) => ({ ...current, [id]: false }))
+          return
+        }
         setTyping((current) => ({ ...current, [id]: true }))
-        const previous = timers.get(id)
-        if (previous) window.clearTimeout(previous)
+        clearTimer(id)
         timers.set(
           id,
-          window.setTimeout(() => setTyping((current) => ({ ...current, [id]: false })), 3000),
+          window.setTimeout(() => setTyping((current) => ({ ...current, [id]: false })), TYPING_TTL_MS),
         )
       }),
     )
     return () => {
       stops.forEach((stop) => stop())
       timers.forEach((timer) => window.clearTimeout(timer))
+      setTyping({})
     }
-  }, [ids, profile?.id, chat.conversations])
+  }, [ids, profile?.id])
 
   useEffect(() => () => {
     if (searchTimer.current) window.clearTimeout(searchTimer.current)
@@ -92,7 +124,7 @@ export function Sidebar() {
           setSearchError(error instanceof Error ? error.message : 'Search failed.')
         },
       )
-    }, 160)
+    }, 150)
   }
 
   async function runPref(id: string, patch: { pinned?: boolean; muted?: boolean; archived?: boolean }) {
@@ -632,7 +664,7 @@ function PersonActions({
     return (
       <>
         <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium text-mist" onClick={() => void onCancel()}>
-          Requested · Cancel
+          Request sent
         </button>
         {safety}
       </>
@@ -641,7 +673,7 @@ function PersonActions({
   return (
     <>
       <button type="button" className={`${primaryButton} h-9 px-3 text-xs`} onClick={() => void onAdd()}>
-        Add contact
+        Send request
       </button>
       {safety}
     </>

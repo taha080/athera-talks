@@ -71,7 +71,7 @@ export function createDemoBackend(options: Options = {}) {
   data.prefs = data.prefs ?? []
   data.calls = data.calls ?? []
   const callListeners = new Set<(call: CallLog) => void>()
-  const typingListeners = new Map<string, Set<(userId: string) => void>>()
+  const typingListeners = new Map<string, Set<(userId: string, typing: boolean) => void>>()
 
   function emitInsert(message: Message) {
     listeners.forEach((listener) => listener.onInsert(message))
@@ -457,9 +457,24 @@ export function createDemoBackend(options: Options = {}) {
       const me = requireUser()
       const needle = query.trim().toLowerCase()
       if (!needle) return []
-      return data.profiles
-        .filter((profile) => profile.id !== me && !isBlocked(me, profile.id) && profile.username.toLowerCase().includes(needle))
-        .slice(0, 20)
+      const visible = data.profiles.filter((profile) => profile.id !== me && !isBlocked(me, profile.id))
+      const exact = visible.filter((profile) => profile.username.toLowerCase() === needle)
+      const ranked = exact.length
+        ? exact.slice(0, 1)
+        : [
+            ...visible.filter((profile) => profile.username.toLowerCase().startsWith(needle)),
+            ...visible.filter((profile) => {
+              const name = profile.username.toLowerCase()
+              return !name.startsWith(needle) && name.includes(needle)
+            }),
+          ]
+            .sort((a, b) => {
+              const aPrefix = a.username.toLowerCase().startsWith(needle) ? 0 : 1
+              const bPrefix = b.username.toLowerCase().startsWith(needle) ? 0 : 1
+              return aPrefix - bPrefix || a.username.localeCompare(b.username)
+            })
+            .slice(0, 20)
+      return ranked
         .map((profile) => {
           const request = requestBetween(me, profile.id)
           return {
@@ -968,16 +983,16 @@ export function createDemoBackend(options: Options = {}) {
       return () => listeners.delete(listener)
     },
 
-    subscribeTyping(conversationId: string, onTyping: (userId: string) => void): () => void {
+    subscribeTyping(conversationId: string, onTyping: (userId: string, typing: boolean) => void): () => void {
       const set = typingListeners.get(conversationId) ?? new Set()
       set.add(onTyping)
       typingListeners.set(conversationId, set)
       return () => set.delete(onTyping)
     },
 
-    async broadcastTyping(conversationId: string): Promise<void> {
+    async broadcastTyping(conversationId: string, typing = true): Promise<void> {
       const me = requireUser()
-      typingListeners.get(conversationId)?.forEach((listener) => listener(me))
+      typingListeners.get(conversationId)?.forEach((listener) => listener(me, typing))
     },
 
     reset() {
