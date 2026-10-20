@@ -133,6 +133,7 @@ export type GroupMember = {
   favouriteAnime: string | null
   isCreator: boolean
   role: MemberRole
+  lastSeenAt?: string | null
 }
 
 export type BlockedPerson = {

@@ -19,6 +19,7 @@ export function GroupPanel({
   onRole,
   onLeave,
   onDelete,
+  onOpenProfile,
 }: {
   conversation: Conversation
   meId: string
@@ -32,6 +33,7 @@ export function GroupPanel({
   onRole: (userId: string, role: 'admin' | 'member') => Promise<void>
   onLeave: () => Promise<void>
   onDelete: () => Promise<void>
+  onOpenProfile: (member: GroupMember) => void
 }) {
   const admin = conversation.myRole === 'admin'
   const [title, setTitle] = useState(conversation.title ?? '')
@@ -113,11 +115,28 @@ export function GroupPanel({
       <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto">
         {members.map((member) => (
           <li key={member.id} className="flex items-center gap-2">
-            <Avatar name={member.username} url={member.avatarUrl} size="sm" creator={member.isCreator} />
-            <span className="min-w-0 flex-1">
-              <DisplayName name={member.username} creator={member.isCreator} className="text-sm" />
-              <span className="block text-[11px] text-mist">{member.role === 'admin' ? 'Admin' : 'Member'}</span>
-            </span>
+            {member.id === meId ? (
+              <>
+                <Avatar name={member.username} url={member.avatarUrl} size="sm" creator={member.isCreator} />
+                <span className="min-w-0 flex-1">
+                  <DisplayName name={member.username} creator={member.isCreator} className="text-sm" />
+                  <span className="block text-[11px] text-mist">{member.role === 'admin' ? 'Admin' : 'Member'}</span>
+                </span>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                aria-label={`View @${member.username}`}
+                onClick={() => onOpenProfile(member)}
+              >
+                <Avatar name={member.username} url={member.avatarUrl} size="sm" creator={member.isCreator} />
+                <span className="min-w-0 flex-1">
+                  <DisplayName name={member.username} creator={member.isCreator} className="text-sm" />
+                  <span className="block text-[11px] text-mist">{member.role === 'admin' ? 'Admin' : 'Member'}</span>
+                </span>
+              </button>
+            )}
             {admin && member.id !== meId ? (
               <span className="flex shrink-0 gap-1">
                 <button

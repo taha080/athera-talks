@@ -4,6 +4,7 @@ import { messagePreview } from '../lib/messages'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform } from '../lib/voice'
 import { byChatOrder, REPORT_REASONS } from '../lib/chatList'
+import { visibleLastSeen } from '../lib/profileAccess'
 import type { BlockedPerson, CallLog, ChatPrefPatch, ContactRequest, Conversation, GroupMember, Message, MessageListener, OutgoingMedia, Profile, ReactionChange, ReplyTarget, SearchPerson, UserReport } from '../types'
 import {
   DEMO_EMAIL,
@@ -782,6 +783,7 @@ export function createDemoBackend(options: Options = {}) {
       const me = requireUser()
       const conversation = data.conversations.find((item) => item.id === conversationId)
       if (!conversation?.memberIds.includes(me)) throw new Error('That chat is not yours.')
+      const viewer = profileById(me)
       return conversation.memberIds.map((id) => {
         const profile = profileById(id)
         return {
@@ -791,6 +793,7 @@ export function createDemoBackend(options: Options = {}) {
           favouriteAnime: profile?.favouriteAnime ?? null,
           isCreator: Boolean(profile?.isCreator),
           role: conversation.roles?.[id] ?? 'member',
+          lastSeenAt: visibleLastSeen(profile?.lastSeenAt, profile?.showLastSeen, viewer?.isCreator === true),
         }
       })
     },

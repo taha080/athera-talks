@@ -31,7 +31,7 @@ export function ReportDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label={`Report @${username}`}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label={`Report @${username}`}>
       <div className="w-full max-w-sm rounded-xl border border-line bg-panel p-4 shadow-md">
         <div className="flex items-start justify-between gap-2">
           <div>
