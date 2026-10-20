@@ -1,4 +1,4 @@
-import type { Message, Profile } from '../types'
+import type { CallLog, Message, Profile } from '../types'
 
 export const TAHA_ID = 'a1000000-0000-4000-8000-000000000001'
 export const SAKURA_ID = 'a1000000-0000-4000-8000-000000000002'
@@ -82,6 +82,7 @@ export type DemoData = {
   blocks?: DemoBlock[]
   reports?: DemoReport[]
   prefs?: DemoPref[]
+  calls?: CallLog[]
 }
 
 const hour = 60 * 60 * 1000
@@ -138,6 +139,32 @@ export function buildSeed(now = Date.now()): DemoData {
     ],
     messages,
     hides: [],
+    calls: [
+      {
+        id: 'call-done',
+        conversationId: SAKURA_CHAT,
+        callerId: TAHA_ID,
+        calleeId: SAKURA_ID,
+        callType: 'voice',
+        startedAt: at(3 * 60 * 1000),
+        answeredAt: at(3 * 60 * 1000 - 2000),
+        endedAt: at(2 * 60 * 1000),
+        status: 'completed',
+        durationSeconds: 222,
+      },
+      {
+        id: 'call-missed',
+        conversationId: SAKURA_CHAT,
+        callerId: SAKURA_ID,
+        calleeId: TAHA_ID,
+        callType: 'voice',
+        startedAt: at(70 * 1000),
+        answeredAt: null,
+        endedAt: at(40 * 1000),
+        status: 'missed',
+        durationSeconds: 0,
+      },
+    ],
     requests: [SAKURA_CHAT, KENJI_CHAT, MIRA_CHAT, REN_CHAT].map((id, index) => {
       const conversation = [
         [TAHA_ID, SAKURA_ID],

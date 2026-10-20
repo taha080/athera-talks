@@ -4,7 +4,7 @@ import { messagePreview } from '../lib/messages'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform } from '../lib/voice'
 import { byChatOrder, REPORT_REASONS } from '../lib/chatList'
-import type { BlockedPerson, ChatPrefPatch, ContactRequest, Conversation, GroupMember, Message, MessageListener, OutgoingMedia, Profile, ReactionChange, ReplyTarget, SearchPerson, UserReport } from '../types'
+import type { BlockedPerson, CallLog, ChatPrefPatch, ContactRequest, Conversation, GroupMember, Message, MessageListener, OutgoingMedia, Profile, ReactionChange, ReplyTarget, SearchPerson, UserReport } from '../types'
 import {
   DEMO_EMAIL,
   TAHA_ID,
@@ -68,6 +68,8 @@ export function createDemoBackend(options: Options = {}) {
   data.blocks = data.blocks ?? []
   data.reports = data.reports ?? []
   data.prefs = data.prefs ?? []
+  data.calls = data.calls ?? []
+  const callListeners = new Set<(call: CallLog) => void>()
   const typingListeners = new Map<string, Set<(userId: string) => void>>()
 
   function emitInsert(message: Message) {
@@ -415,6 +417,35 @@ export function createDemoBackend(options: Options = {}) {
         .filter((message) => message.conversationId === conversationId && !hidden(message.id, me))
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
         .map((message) => presentMessage(message, visible))
+    },
+
+    async listCalls(conversationId: string): Promise<CallLog[]> {
+      const me = requireUser()
+      const conversation = data.conversations.find((item) => item.id === conversationId)
+      if (!conversation || !conversation.memberIds.includes(me)) return []
+      return (data.calls ?? [])
+        .filter((call) => call.conversationId === conversationId)
+        .sort((a, b) => a.endedAt.localeCompare(b.endedAt))
+    },
+
+    async logCall(input: Omit<CallLog, 'id'>): Promise<CallLog> {
+      const me = requireUser()
+      const conversation = data.conversations.find((item) => item.id === input.conversationId)
+      if (!conversation || !conversation.memberIds.includes(me)) throw new Error('That chat is not yours.')
+      if (input.callerId !== me && input.calleeId !== me) throw new Error('Only people on the call can log it.')
+      const call: CallLog = { ...input, id: newId('call') }
+      data.calls = [...(data.calls ?? []), call]
+      save()
+      callListeners.forEach((listener) => listener(call))
+      return call
+    },
+
+    subscribeCalls(conversationId: string, onInsert: (call: CallLog) => void): () => void {
+      const listener = (call: CallLog) => {
+        if (call.conversationId === conversationId) onInsert(call)
+      }
+      callListeners.add(listener)
+      return () => callListeners.delete(listener)
     },
 
     async searchUsers(query: string): Promise<SearchPerson[]> {
@@ -944,6 +975,7 @@ function load(storage: MemoryStorage | undefined): DemoData | null {
     parsed.blocks = parsed.blocks ?? []
     parsed.reports = parsed.reports ?? []
     parsed.prefs = parsed.prefs ?? []
+    parsed.calls = parsed.calls ?? []
     return parsed
   } catch {
     return null
