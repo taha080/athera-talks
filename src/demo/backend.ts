@@ -458,7 +458,7 @@ export function createDemoBackend(options: Options = {}) {
       const needle = query.trim().toLowerCase()
       if (!needle) return []
       return data.profiles
-        .filter((profile) => profile.id !== me && profile.username.includes(needle))
+        .filter((profile) => profile.id !== me && !isBlocked(me, profile.id) && profile.username.toLowerCase().includes(needle))
         .slice(0, 20)
         .map((profile) => {
           const request = requestBetween(me, profile.id)

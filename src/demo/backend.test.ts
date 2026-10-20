@@ -92,6 +92,33 @@ describe('demo auth and chat', () => {
     expect(list.find((chat) => chat.id === SAKURA_CHAT)?.lastMessage?.body).toBe('This message was deleted')
   })
 
+  it('matches part of a username, keeps underscores literal, and hides either side of a block', async () => {
+    const seed = buildSeed()
+    const azan = 'a1000000-0000-4000-8000-000000000091'
+    const azanx = 'a1000000-0000-4000-8000-000000000092'
+    seed.profiles.push(
+      { id: azan, username: 'azan_', avatarUrl: 'https://example.com/azan.gif', favouriteAnime: 'Naruto', isCreator: false },
+      { id: azanx, username: 'azanx', avatarUrl: null, favouriteAnime: null },
+    )
+    seed.accounts.push({ email: 'sakura@example.com', password: 'secret1', profileId: SAKURA_ID })
+    const demo = createDemoBackend({ initial: seed })
+    await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
+    expect((await demo.searchUsers('AZAN_')).map((person) => person.username)).toEqual(['azan_'])
+    expect((await demo.searchUsers('_')).map((person) => person.username)).toEqual(['azan_'])
+    expect(await demo.searchUsers('%')).toEqual([])
+    expect(await demo.searchUsers('taha')).toEqual([])
+    expect((await demo.searchUsers('aza')).map((person) => person.username)).toEqual(['azan_', 'azanx'])
+    expect((await demo.searchUsers('azan_'))[0]?.avatarUrl).toBe('https://example.com/azan.gif')
+    await demo.blockUser(azan)
+    expect(await demo.searchUsers('_')).toEqual([])
+    demo.signOut()
+    await demo.signIn('sakura@example.com', 'secret1')
+    await demo.blockUser(TAHA_ID)
+    demo.signOut()
+    await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
+    expect(await demo.searchUsers('sak')).toEqual([])
+  })
+
   it('blocks a chat until the contact request is accepted', async () => {
     const demo = createDemoBackend()
     const hana = await demo.signUp({ email: 'hana@example.com', password: 'secret1', username: 'hana' })
