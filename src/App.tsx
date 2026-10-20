@@ -6,7 +6,7 @@ import { SetupScreen, Splash } from './components/SetupScreen'
 import { SessionProvider, useSession } from './context/SessionContext'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { APP_NAME } from './lib/brand'
-import { parseTheme } from './lib/theme'
+import { accountTheme } from './lib/theme'
 import { routerBasename } from './lib/url'
 import { AuthScreen } from './pages/AuthScreen'
 import { HomePage } from './pages/HomePage'
@@ -57,8 +57,9 @@ function ThemeSync() {
   const { profile } = useSession()
   const { setTheme } = useTheme()
   useEffect(() => {
-    if (profile?.theme) setTheme(parseTheme(profile.theme))
-  }, [profile?.theme, profile?.id, setTheme])
+    if (!profile) return
+    setTheme(accountTheme(profile.theme))
+  }, [profile, setTheme])
   return null
 }
 

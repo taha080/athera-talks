@@ -55,6 +55,11 @@ export function readStoredTheme(storage: { getItem: (key: string) => string | nu
   }
 }
 
+/** The account theme replaces a stale value saved in the browser. */
+export function accountTheme(profileTheme: string | null | undefined): ThemeName {
+  return parseTheme(profileTheme)
+}
+
 export function applyTheme(theme: ThemeName): void {
   if (typeof document === 'undefined') return
   document.documentElement.setAttribute('data-theme', theme)

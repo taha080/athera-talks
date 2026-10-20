@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
+import { useTheme } from '../context/ThemeContext'
 import { wallpaperClass } from '../lib/appearance'
 import { chatTitle, isGroup, showSenderName } from '../lib/chatList'
 import { QUICK_REACTIONS, groupPosition, groupedReactions, linkHost, linkParts, type GroupPos } from '../lib/chatView'
@@ -23,6 +24,7 @@ import { BackIcon, CheckIcon, CloseIcon, CopyIcon, DownIcon, MoreIcon, PhoneIcon
 export function ChatThread({ conversation }: { conversation: Conversation | undefined }) {
   const navigate = useNavigate()
   const { profile } = useSession()
+  const { theme } = useTheme()
   const chat = useChat()
   const call = useCall()
   const [reply, setReply] = useState<ReplyTarget | null>(null)
@@ -182,7 +184,10 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
   }
 
   const wallpaper = profile?.wallpaper ?? 'plain'
-  const customImage = wallpaper === 'custom' && profile?.wallpaperUrl ? profile.wallpaperUrl.replace(/"/g, '') : ''
+  const customImage =
+    theme === 'midnight' || wallpaper !== 'custom' || !profile?.wallpaperUrl
+      ? ''
+      : profile.wallpaperUrl.replace(/"/g, '')
   const group = isGroup(conversation)
   const title = chatTitle(conversation)
   const online = group ? false : isOnline(conversation.peer.lastSeenAt)

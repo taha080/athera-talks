@@ -1019,6 +1019,7 @@ textarea:-webkit-autofill {
   background-image: none;
 }
 
+[data-theme='midnight'] .chat-column,
 [data-theme='midnight'].wallpaper-plain,
 [data-theme='midnight'] .wallpaper-plain,
 [data-theme='midnight'] .chat-column.wallpaper-plain {
