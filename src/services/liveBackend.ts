@@ -2,6 +2,7 @@ import { normalizeUsername, usernameIssue } from '../lib/auth'
 import { parseWallpaper } from '../lib/appearance'
 import { baseMime, mediaBucket } from '../lib/media'
 import { MESSAGE_PAGE, messageKind, newestFirstPage } from '../lib/messages'
+import { imageExtension } from '../lib/pasteImage'
 import { isPremiumWindow } from '../lib/premium'
 import { isDuplicateCallInsert } from '../lib/callLog'
 import { parseTheme } from '../lib/theme'
@@ -595,7 +596,7 @@ export const liveChat = {
     const userId = await currentUserId()
     const bucket = mediaBucket(input.kind)
     const mime = baseMime(input.mime || (input.kind === 'image' ? 'image/jpeg' : 'audio/webm'))
-    const ext = input.kind === 'image' ? 'jpg' : extensionForMime(mime)
+    const ext = input.kind === 'image' ? imageExtension(mime) : extensionForMime(mime)
     const path = `${input.conversationId}/${userId}/${crypto.randomUUID()}.${ext}`
     const { error: uploadError } = await supabase.storage.from(bucket).upload(path, input.file, {
       contentType: mime,
@@ -607,7 +608,7 @@ export const liveChat = {
       .insert({
         conversation_id: input.conversationId,
         sender_id: userId,
-        body: input.kind === 'voice' ? 'Voice message' : 'Photo',
+        body: input.kind === 'voice' ? 'Voice message' : input.caption?.trim() || 'Photo',
         kind: input.kind,
         media_path: path,
         media_mime: mime,

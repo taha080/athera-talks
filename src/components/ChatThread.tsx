@@ -10,6 +10,7 @@ import { chatTitle, isGroup, showSenderName } from '../lib/chatList'
 import { QUICK_REACTIONS, groupPosition, groupedReactions, linkHost, linkParts, type GroupPos } from '../lib/chatView'
 import { dayKey, formatDayLabel, formatMessageTime } from '../lib/format'
 import { messagePreview } from '../lib/messages'
+import { firstImageFile } from '../lib/pasteImage'
 import { isOnline, presenceLabel } from '../lib/presence'
 import { TYPING_TTL_MS } from '../lib/typing'
 import { canViewSharedProfile } from '../lib/profileAccess'
@@ -50,6 +51,9 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
   const [actionError, setActionError] = useState('')
   const [lightbox, setLightbox] = useState<string | null>(null)
   const [showJump, setShowJump] = useState(false)
+  const [dropFile, setDropFile] = useState<File | null>(null)
+  const [dropHot, setDropHot] = useState(false)
+  const dragDepth = useRef(0)
   const [jumpCount, setJumpCount] = useState(0)
   const [dividerId, setDividerId] = useState<string | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
@@ -105,6 +109,8 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
     setSearchOpen(false)
     setSearch('')
     setTyping(false)
+    setDropFile(null)
+    setDropHot(false)
     setShowJump(false)
     setJumpCount(0)
     setDividerId(null)
@@ -336,7 +342,36 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
     <div
       className={`chat-column relative flex h-full min-h-0 flex-col ${wallpaperClass(wallpaper)}`}
       style={customImage ? { backgroundImage: `url("${customImage}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+      onDragEnter={(event) => {
+        if (pendingRequest || conversation.blocked || !Array.from(event.dataTransfer.types).includes('Files')) return
+        event.preventDefault()
+        dragDepth.current += 1
+        setDropHot(true)
+      }}
+      onDragOver={(event) => {
+        if (pendingRequest || conversation.blocked || !Array.from(event.dataTransfer.types).includes('Files')) return
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'copy'
+      }}
+      onDragLeave={() => {
+        dragDepth.current = Math.max(0, dragDepth.current - 1)
+        if (dragDepth.current === 0) setDropHot(false)
+      }}
+      onDrop={(event) => {
+        dragDepth.current = 0
+        setDropHot(false)
+        if (pendingRequest || conversation.blocked) return
+        event.preventDefault()
+        const file = firstImageFile(event.dataTransfer.files)
+        if (file) setDropFile(file)
+        else if (event.dataTransfer.files.length > 0) setActionError('Choose an image file.')
+      }}
     >
+      {dropHot ? (
+        <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center bg-black/45">
+          <p className="rounded-xl border border-line bg-panel px-4 py-2 text-sm text-paper">Drop a photo</p>
+        </div>
+      ) : null}
       <header className="chat-header relative flex h-14 shrink-0 items-center gap-2 border-b border-line bg-panel px-2">
         <Link to="/" className={`${iconButton} md:hidden`} aria-label="Back to chats">
           <BackIcon className="h-5 w-5" />
@@ -611,11 +646,14 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
       ) : (
       <div className="composer-dock px-2 pb-2 pt-1 sm:px-4">
         <Composer
+          key={conversation.id}
           peerName={group ? title : `@${conversation.peer.username}`}
           reply={reply}
           editing={editing}
           onCancelEdit={() => setEditing(null)}
           onClearReply={() => setReply(null)}
+          incomingFile={dropFile}
+          onIncomingHandled={() => setDropFile(null)}
           onTyping={(active) => chat.broadcastTyping(conversation.id, active)}
           onSendText={async (body) => {
             nearBottom.current = true
@@ -627,9 +665,9 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
             await chat.send(conversation.id, body, reply)
             setReply(null)
           }}
-          onSendFile={async (file, mime, kind, seconds, waveform) => {
+          onSendFile={async (file, mime, kind, seconds, waveform, caption) => {
             nearBottom.current = true
-            await chat.sendMedia({ conversationId: conversation.id, kind, file, mime, seconds, waveform, reply })
+            await chat.sendMedia({ conversationId: conversation.id, kind, file, mime, seconds, waveform, reply, caption })
             setReply(null)
           }}
         />
@@ -812,11 +850,14 @@ function MessageRow({
           {image ? (
             message.mediaUrl ? (
               <button type="button" className="block" aria-label="Open photo" onClick={() => onOpenImage(message.mediaUrl as string)}>
-                <img src={message.mediaUrl} alt="Photo" className="max-h-72 rounded-[14px] object-cover" />
+                <img src={message.mediaUrl} alt={message.body && message.body !== 'Photo' ? message.body : 'Photo'} className="max-h-72 rounded-[14px] object-cover" />
               </button>
             ) : (
               <p className="px-2 py-1 text-sm">Photo</p>
             )
+          ) : null}
+          {image && message.body.trim() && message.body.trim() !== 'Photo' ? (
+            <p className="msg-copy whitespace-pre-wrap px-1.5 pb-0.5 pt-1 text-sm leading-5">{message.body}</p>
           ) : null}
           {!deleted && message.kind === 'voice' ? (
             <VoiceBubble src={message.mediaUrl} seconds={message.mediaSeconds} waveform={message.waveform} mine={ownTone} />
