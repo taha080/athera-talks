@@ -555,7 +555,7 @@ function MessageRow({
     : tailed ? 'rounded-[18px] rounded-bl-[5px]' : 'rounded-[18px]'
   const image = !deleted && message.kind === 'image'
   const creator = senderCreator && !deleted
-  const ownTone = mine && !creator
+  const ownTone = mine || creator
   const reactions = groupedReactions(message.reactions, meId)
   const parts = linkParts(message.body)
   const firstLink = parts.find((part) => part.type === 'link')?.value
