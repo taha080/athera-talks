@@ -469,14 +469,19 @@ export const liveChat = {
   },
 
   async searchUsers(query: string): Promise<SearchPerson[]> {
+    const needle = query.trim().toLowerCase().replace(/^@+/, '')
+    if (!needle) return []
     const { data, error } = await client().rpc('search_profiles', { query })
     if (error) throw new Error(error.message)
-    return ((data ?? []) as (ProfileRow & { request_id?: string | null; request_status?: string | null; request_from?: string | null })[]).map((row) => ({
-      ...mapProfile(row),
-      requestId: row.request_id ?? null,
-      requestStatus: contactStatus(row.request_status),
-      requestFromId: row.request_from ?? null,
-    }))
+    return ((data ?? []) as (ProfileRow & { request_id?: string | null; request_status?: string | null; request_from?: string | null })[])
+      .map((row) => ({
+        ...mapProfile(row),
+        requestId: row.request_id ?? null,
+        requestStatus: contactStatus(row.request_status),
+        requestFromId: row.request_from ?? null,
+      }))
+      .filter((person) => person.username.toLowerCase() === needle)
+      .slice(0, 1)
   },
 
   async listRequests(): Promise<ContactRequest[]> {

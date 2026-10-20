@@ -57,7 +57,7 @@ describe('demo auth and chat', () => {
   it('searches, reuses a chat, sends a message, and clears unread', async () => {
     const demo = createDemoBackend()
     await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
-    const found = await demo.searchUsers('sak')
+    const found = await demo.searchUsers('@Sakura')
     expect(found.map((profile) => profile.username)).toEqual(['sakura'])
     expect(found[0]?.isCreator).toBeFalsy()
     const existing = await demo.startConversation(SAKURA_ID)
@@ -92,7 +92,7 @@ describe('demo auth and chat', () => {
     expect(list.find((chat) => chat.id === SAKURA_CHAT)?.lastMessage?.body).toBe('This message was deleted')
   })
 
-  it('matches part of a username, keeps underscores literal, and hides either side of a block', async () => {
+  it('matches only a full username and hides either side of a block', async () => {
     const seed = buildSeed()
     const azan = 'a1000000-0000-4000-8000-000000000091'
     const azanx = 'a1000000-0000-4000-8000-000000000092'
@@ -104,21 +104,22 @@ describe('demo auth and chat', () => {
     const demo = createDemoBackend({ initial: seed })
     await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
     expect((await demo.searchUsers('AZAN_')).map((person) => person.username)).toEqual(['azan_'])
-    expect((await demo.searchUsers('_')).map((person) => person.username)).toEqual(['azan_'])
+    expect((await demo.searchUsers('@azan_')).map((person) => person.username)).toEqual(['azan_'])
+    expect(await demo.searchUsers('_')).toEqual([])
     expect(await demo.searchUsers('%')).toEqual([])
     expect(await demo.searchUsers('taha')).toEqual([])
-    expect((await demo.searchUsers('aza')).map((person) => person.username)).toEqual(['azan_', 'azanx'])
-    expect((await demo.searchUsers('a')).map((person) => person.username)).toEqual(['azan_', 'azanx', 'mira', 'sakura'])
-    expect((await demo.searchUsers('s')).map((person) => person.username)).toEqual(['sakura'])
+    expect(await demo.searchUsers('aza')).toEqual([])
+    expect(await demo.searchUsers('a')).toEqual([])
+    expect(await demo.searchUsers('s')).toEqual([])
     expect((await demo.searchUsers('azan_'))[0]?.avatarUrl).toBe('https://example.com/azan.gif')
     await demo.blockUser(azan)
-    expect(await demo.searchUsers('_')).toEqual([])
+    expect(await demo.searchUsers('azan_')).toEqual([])
     demo.signOut()
     await demo.signIn('sakura@example.com', 'secret1')
     await demo.blockUser(TAHA_ID)
     demo.signOut()
     await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
-    expect(await demo.searchUsers('sak')).toEqual([])
+    expect(await demo.searchUsers('sakura')).toEqual([])
   })
 
   it('blocks a chat until the contact request is accepted', async () => {

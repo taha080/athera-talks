@@ -456,35 +456,18 @@ export function createDemoBackend(options: Options = {}) {
 
     async searchUsers(query: string): Promise<SearchPerson[]> {
       const me = requireUser()
-      const needle = query.trim().toLowerCase()
+      const needle = query.trim().toLowerCase().replace(/^@+/, '')
       if (!needle) return []
       const visible = data.profiles.filter((profile) => profile.id !== me && !isBlocked(me, profile.id))
-      const exact = visible.filter((profile) => profile.username.toLowerCase() === needle)
-      const ranked = exact.length
-        ? exact.slice(0, 1)
-        : [
-            ...visible.filter((profile) => profile.username.toLowerCase().startsWith(needle)),
-            ...visible.filter((profile) => {
-              const name = profile.username.toLowerCase()
-              return !name.startsWith(needle) && name.includes(needle)
-            }),
-          ]
-            .sort((a, b) => {
-              const aPrefix = a.username.toLowerCase().startsWith(needle) ? 0 : 1
-              const bPrefix = b.username.toLowerCase().startsWith(needle) ? 0 : 1
-              return aPrefix - bPrefix || a.username.localeCompare(b.username)
-            })
-            .slice(0, 20)
-      return ranked
-        .map((profile) => {
-          const request = requestBetween(me, profile.id)
-          return {
-            ...profile,
-            requestId: request?.id ?? null,
-            requestStatus: request?.status ?? null,
-            requestFromId: request?.fromId ?? null,
-          }
-        })
+      const exact = visible.find((profile) => profile.username.toLowerCase() === needle)
+      if (!exact) return []
+      const request = requestBetween(me, exact.id)
+      return [{
+        ...exact,
+        requestId: request?.id ?? null,
+        requestStatus: request?.status ?? null,
+        requestFromId: request?.fromId ?? null,
+      }]
     },
 
     async listRequests(): Promise<ContactRequest[]> {
