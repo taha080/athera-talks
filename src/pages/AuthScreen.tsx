@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AuthFrame } from '../components/AuthFrame'
 import { GoogleIcon } from '../components/Icons'
 import { useSession } from '../context/SessionContext'
@@ -14,7 +14,12 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
   const session = useSession()
   const usernameStatus = session.usernameStatus
   const navigate = useNavigate()
-  const [email, setEmail] = useState(session.mode === 'demo' ? DEMO_EMAIL : '')
+  const location = useLocation()
+  const seededEmail =
+    typeof (location.state as { email?: string } | null)?.email === 'string'
+      ? (location.state as { email: string }).email
+      : ''
+  const [email, setEmail] = useState(seededEmail || (session.mode === 'demo' ? DEMO_EMAIL : ''))
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -273,13 +278,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
           <label className="block text-sm">
             <span className="mb-1.5 flex items-center justify-between font-medium text-paper">
               Password
-              {mode === 'sign-in' ? (
-                <Link to="/forgot-password" className="text-xs font-medium text-sakura hover:underline">
-                  Forgot password?
-                </Link>
-              ) : (
-                <span className="text-xs font-normal text-mist">At least 6 characters</span>
-              )}
+              {mode === 'sign-up' ? <span className="text-xs font-normal text-mist">At least 6 characters</span> : null}
             </span>
             <span className="relative block">
               <input
@@ -361,6 +360,15 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
         >
           {submitLabel}
         </button>
+        {mode === 'sign-in' ? (
+          <button
+            type="button"
+            className="w-full rounded-lg border border-line bg-elevated px-4 py-2.5 text-sm font-medium text-paper"
+            onClick={() => navigate('/forgot-password', { state: { email: email.trim() } })}
+          >
+            Forgot password?
+          </button>
+        ) : null}
       </form>
 
       {mode === 'forgot' ? (

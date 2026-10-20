@@ -46,7 +46,7 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <AuthFrame title="Choose a new password" subtitle="Use at least 6 characters.">
+    <AuthFrame title="Set new password" subtitle="Use at least 6 characters.">
       {canReset ? (
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <label className="block text-sm">
@@ -88,7 +88,7 @@ export function ResetPasswordPage() {
             </p>
           ) : null}
           <button type="submit" className={`${primaryButton} w-full`} disabled={busy} aria-busy={busy}>
-            {busy ? 'Saving…' : 'Update password'}
+            {busy ? 'Saving…' : 'Set new password'}
           </button>
         </form>
       ) : (
