@@ -581,6 +581,30 @@ export function createDemoBackend(options: Options = {}) {
       return message
     },
 
+    deliverIncoming(input: { conversationId: string; senderId: string; body?: string; kind?: 'text' | 'voice' | 'image' }): Message {
+      const conversation = data.conversations.find((item) => item.id === input.conversationId)
+      if (!conversation || !conversation.memberIds.includes(input.senderId)) throw new Error('That chat is not yours.')
+      const kind = input.kind ?? 'text'
+      const message: Message = {
+        id: newId('msg'),
+        conversationId: input.conversationId,
+        senderId: input.senderId,
+        body: kind === 'text' ? (input.body ?? '').trim() : '',
+        createdAt: new Date().toISOString(),
+        readAt: null,
+        kind,
+        deliveredAt: new Date().toISOString(),
+        mediaSeconds: kind === 'voice' ? 3 : null,
+        deletedAt: null,
+      }
+      data.messages.push(message)
+      conversation.updatedAt = message.createdAt
+      unarchiveOnMessage(conversation.id)
+      save()
+      emitInsert(message)
+      return message
+    },
+
     async sendMedia(input: OutgoingMedia): Promise<Message> {
       const me = requireUser()
       const conversation = data.conversations.find((item) => item.id === input.conversationId)

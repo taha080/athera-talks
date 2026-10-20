@@ -9,11 +9,28 @@ import {
 } from 'react'
 import { appendMessage, foldConversation } from '../lib/conversations'
 import { messagePreview } from '../lib/messages'
+import {
+  noticePreview,
+  shouldPlayMessageSound,
+  shouldShowDesktopNotification,
+  shouldShowMessageNotice,
+  stackNotices,
+} from '../lib/notice'
 import { desktopNotice, playMessageTone } from '../lib/notify'
 import type { BlockedPerson, ChatPrefPatch, ContactRequest, Conversation, GroupMember, MemberRole, Message, OutgoingMedia, ReactionChange, ReplyTarget, SearchPerson, UserReport } from '../types'
 import { useSession } from './SessionContext'
 
 type Toast = { id: string; text: string }
+
+export type MessageNotice = {
+  id: string
+  conversationId: string
+  senderName: string
+  senderCreator: boolean
+  avatarUrl: string | null
+  preview: string
+  groupTitle: string | null
+}
 
 type ChatValue = {
   conversations: Conversation[]
@@ -25,6 +42,8 @@ type ChatValue = {
   toasts: Toast[]
   dismissToast: (id: string) => void
   pushToast: (text: string) => void
+  notices: MessageNotice[]
+  dismissNotice: (id: string) => void
   setActive: (id: string | null) => void
   refresh: () => Promise<void>
   search: (query: string) => Promise<SearchPerson[]>
@@ -74,7 +93,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const seenRequests = useRef(new Set<string>())
   const requestsReady = useRef(false)
   const [toasts, setToasts] = useState<Toast[]>([])
+  const [notices, setNotices] = useState<MessageNotice[]>([])
   const activeRef = useRef<string | null>(null)
+  const blockedRef = useRef(new Set<string>())
+  const memberCache = useRef(new Map<string, GroupMember[]>())
   const seen = useRef(new Set<string>())
   const conversationsRef = useRef(conversations)
   const profileRef = useRef(profile)
@@ -92,6 +114,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id))
+  }, [])
+
+  const dismissNotice = useCallback((id: string) => {
+    setNotices((prev) => prev.filter((notice) => notice.id !== id))
+  }, [])
+
+  const pushNotice = useCallback((notice: Omit<MessageNotice, 'id'>) => {
+    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
+    setNotices((prev) => stackNotices(prev, { ...notice, id }))
+    window.setTimeout(() => {
+      setNotices((prev) => prev.filter((item) => item.id !== id))
+    }, 4000)
   }, [])
 
   const refresh = useCallback(async () => {
@@ -131,6 +165,36 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     )
   }, [])
 
+  const senderFor = useCallback(
+    async (convo: Conversation, senderId: string) => {
+      if (convo.kind !== 'group') {
+        return {
+          name: convo.peer.username,
+          creator: Boolean(convo.peer.isCreator),
+          avatarUrl: convo.peer.avatarUrl ?? null,
+          groupTitle: null as string | null,
+        }
+      }
+      let members = memberCache.current.get(convo.id)
+      if (!members) {
+        try {
+          members = await chat.listMembers(convo.id)
+          memberCache.current.set(convo.id, members)
+        } catch {
+          members = []
+        }
+      }
+      const sender = members.find((member) => member.id === senderId)
+      return {
+        name: sender?.username ?? 'member',
+        creator: Boolean(sender?.isCreator),
+        avatarUrl: sender?.avatarUrl ?? null,
+        groupTitle: convo.title?.trim() || 'Group',
+      }
+    },
+    [chat],
+  )
+
   const ingest = useCallback(
     async (message: Message) => {
       let ready = message
@@ -155,25 +219,67 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       })
       const mine = ready.senderId === me
       const viewing = activeRef.current === ready.conversationId
-      if (viewing && !mine) {
+      const tabHidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
+      if (viewing && !mine && !tabHidden) {
         void chat.markRead(ready.conversationId).then(() => {
           setConversations((prev) => prev.map((item) => (item.id === ready.conversationId ? { ...item, unread: 0 } : item)))
         })
       }
-      if (!mine && !viewing && !ready.deletedAt) {
-        const convo = conversationsRef.current.find((item) => item.id === ready.conversationId)
-        if (!convo?.muted) {
-          const prefs = profileRef.current
-          const peer = convo?.kind === 'group' ? convo.title || 'Group' : convo?.peer.username
-          const preview = messagePreview(ready)
-          if (prefs?.notifySound !== false) playMessageTone()
-          if (prefs?.notifyDesktop !== false) void desktopNotice(peer ? (convo?.kind === 'group' ? peer : `@${peer}`) : 'Athera Talks', preview)
-          pushToast(peer ? `New message from ${convo?.kind === 'group' ? peer : `@${peer}`}` : 'New message')
+      const convo = conversationsRef.current.find((item) => item.id === ready.conversationId)
+      const blocked = Boolean(convo?.blocked || convo?.blockedByMe || blockedRef.current.has(ready.senderId))
+      const show = Boolean(
+        convo &&
+          shouldShowMessageNotice({
+            mine,
+            deleted: Boolean(ready.deletedAt),
+            muted: Boolean(convo.muted),
+            blocked,
+            conversationOpen: viewing,
+            tabHidden,
+          }),
+      )
+      if (show && convo) {
+        const sender = await senderFor(convo, ready.senderId)
+        const preview = noticePreview(ready)
+        const prefs = profileRef.current
+        if (shouldPlayMessageSound({ show: true, notifySound: prefs?.notifySound !== false })) playMessageTone()
+        if (
+          shouldShowDesktopNotification({
+            show: true,
+            tabHidden,
+            notifyDesktop: prefs?.notifyDesktop !== false,
+            permissionGranted: typeof Notification !== 'undefined' && Notification.permission === 'granted',
+          })
+        ) {
+          const title = sender.groupTitle ? `${sender.name} · ${sender.groupTitle}` : sender.name
+          void desktopNotice(title, preview)
         }
+        pushNotice({
+          conversationId: ready.conversationId,
+          senderName: sender.name,
+          senderCreator: sender.creator,
+          avatarUrl: sender.avatarUrl,
+          preview,
+          groupTitle: sender.groupTitle,
+        })
       }
     },
-    [applyUpdate, chat, me, pushToast, refresh],
+    [applyUpdate, chat, me, pushNotice, refresh, senderFor],
   )
+
+  useEffect(() => {
+    if (!profile) {
+      blockedRef.current = new Set()
+      return
+    }
+    let cancelled = false
+    void chat.listBlocked().then((rows) => {
+      if (!cancelled) blockedRef.current = new Set(rows.map((person) => person.id))
+    }).catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [chat, profile])
 
   useEffect(() => {
     let cancelled = false
@@ -386,6 +492,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const blockUser = useCallback(
     async (userId: string) => {
       await chat.blockUser(userId)
+      blockedRef.current.add(userId)
       setConversations((prev) =>
         prev.map((item) => (item.kind !== 'group' && item.peer.id === userId ? { ...item, blocked: true, blockedByMe: true } : item)),
       )
@@ -397,6 +504,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const unblockUser = useCallback(
     async (userId: string) => {
       await chat.unblockUser(userId)
+      blockedRef.current.delete(userId)
       setConversations((prev) =>
         prev.map((item) => (item.kind !== 'group' && item.peer.id === userId ? { ...item, blocked: false, blockedByMe: false } : item)),
       )
@@ -489,6 +597,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     toasts,
     dismissToast,
     pushToast,
+    notices,
+    dismissNotice,
     setActive,
     refresh,
     search,
