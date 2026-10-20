@@ -158,6 +158,10 @@ export function Sidebar() {
   const inbox = inboxChats(chat.conversations).filter((item) => filter === 'all' || item.unread > 0)
   const archivedVisible = archived.filter((item) => filter === 'all' || item.unread > 0)
   const visible = archiveOpen ? archivedVisible : inbox
+  const chatNeedle = query.trim().toLowerCase().replace(/^@+/, '')
+  const listed = chatNeedle
+    ? visible.filter((item) => chatTitle(item).toLowerCase().includes(chatNeedle))
+    : visible
   const contacts = chat.conversations
     .filter((item) => !isGroup(item) && !item.blocked)
     .map((item) => item.peer)
@@ -304,7 +308,7 @@ export function Sidebar() {
         ) : results ? (
           <div data-username-search="true">
             {searchError ? <p className="px-4 py-3 text-sm text-danger">{searchError}</p> : null}
-            {results.length === 0 && !searchError ? <p className="px-4 py-8 text-center text-sm text-mist" data-search-empty="true">No one with that username.</p> : null}
+            {results.length === 0 && !searchError ? <p className="px-4 py-3 text-center text-sm text-mist" data-search-empty="true">Type the full username.</p> : null}
             {results.map((person) => (
               <article key={person.id} className="mx-3 my-2 rounded-xl border border-line bg-panel p-3 shadow-sm">
                 <div className="flex items-center gap-3">
@@ -353,13 +357,14 @@ export function Sidebar() {
               </article>
             ))}
           </div>
-        ) : chat.loading ? (
+        ) : null}
+        {groupOpen || showRequests ? null : chat.loading && !results ? (
           <ListSkeleton />
-        ) : visible.length === 0 && (archiveOpen || archived.length === 0) ? (
+        ) : listed.length === 0 && !results && (archiveOpen || archived.length === 0) ? (
           <p className="px-4 py-10 text-center text-sm leading-6 text-mist">
             {archiveOpen ? 'No archived chats.' : filter === 'unread' ? 'No unread chats.' : 'No chats yet. Search a username to send a contact request.'}
           </p>
-        ) : (
+        ) : listed.length === 0 ? null : (
           <ul>
             {archiveOpen ? (
               <li>
@@ -367,7 +372,7 @@ export function Sidebar() {
                   Back to chats
                 </button>
               </li>
-            ) : archived.length > 0 ? (
+            ) : archived.length > 0 && !chatNeedle ? (
               <li>
                 <button type="button" className="flex w-full items-center gap-3 border-b border-line/70 px-3 py-2.5 text-left" onClick={() => setArchiveOpen(true)}>
                   <ArchiveIcon className="h-5 w-5 text-mist" />
@@ -376,7 +381,7 @@ export function Sidebar() {
                 </button>
               </li>
             ) : null}
-            {visible.map((conversation) => (
+            {listed.map((conversation) => (
               <ChatRow
                 key={conversation.id}
                 conversation={conversation}
