@@ -813,6 +813,25 @@ textarea:-webkit-autofill {
   color: #9ca3af;
 }
 
+.profile-sheet {
+  background: #151e31;
+  border-color: #2a3548;
+  color: #e5e7eb;
+  box-shadow: none;
+}
+
+.profile-sheet .profile-kicker,
+.profile-sheet .profile-close {
+  color: #9ca3af;
+}
+
+.profile-sheet .profile-action {
+  background: transparent;
+  border-color: #2a3548;
+  color: #e5e7eb;
+  box-shadow: none;
+}
+
 .notice-in {
   animation: notice-in 220ms ease;
 }

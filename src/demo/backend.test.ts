@@ -260,6 +260,22 @@ describe('demo auth and chat', () => {
     expect((await demo.listConversations()).some((chat) => chat.id === created)).toBe(false)
   })
 
+  it('hides a group member last seen unless they share it or the viewer is the creator', async () => {
+    const seed = buildSeed()
+    const kenji = seed.profiles.find((profile) => profile.id === KENJI_ID)
+    if (kenji) kenji.showLastSeen = false
+    seed.accounts.push({ email: 'sakura@example.com', password: 'secret1', profileId: SAKURA_ID })
+    const demo = createDemoBackend({ initial: seed })
+    await demo.signIn('sakura@example.com', 'secret1')
+    const hidden = await demo.listMembers(GROUP_CHAT)
+    expect(hidden.find((member) => member.id === KENJI_ID)?.lastSeenAt).toBeNull()
+    expect(hidden.find((member) => member.id === SAKURA_ID)?.lastSeenAt).toBeTruthy()
+    demo.signOut()
+    await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
+    const asCreator = await demo.listMembers(GROUP_CHAT)
+    expect(asCreator.find((member) => member.id === KENJI_ID)?.lastSeenAt).toBeTruthy()
+  })
+
   it('pins three chats, mutes, and unarchives on a new message unless muted', async () => {
     const seed = buildSeed()
     seed.accounts.push({ email: 'sakura@example.com', password: 'secret1', profileId: SAKURA_ID })

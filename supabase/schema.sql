@@ -3216,13 +3216,16 @@ returns table (
   avatar_url text,
   favourite_anime text,
   is_creator boolean,
-  role text
+  role text,
+  last_seen timestamptz
 )
 language plpgsql
 stable
 security definer
 set search_path = public
 as $$
+declare
+  creator boolean := private.viewer_is_creator();
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated';
@@ -3231,7 +3234,17 @@ begin
     raise exception 'That chat is not yours';
   end if;
   return query
-  select p.id, p.username, p.avatar_url, p.favourite_anime, p.is_creator, m.role
+  select
+    p.id,
+    p.username,
+    p.avatar_url,
+    p.favourite_anime,
+    p.is_creator,
+    m.role,
+    case
+      when p.show_last_seen or creator then p.last_seen_at
+      else null
+    end
   from public.conversation_members m
   join public.profiles p on p.id = m.user_id
   where m.conversation_id = cid

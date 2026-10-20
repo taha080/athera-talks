@@ -708,6 +708,7 @@ export const liveChat = {
       favourite_anime: string | null
       is_creator?: boolean | null
       role: string
+      last_seen?: string | null
     }[]).map((row) => ({
       id: row.id,
       username: row.username,
@@ -715,6 +716,7 @@ export const liveChat = {
       favouriteAnime: row.favourite_anime,
       isCreator: Boolean(row.is_creator),
       role: memberRole(row.role),
+      lastSeenAt: row.last_seen ?? null,
     }))
   },
 

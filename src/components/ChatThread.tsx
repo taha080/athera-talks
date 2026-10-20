@@ -11,6 +11,7 @@ import { QUICK_REACTIONS, groupPosition, groupedReactions, linkHost, linkParts, 
 import { dayKey, formatDayLabel, formatMessageTime } from '../lib/format'
 import { messagePreview } from '../lib/messages'
 import { isOnline, presenceLabel } from '../lib/presence'
+import { canViewSharedProfile } from '../lib/profileAccess'
 import { receiptTick } from '../lib/receipts'
 import { iconButton } from '../lib/styles'
 import type { CallLog, Conversation, GroupMember, Message, ReplyTarget } from '../types'
@@ -18,6 +19,7 @@ import { Avatar } from './Avatar'
 import { DisplayName } from './CreatorBadge'
 import { Composer } from './Composer'
 import { GroupPanel } from './GroupPanel'
+import { ProfileSheet, type SharedProfile } from './ProfileSheet'
 import { ReportDialog } from './ReportDialog'
 import { VoiceBubble } from './VoiceBubble'
 import { BackIcon, CheckIcon, CloseIcon, CopyIcon, DownIcon, MoreIcon, PhoneIcon, ReplyIcon, SearchIcon, SmileIcon, TrashIcon } from './Icons'
@@ -35,7 +37,8 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
   const [actionsId, setActionsId] = useState<string | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
   const [editing, setEditing] = useState<{ id: string; body: string } | null>(null)
-  const [reporting, setReporting] = useState(false)
+  const [reporting, setReporting] = useState<{ id: string; username: string } | null>(null)
+  const [profilePerson, setProfilePerson] = useState<SharedProfile | null>(null)
   const [members, setMembers] = useState<GroupMember[]>([])
   const [searchOpen, setSearchOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -93,6 +96,8 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
     setReactId(null)
     setActionsId(null)
     setInfoOpen(false)
+    setReporting(null)
+    setProfilePerson(null)
     setSearchOpen(false)
     setSearch('')
     setTyping(false)
@@ -251,6 +256,42 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
     }
   }
 
+  const directPeerIds = chat.conversations.filter((item) => !isGroup(item)).map((item) => item.peer.id)
+
+  function profileFromPeer(peer: Conversation['peer']): SharedProfile {
+    return {
+      id: peer.id,
+      username: peer.username,
+      avatarUrl: peer.avatarUrl,
+      favouriteAnime: peer.favouriteAnime,
+      isCreator: Boolean(peer.isCreator),
+      lastSeenAt: peer.lastSeenAt ?? null,
+    }
+  }
+
+  function profileFromMember(member: GroupMember): SharedProfile {
+    return {
+      id: member.id,
+      username: member.username,
+      avatarUrl: member.avatarUrl,
+      favouriteAnime: member.favouriteAnime,
+      isCreator: member.isCreator,
+      lastSeenAt: member.lastSeenAt ?? null,
+    }
+  }
+
+  function openProfile(person: SharedProfile, source: 'direct' | 'group') {
+    const allowed = canViewSharedProfile({
+      personId: person.id,
+      meId: profile?.id,
+      directPeerIds: source === 'direct' ? [...directPeerIds, person.id] : directPeerIds,
+      groupMemberIds: source === 'group' ? members.map((member) => member.id) : [],
+    })
+    if (!allowed) return
+    setInfoOpen(false)
+    setProfilePerson(person)
+  }
+
   async function copyMessage(message: Message) {
     const text = message.kind === 'image' ? 'Photo' : message.kind === 'voice' ? 'Voice message' : message.body
     try {
@@ -272,11 +313,28 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
         <Link to="/" className={`${iconButton} md:hidden`} aria-label="Back to chats">
           <BackIcon className="h-5 w-5" />
         </Link>
-        <Avatar name={title} url={group ? conversation.photoUrl ?? null : conversation.peer.avatarUrl} size="sm" online={online} creator={group ? false : conversation.peer.isCreator} />
-        <div className="min-w-0 flex-1">
-          <DisplayName name={title} creator={group ? false : conversation.peer.isCreator} className="chat-title text-sm font-semibold" />
-          <p className={`chat-status truncate text-xs ${typing || online ? 'text-foam' : 'text-mist'}`}>{status}</p>
-        </div>
+        {group ? (
+          <>
+            <Avatar name={title} url={conversation.photoUrl ?? null} size="sm" creator={false} />
+            <div className="min-w-0 flex-1">
+              <DisplayName name={title} creator={false} className="chat-title text-sm font-semibold" />
+              <p className={`chat-status truncate text-xs ${typing || online ? 'text-foam' : 'text-mist'}`}>{status}</p>
+            </div>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left"
+            aria-label={`View @${conversation.peer.username}`}
+            onClick={() => openProfile(profileFromPeer(conversation.peer), 'direct')}
+          >
+            <Avatar name={title} url={conversation.peer.avatarUrl} size="sm" online={online} creator={conversation.peer.isCreator} />
+            <span className="min-w-0 flex-1">
+              <DisplayName name={title} creator={conversation.peer.isCreator} className="chat-title text-sm font-semibold" />
+              <p className={`chat-status truncate text-xs ${typing || online ? 'text-foam' : 'text-mist'}`}>{status}</p>
+            </span>
+          </button>
+        )}
         {group || conversation.blocked ? null : (
           <button type="button" className={iconButton} aria-label="Start voice call" onClick={() => void call.startCall(conversation.peer, conversation.id)}>
             <PhoneIcon className="h-5 w-5" />
@@ -320,6 +378,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
               setInfoOpen(false)
               navigate('/')
             }}
+            onOpenProfile={(member) => openProfile(profileFromMember(member), 'group')}
           />
         ) : null}
         {infoOpen && !group ? (
@@ -342,7 +401,11 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
               >
                 {conversation.blockedByMe ? 'Unblock' : 'Block'}
               </button>
-              <button type="button" className="h-9 flex-1 rounded-lg border border-line px-2 text-xs font-medium" onClick={() => setReporting(true)}>
+              <button
+                type="button"
+                className="h-9 flex-1 rounded-lg border border-line px-2 text-xs font-medium"
+                onClick={() => setReporting({ id: conversation.peer.id, username: conversation.peer.username })}
+              >
                 Report
               </button>
             </div>
@@ -463,6 +526,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
                   void act(chat.react(message.id, emoji))
                 }}
                 onOpenImage={(src) => setLightbox(src)}
+                onOpenSender={showSenderName(mine, group) && sender ? () => openProfile(profileFromMember(sender), 'group') : undefined}
               />
             </div>
           )
@@ -532,12 +596,23 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
         />
       </div>
       )}
-      {reporting && !group ? (
+      {profilePerson ? (
+        <ProfileSheet
+          person={profilePerson}
+          meId={profile?.id ?? ''}
+          sourceConversationId={conversation.id}
+          directPeerIds={group ? directPeerIds : [...directPeerIds, profilePerson.id]}
+          groupMemberIds={group ? members.map((member) => member.id) : []}
+          onClose={() => setProfilePerson(null)}
+          onReport={(person) => setReporting({ id: person.id, username: person.username })}
+        />
+      ) : null}
+      {reporting ? (
         <ReportDialog
-          username={conversation.peer.username}
-          onClose={() => setReporting(false)}
+          username={reporting.username}
+          onClose={() => setReporting(null)}
           onSubmit={async (reason, details) => {
-            await chat.reportUser(conversation.peer.id, reason, details, conversation.id)
+            await chat.reportUser(reporting.id, reason, details, conversation.id)
             chat.pushToast('Report sent')
           }}
         />
@@ -577,6 +652,7 @@ function MessageRow({
   onEdit,
   onToggleReaction,
   onOpenImage,
+  onOpenSender,
 }: {
   message: Message
   mine: boolean
@@ -600,6 +676,7 @@ function MessageRow({
   onEdit: () => void
   onToggleReaction: (emoji: string) => void
   onOpenImage: (src: string) => void
+  onOpenSender?: () => void
 }) {
   const deleted = Boolean(message.deletedAt)
   const tick = receiptTick(message, receiptsShared)
@@ -653,7 +730,13 @@ function MessageRow({
       onContextMenu={(event) => event.preventDefault()}
     >
       {(pos === 'start' || pos === 'single') && showSender ? (
-        <DisplayName name={senderName} creator={senderCreator} className="msg-sender mb-0.5 px-1 text-[11px] font-medium text-mist" />
+        onOpenSender ? (
+          <button type="button" className="msg-sender mb-0.5 px-1 text-left text-[11px] font-medium" aria-label={`View @${senderName}`} onClick={onOpenSender}>
+            <DisplayName name={senderName} creator={senderCreator} className="text-[11px] font-medium" />
+          </button>
+        ) : (
+          <DisplayName name={senderName} creator={senderCreator} className="msg-sender mb-0.5 px-1 text-[11px] font-medium text-mist" />
+        )
       ) : null}
       {!deleted ? (
         <div className={`msg-actions absolute top-1 z-10 flex gap-0.5 rounded-full border border-line bg-panel p-0.5 shadow-sm ${mine ? 'right-1' : 'left-1'}`} hidden={!actionsOpen}>
