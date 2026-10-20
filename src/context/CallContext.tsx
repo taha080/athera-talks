@@ -48,7 +48,7 @@ import {
   waitForIceCandidate,
   type IcePolicy,
 } from '../lib/webrtc'
-import { endedCallStatus } from '../lib/callLog'
+import { endedCallStatus, shouldRecordCall } from '../lib/callLog'
 import { profileIsCreator } from '../services/liveBackend'
 import { closeOutbox, sendSignal, subscribeSignals } from '../services/signaling'
 import type { CallSignal, Profile } from '../types'
@@ -115,6 +115,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const hangupRef = useRef<() => Promise<void>>(async () => {})
   const startedAtRef = useRef<string | null>(null)
   const loggedRef = useRef(false)
+  const callIdRef = useRef<string | null>(null)
+  const callerHungUpRef = useRef(false)
   stateRef.current = state
   profileRef.current = profile
   modeRef.current = mode
@@ -222,7 +224,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const deliver = useCallback(
     async (to: Profile, signal: CallSignal) => {
       if (mode !== 'live') return
-      await sendSignal(to.id, signal)
+      const callId = signal.callId ?? callIdRef.current ?? undefined
+      await sendSignal(to.id, callId ? { ...signal, callId } : signal)
     },
     [mode],
   )
@@ -252,8 +255,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
     const snap = stateRef.current
     const me = profileRef.current
     if (!me || !snap.conversationId || !snap.peer || snap.phase === 'idle' || snap.phase === 'failed') return
-    loggedRef.current = true
     const role = roleRef.current === 'callee' ? 'callee' : 'caller'
+    if (!shouldRecordCall({ role, callerSentHangup: callerHungUpRef.current })) {
+      loggedRef.current = true
+      return
+    }
+    loggedRef.current = true
+    if (!callIdRef.current) callIdRef.current = crypto.randomUUID()
+    const clientId = callIdRef.current
     const answered = Boolean(snap.connectedAt)
     const endedAt = new Date().toISOString()
     void api
@@ -267,9 +276,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
         endedAt,
         status: endedCallStatus({ answered, reason, role }),
         durationSeconds: answered && snap.connectedAt ? Math.max(0, Math.round((Date.now() - snap.connectedAt) / 1000)) : 0,
+        clientId,
       })
-      .catch(() => {
-        loggedRef.current = false
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : ''
+        if (!/duplicate key|calls_client_id/i.test(message)) loggedRef.current = false
       })
   }, [api])
 
@@ -546,6 +557,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
       if (!me || signal.from.id === me.id) return
       const phase = stateRef.current.phase
       const currentId = stateRef.current.conversationId
+      if (typeof signal.callId === 'string' && signal.callId) {
+        const active = currentId ?? activeCallRef.current
+        const sameCall = Boolean(active && signal.conversationId === active)
+        if (phase === 'idle' || (sameCall && !callIdRef.current)) callIdRef.current = signal.callId
+      }
 
       if (signal.kind === 'offer' && signal.sdp && activeCallRef.current === signal.conversationId) {
         const pc = pcRef.current
@@ -587,6 +603,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
         if (phase === 'idle' && !activeCallRef.current) {
           activeCallRef.current = signal.conversationId
           roleRef.current = 'callee'
+          callerHungUpRef.current = false
+          callIdRef.current = typeof signal.callId === 'string' && signal.callId ? signal.callId : crypto.randomUUID()
           startedAtRef.current = new Date().toISOString()
           loggedRef.current = false
           const peer = mode === 'live'
@@ -597,7 +615,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
         }
         if ((currentId ?? activeCallRef.current) === signal.conversationId) return
         if (signal.kind === 'ring') {
-          await deliver(signal.from, { kind: 'reject', conversationId: signal.conversationId, from: me })
+          await deliver(signal.from, {
+            kind: 'reject',
+            conversationId: signal.conversationId,
+            from: me,
+            callId: signal.callId,
+          })
         }
         return
       }
@@ -638,6 +661,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       }
 
       if (signal.kind === 'reject' || signal.kind === 'hangup') {
+        if (signal.kind === 'hangup') callerHungUpRef.current = true
         cleanupMedia()
         dispatch({ type: 'hangup' })
         setBanner(signal.kind === 'reject' ? 'Call declined' : 'Call ended')
@@ -831,6 +855,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
       if (!me || stateRef.current.phase !== 'idle') return
       activeCallRef.current = conversationId
       roleRef.current = 'caller'
+      callerHungUpRef.current = false
+      callIdRef.current = crypto.randomUUID()
       startedAtRef.current = new Date().toISOString()
       loggedRef.current = false
       relayTriedRef.current = false
@@ -907,10 +933,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
     async (kind: 'reject' | 'hangup') => {
       const snap = stateRef.current
       const me = profileRef.current
+      const reason = kind === 'reject' ? 'reject' : 'hangup'
+      recordCall(reason)
+      if (kind === 'hangup' && roleRef.current === 'caller') callerHungUpRef.current = true
       if (me && snap.peer && snap.conversationId && mode === 'live' && snap.phase !== 'idle') {
         await deliver(snap.peer, { kind, conversationId: snap.conversationId, from: me }).catch(() => {})
       }
-      recordCall(kind === 'reject' ? 'reject' : 'hangup')
       cleanupMedia()
       dispatch({ type: 'hangup' })
     },

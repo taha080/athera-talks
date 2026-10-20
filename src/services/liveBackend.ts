@@ -2,6 +2,7 @@ import { normalizeUsername, usernameIssue } from '../lib/auth'
 import { parseWallpaper } from '../lib/appearance'
 import { baseMime, mediaBucket } from '../lib/media'
 import { messageKind } from '../lib/messages'
+import { isDuplicateCallInsert } from '../lib/callLog'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform, extensionForMime, parseWaveform } from '../lib/voice'
 import { getSupabase } from '../lib/supabase'
@@ -833,6 +834,7 @@ export const liveChat = {
   },
 
   async logCall(input: Omit<CallLog, 'id'>): Promise<CallLog> {
+    const columns = 'id, conversation_id, caller_id, callee_id, call_type, started_at, answered_at, ended_at, status, duration_seconds'
     const { data, error } = await client()
       .from('calls')
       .insert({
@@ -845,10 +847,17 @@ export const liveChat = {
         ended_at: input.endedAt,
         status: input.status,
         duration_seconds: input.durationSeconds,
+        client_id: input.clientId ?? null,
       })
-      .select('id, conversation_id, caller_id, callee_id, call_type, started_at, answered_at, ended_at, status, duration_seconds')
+      .select(columns)
       .single()
-    if (error) throw new Error(error.message)
+    if (error) {
+      if (isDuplicateCallInsert(error) && input.clientId) {
+        const existing = await client().from('calls').select(columns).eq('client_id', input.clientId).maybeSingle()
+        if (existing.data) return mapCall(existing.data as CallRow)
+      }
+      throw new Error(error.message)
+    }
     return mapCall(data as CallRow)
   },
 

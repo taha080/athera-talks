@@ -433,6 +433,10 @@ export function createDemoBackend(options: Options = {}) {
       const conversation = data.conversations.find((item) => item.id === input.conversationId)
       if (!conversation || !conversation.memberIds.includes(me)) throw new Error('That chat is not yours.')
       if (input.callerId !== me && input.calleeId !== me) throw new Error('Only people on the call can log it.')
+      const existing = input.clientId
+        ? (data.calls ?? []).find((call) => call.clientId === input.clientId)
+        : undefined
+      if (existing) return existing
       const call: CallLog = { ...input, id: newId('call') }
       data.calls = [...(data.calls ?? []), call]
       save()
