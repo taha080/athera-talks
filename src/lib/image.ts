@@ -1,5 +1,6 @@
 // Shrink avatars before upload so Storage and the demo's local save stay small.
 export async function squareAvatar(file: File, size = 256): Promise<Blob> {
+  if (file.type.toLowerCase().split(';')[0]?.trim() === 'image/gif' || file.name.toLowerCase().endsWith('.gif')) return file
   const bitmap = await createImageBitmap(file)
   const canvas = document.createElement('canvas')
   canvas.width = size

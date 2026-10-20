@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { AVATAR_BYTES } from '../lib/avatarFile'
 import { squareAvatar } from '../lib/image'
 import { fieldClass, ghostButton } from '../lib/styles'
 import type { Conversation, GroupMember, Profile } from '../types'
@@ -85,7 +86,12 @@ export function GroupPanel({
               const file = event.target.files?.[0]
               event.target.value = ''
               if (!file) return
-              void run(squareAvatar(file).then((blob) => onPhoto(blob)))
+              void run(
+                (async () => {
+                  if (file.size > AVATAR_BYTES) throw new Error('Choose an image under 30 MB.')
+                  await onPhoto(await squareAvatar(file))
+                })(),
+              )
             }}
           />
         </label>

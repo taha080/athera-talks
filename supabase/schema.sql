@@ -482,7 +482,7 @@ values (
   'avatars',
   'avatars',
   true,
-  2097152,
+  31457280,
   array['image/png', 'image/jpeg', 'image/webp', 'image/gif']
 )
 on conflict (id) do update
@@ -2350,8 +2350,8 @@ notify pgrst, 'reload schema';
 -- image/jpeg to <user-id>/avatar.jpg, including when the person picked a GIF.
 -- These rules still allow that upload. They only stop a non-creator from
 -- storing an image/gif object or a .gif name, and from saving a GIF URL on
--- their profile. The avatars bucket limit rises to 5 MB so a creator GIF fits.
--- Still photos stay small because the app compresses them before upload.
+-- their profile. The avatars bucket limit is 30 MB so a creator GIF fits.
+-- Still photos stay small because the app compresses them before upload. GIFs are stored as uploaded.
 
 create schema if not exists private;
 
@@ -2375,7 +2375,7 @@ revoke all on function private.viewer_is_creator() from public, anon, authentica
 grant execute on function private.viewer_is_creator() to authenticated;
 
 update storage.buckets
-set file_size_limit = 5242880,
+set file_size_limit = 31457280,
     allowed_mime_types = array['image/png', 'image/jpeg', 'image/webp', 'image/gif']
 where id = 'avatars';
 
@@ -3627,7 +3627,7 @@ values (
   'group-photos',
   'group-photos',
   true,
-  2097152,
+  31457280,
   array['image/jpeg', 'image/png', 'image/webp']
 )
 on conflict (id) do update

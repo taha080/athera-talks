@@ -1,8 +1,7 @@
 import { squareAvatar } from './image'
 
 export const CREATOR_GIF_MESSAGE = 'Animated GIF avatars are for the creator only.'
-export const GIF_AVATAR_BYTES = 5 * 1024 * 1024
-export const STILL_AVATAR_BYTES = 2_000_000
+export const AVATAR_BYTES = 31_457_280
 
 const STILL_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 
@@ -15,7 +14,7 @@ export function isGifAvatar(file: { name: string; type: string }): boolean {
 export function avatarKind(file: { name: string; type: string; size: number }, creator: boolean): 'gif' | 'still' {
   if (isGifAvatar(file)) {
     if (!creator) throw new Error(CREATOR_GIF_MESSAGE)
-    if (file.size > GIF_AVATAR_BYTES) throw new Error('Choose a GIF under 5 MB.')
+    if (file.size > AVATAR_BYTES) throw new Error('Choose a GIF under 30 MB.')
     return 'gif'
   }
   const type = file.type.toLowerCase().split(';')[0]?.trim() ?? ''
@@ -25,7 +24,7 @@ export function avatarKind(file: { name: string; type: string; size: number }, c
   if ((type && !STILL_TYPES.has(type)) || (!type && !stillName)) {
     throw new Error('Choose a PNG, JPG, or WebP image.')
   }
-  if (file.size > STILL_AVATAR_BYTES) throw new Error('Choose an image under 2 MB.')
+  if (file.size > AVATAR_BYTES) throw new Error('Choose an image under 30 MB.')
   return 'still'
 }
 
