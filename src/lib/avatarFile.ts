@@ -1,6 +1,6 @@
 import { squareAvatar } from './image'
 
-export const CREATOR_GIF_MESSAGE = 'Animated GIF avatars are for the creator only.'
+export const CREATOR_GIF_MESSAGE = 'Animated GIF avatars are for Premium and the creator.'
 export const AVATAR_BYTES = 31_457_280
 
 const STILL_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])

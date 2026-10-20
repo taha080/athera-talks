@@ -1,6 +1,7 @@
 import { normalizeUsername, passwordIssue, usernameIssue } from '../lib/auth'
 import { parseWallpaper } from '../lib/appearance'
 import { messagePreview, newestFirstPage } from '../lib/messages'
+import { hasPremium } from '../lib/premium'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform } from '../lib/voice'
 import { byChatOrder, REPORT_REASONS } from '../lib/chatList'
@@ -234,6 +235,7 @@ export function createDemoBackend(options: Options = {}) {
             avatarUrl: conversation.photoUrl ?? null,
             favouriteAnime: null,
             isCreator: false,
+            isPremium: false,
             showReadReceipts: true,
           }
         : {
@@ -682,6 +684,7 @@ export function createDemoBackend(options: Options = {}) {
             username: profile?.username ?? 'fan',
             avatarUrl: profile?.avatarUrl ?? null,
             isCreator: Boolean(profile?.isCreator),
+            isPremium: hasPremium(profile),
             blockedAt: block.createdAt,
           }
         })
@@ -791,6 +794,7 @@ export function createDemoBackend(options: Options = {}) {
           avatarUrl: profile?.avatarUrl ?? null,
           favouriteAnime: profile?.favouriteAnime ?? null,
           isCreator: Boolean(profile?.isCreator),
+          isPremium: hasPremium(profile),
           role: conversation.roles?.[id] ?? 'member',
           lastSeenAt: visibleLastSeen(profile?.lastSeenAt, profile?.showLastSeen, viewer?.isCreator === true),
         }

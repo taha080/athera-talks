@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { appendMessage, foldConversation } from '../lib/conversations'
 import { messagePreview } from '../lib/messages'
+import { hasPremium } from '../lib/premium'
 import {
   noticePreview,
   shouldPlayMessageSound,
@@ -27,6 +28,7 @@ export type MessageNotice = {
   conversationId: string
   senderName: string
   senderCreator: boolean
+  senderPremium?: boolean
   avatarUrl: string | null
   preview: string
   groupTitle: string | null
@@ -171,6 +173,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         return {
           name: convo.peer.username,
           creator: Boolean(convo.peer.isCreator),
+          premium: hasPremium(convo.peer),
           avatarUrl: convo.peer.avatarUrl ?? null,
           groupTitle: null as string | null,
         }
@@ -188,6 +191,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       return {
         name: sender?.username ?? 'member',
         creator: Boolean(sender?.isCreator),
+        premium: hasPremium(sender),
         avatarUrl: sender?.avatarUrl ?? null,
         groupTitle: convo.title?.trim() || 'Group',
       }
@@ -258,6 +262,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           conversationId: ready.conversationId,
           senderName: sender.name,
           senderCreator: sender.creator,
+          senderPremium: sender.premium,
           avatarUrl: sender.avatarUrl,
           preview,
           groupTitle: sender.groupTitle,

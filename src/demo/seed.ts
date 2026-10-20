@@ -93,7 +93,7 @@ export function buildSeed(now = Date.now()): DemoData {
 
   const profiles: Profile[] = [
     { id: TAHA_ID, username: 'taha', avatarUrl: null, favouriteAnime: 'Attack on Titan', theme: 'midnight', wallpaper: 'plain', lastSeenAt: at(15_000), showLastSeen: true, showReadReceipts: true, notifySound: true, notifyDesktop: true, isCreator: true },
-    { id: SAKURA_ID, username: 'sakura', avatarUrl: null, favouriteAnime: 'Demon Slayer', lastSeenAt: at(20_000), showReadReceipts: true },
+    { id: SAKURA_ID, username: 'sakura', avatarUrl: null, favouriteAnime: 'Demon Slayer', lastSeenAt: at(20_000), showReadReceipts: true, premiumFrom: null, premiumUntil: new Date(now + 14 * day).toISOString(), isPremium: true },
     { id: KENJI_ID, username: 'kenji', avatarUrl: null, favouriteAnime: 'One Piece', lastSeenAt: at(2 * hour), showReadReceipts: true },
     { id: MIRA_ID, username: 'mira', avatarUrl: null, favouriteAnime: 'Spy x Family', lastSeenAt: at(5 * hour), showReadReceipts: false },
     { id: REN_ID, username: 'ren', avatarUrl: null, favouriteAnime: 'Frieren', lastSeenAt: at(10 * 60_000), showReadReceipts: true },

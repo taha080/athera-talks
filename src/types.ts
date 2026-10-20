@@ -49,6 +49,9 @@ export type Profile = {
   notifySound?: boolean
   notifyDesktop?: boolean
   isCreator?: boolean
+  isPremium?: boolean
+  premiumFrom?: string | null
+  premiumUntil?: string | null
 }
 
 export type ReplyTarget = {
@@ -132,6 +135,7 @@ export type GroupMember = {
   avatarUrl: string | null
   favouriteAnime: string | null
   isCreator: boolean
+  isPremium?: boolean
   role: MemberRole
   lastSeenAt?: string | null
 }
@@ -141,6 +145,7 @@ export type BlockedPerson = {
   username: string
   avatarUrl: string | null
   isCreator: boolean
+  isPremium?: boolean
   blockedAt: string
 }
 

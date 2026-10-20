@@ -4,6 +4,7 @@ import { useChat } from '../context/ChatContext'
 import { isGroup } from '../lib/chatList'
 import { isOnline, presenceLabel } from '../lib/presence'
 import { canViewSharedProfile } from '../lib/profileAccess'
+import { hasPremium } from '../lib/premium'
 import type { Profile } from '../types'
 import { Avatar } from './Avatar'
 import { DisplayName } from './CreatorBadge'
@@ -15,6 +16,7 @@ export type SharedProfile = {
   avatarUrl: string | null
   favouriteAnime: string | null
   isCreator: boolean
+  isPremium?: boolean
   lastSeenAt: string | null
 }
 
@@ -101,8 +103,8 @@ export function ProfileSheet({
           </button>
         </div>
         <div className="flex flex-col items-center text-center">
-          <Avatar name={person.username} url={person.avatarUrl} size="xl" online={online} creator={person.isCreator} />
-          <DisplayName name={`@${person.username}`} creator={person.isCreator} className="mt-3 text-lg font-semibold" />
+          <Avatar name={person.username} url={person.avatarUrl} size="xl" online={online} creator={person.isCreator} premium={hasPremium(person)} />
+          <DisplayName name={`@${person.username}`} creator={person.isCreator} premium={hasPremium(person)} className="mt-3 text-lg font-semibold" />
           {presence ? <p className={`mt-1 text-sm ${online ? 'text-foam' : 'profile-kicker'}`}>{presence}</p> : null}
           <p className="profile-kicker mt-4 text-[11px] font-medium uppercase tracking-[0.14em]">Favourite anime</p>
           <p className="mt-1 text-sm">{person.favouriteAnime || 'Not set'}</p>
@@ -122,6 +124,7 @@ export function ProfileSheet({
                   avatarUrl: person.avatarUrl,
                   favouriteAnime: person.favouriteAnime,
                   isCreator: person.isCreator,
+                  isPremium: hasPremium(person),
                   lastSeenAt: person.lastSeenAt,
                 }
                 await call.startCall(peer, conversationId)
