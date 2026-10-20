@@ -400,7 +400,7 @@ function PrivacySection() {
       </section>
       <Toggle
         label="Message sound"
-        detail="A short tone plays when a new message arrives."
+        detail="A short chime plays with each message pop-up."
         checked={profile.notifySound !== false}
         onChange={(checked) => void toggle({ notifySound: checked })}
       />

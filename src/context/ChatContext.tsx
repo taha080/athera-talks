@@ -16,7 +16,7 @@ import {
   shouldShowMessageNotice,
   stackNotices,
 } from '../lib/notice'
-import { desktopNotice, playMessageTone } from '../lib/notify'
+import { armNoticeChime, desktopNotice, playMessageTone, playNoticeChime } from '../lib/notify'
 import type { BlockedPerson, ChatPrefPatch, ContactRequest, Conversation, GroupMember, MemberRole, Message, OutgoingMedia, ReactionChange, ReplyTarget, SearchPerson, UserReport } from '../types'
 import { useSession } from './SessionContext'
 
@@ -242,7 +242,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         const sender = await senderFor(convo, ready.senderId)
         const preview = noticePreview(ready)
         const prefs = profileRef.current
-        if (shouldPlayMessageSound({ show: true, notifySound: prefs?.notifySound !== false })) playMessageTone()
+        if (shouldPlayMessageSound({ show: true, notifySound: prefs?.notifySound !== false })) playNoticeChime()
         if (
           shouldShowDesktopNotification({
             show: true,
@@ -266,6 +266,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     },
     [applyUpdate, chat, me, pushNotice, refresh, senderFor],
   )
+
+  useEffect(() => {
+    armNoticeChime()
+  }, [])
 
   useEffect(() => {
     if (!profile) {
