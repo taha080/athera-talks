@@ -67,6 +67,7 @@ export type OutgoingMedia = {
   seconds?: number
   waveform?: number[]
   reply?: ReplyTarget | null
+  caption?: string
 }
 
 export type Reaction = {

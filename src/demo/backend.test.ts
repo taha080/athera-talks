@@ -90,6 +90,16 @@ describe('demo auth and chat', () => {
     expect(deleted?.deletedAt).toBeTruthy()
     const list = await demo.listConversations()
     expect(list.find((chat) => chat.id === SAKURA_CHAT)?.lastMessage?.body).toBe('This message was deleted')
+    const photo = await demo.sendMedia({
+      conversationId: SAKURA_CHAT,
+      kind: 'image',
+      file: new Blob(['gif'], { type: 'image/gif' }),
+      mime: 'image/gif',
+      caption: 'look',
+    })
+    expect(photo.kind).toBe('image')
+    expect(photo.mediaMime).toBe('image/gif')
+    expect(photo.body).toBe('look')
   })
 
   it('matches only a full username and hides either side of a block', async () => {

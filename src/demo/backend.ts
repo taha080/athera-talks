@@ -620,7 +620,7 @@ export function createDemoBackend(options: Options = {}) {
         id: newId('msg'),
         conversationId: input.conversationId,
         senderId: me,
-        body: input.kind === 'voice' ? 'Voice message' : 'Photo',
+        body: input.kind === 'voice' ? 'Voice message' : input.caption?.trim() || 'Photo',
         createdAt: new Date().toISOString(),
         readAt: null,
         kind: input.kind,

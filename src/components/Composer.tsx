@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { CHAT_IMAGE_BYTES, imageFromClipboard, isChatImage, prepareChatImage } from '../lib/pasteImage'
 import { shouldAnnounceTyping } from '../lib/typing'
 import { EMOJI } from '../lib/emoji'
-import { fitImage } from '../lib/image'
 import { encodeWaveform, pickAudioMime } from '../lib/voice'
 import { formatDuration } from '../lib/format'
 import type { ReplyTarget } from '../types'
@@ -18,17 +18,22 @@ export function Composer({
   onTyping,
   editing = null,
   onCancelEdit,
+  incomingFile = null,
+  onIncomingHandled,
 }: {
   peerName: string
   reply: ReplyTarget | null
   onClearReply: () => void
   onSendText: (body: string) => Promise<void>
-  onSendFile: (file: Blob, mime: string, kind: 'voice' | 'image', seconds?: number, waveform?: number[]) => Promise<void>
+  onSendFile: (file: Blob, mime: string, kind: 'voice' | 'image', seconds?: number, waveform?: number[], caption?: string) => Promise<void>
   onTyping: (typing: boolean) => void
   editing?: { id: string; body: string } | null
   onCancelEdit?: () => void
+  incomingFile?: File | null
+  onIncomingHandled?: () => void
 }) {
   const [draft, setDraft] = useState('')
+  const [pending, setPending] = useState<{ file: File; url: string } | null>(null)
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [phase, setPhase] = useState<Phase>('idle')
   const [seconds, setSeconds] = useState(0)
@@ -77,6 +82,8 @@ export function Composer({
   }
 
   const typingOn = useRef(false)
+  const pendingUrl = useRef<string | null>(null)
+  const sendingPhoto = useRef(false)
   const notifyTyping = useRef(onTyping)
   notifyTyping.current = onTyping
 
@@ -101,6 +108,39 @@ export function Composer({
     notifyTyping.current(true)
   }
 
+  function clearPending() {
+    if (pendingUrl.current) URL.revokeObjectURL(pendingUrl.current)
+    pendingUrl.current = null
+    setPending(null)
+  }
+
+  function stageImage(file: File) {
+    if (editing) return
+    setError('')
+    if (!isChatImage(file)) {
+      setError('Choose an image file.')
+      return
+    }
+    if (file.size > CHAT_IMAGE_BYTES) {
+      setError('Choose an image under 30 MB.')
+      return
+    }
+    if (pendingUrl.current) URL.revokeObjectURL(pendingUrl.current)
+    const url = URL.createObjectURL(file)
+    pendingUrl.current = url
+    setPending({ file, url })
+  }
+
+  useEffect(() => {
+    if (!incomingFile) return
+    stageImage(incomingFile)
+    onIncomingHandled?.()
+  }, [incomingFile])
+
+  useEffect(() => () => {
+    if (pendingUrl.current) URL.revokeObjectURL(pendingUrl.current)
+  }, [])
+
   useEffect(() => {
     function onHide() {
       if (document.visibilityState === 'hidden') stopTyping()
@@ -112,7 +152,32 @@ export function Composer({
     }
   }, [])
 
+  async function sendPending() {
+    if (!pending || sendingPhoto.current) return
+    sendingPhoto.current = true
+    const file = pending.file
+    const caption = draft.trim()
+    setError('')
+    try {
+      const prepared = await prepareChatImage(file)
+      await onSendFile(prepared.blob, prepared.mime, 'image', undefined, undefined, caption)
+      clearPending()
+      setDraft('')
+      stopTyping()
+      setEmojiOpen(false)
+      if (box.current) box.current.style.height = 'auto'
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send that photo.')
+    } finally {
+      sendingPhoto.current = false
+    }
+  }
+
   async function submitText() {
+    if (pending && !editing) {
+      await sendPending()
+      return
+    }
     const body = draft.trim()
     if (!body) return
     setDraft('')
@@ -132,10 +197,8 @@ export function Composer({
     if (!file) return
     setError('')
     try {
-      if (!file.type.startsWith('image/')) throw new Error('Choose an image file.')
-      if (file.size > 8_000_000) throw new Error('Choose an image under 8 MB.')
-      const blob = await fitImage(file, 1600)
-      await onSendFile(blob, 'image/jpeg', 'image')
+      const prepared = await prepareChatImage(file)
+      await onSendFile(prepared.blob, prepared.mime, 'image')
       setEmojiOpen(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send that photo.')
@@ -259,6 +322,18 @@ export function Composer({
           </button>
         </div>
       ) : null}
+      {pending && !editing ? (
+        <div className="mb-2 flex items-center gap-2 rounded-lg bg-elevated px-2 py-2" data-photo-preview="true">
+          <img src={pending.url} alt="" className="h-14 w-14 rounded-lg object-cover" />
+          <p className="min-w-0 flex-1 truncate text-xs text-mist">{draft.trim() ? draft.trim() : 'Photo ready'}</p>
+          <button type="button" className="rounded-lg px-2 py-1 text-sm text-mist hover:text-paper" onClick={clearPending}>
+            Cancel
+          </button>
+          <button type="button" className="rounded-lg bg-sakura px-3 py-1 text-sm font-medium text-white" onClick={() => void sendPending()}>
+            Send
+          </button>
+        </div>
+      ) : null}
       {emojiOpen ? (
         <div className="mb-2 grid grid-cols-8 gap-1 rounded-lg bg-elevated p-2" role="listbox" aria-label="Emoji">
           {EMOJI.map((emoji) => (
@@ -318,8 +393,14 @@ export function Composer({
               rows={1}
               maxLength={4000}
               value={draft}
-              placeholder={editing ? 'Edit message' : `Message ${peerName}`}
+              placeholder={editing ? 'Edit message' : pending ? 'Add a caption' : `Message ${peerName}`}
               onBlur={() => stopTyping()}
+              onPaste={(event) => {
+                const file = imageFromClipboard(event.clipboardData)
+                if (!file) return
+                event.preventDefault()
+                stageImage(file)
+              }}
               onChange={(event) => {
                 noteTyping(event.target.value)
                 grow(event.target)
@@ -332,7 +413,7 @@ export function Composer({
               }}
             />
           </label>
-          {draft.trim() || editing ? (
+          {draft.trim() || editing || pending ? (
             <button type="submit" className="send-button grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label={editing ? 'Save edit' : 'Send message'}>
               <SendIcon className="h-5 w-5" />
             </button>
