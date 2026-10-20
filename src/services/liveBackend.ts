@@ -5,7 +5,7 @@ import { messageKind } from '../lib/messages'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform, extensionForMime, parseWaveform } from '../lib/voice'
 import { getSupabase } from '../lib/supabase'
-import type { BlockedPerson, ChatPrefPatch, ContactRequest, ContactStatus, Conversation, GroupMember, MemberRole, Message, MessageListener, MessageReceipt, OutgoingMedia, Profile, Reaction, ReactionChange, ReplyTarget, SearchPerson, UserReport } from '../types'
+import type { BlockedPerson, CallLog, CallStatus, CallType, ChatPrefPatch, ContactRequest, ContactStatus, Conversation, GroupMember, MemberRole, Message, MessageListener, MessageReceipt, OutgoingMedia, Profile, Reaction, ReactionChange, ReplyTarget, SearchPerson, UserReport } from '../types'
 
 const PROFILE_COLUMNS =
   'id, username, avatar_url, favourite_anime, theme, wallpaper, wallpaper_path, last_seen_at, show_last_seen, show_read_receipts, notify_sound, notify_desktop, is_creator'
@@ -135,6 +135,39 @@ export function mapMessage(row: MessageRow): Message {
     replyPreview: row.reply_preview ?? null,
     deletedAt: row.deleted_at ?? null,
     editedAt: row.edited_at ?? null,
+  }
+}
+
+type CallRow = {
+  id: string
+  conversation_id: string
+  caller_id: string
+  callee_id: string | null
+  call_type: string
+  started_at: string
+  answered_at: string | null
+  ended_at: string
+  status: string
+  duration_seconds: number
+}
+
+function mapCall(row: CallRow): CallLog {
+  const callType: CallType = row.call_type === 'video' ? 'video' : 'voice'
+  const status: CallStatus =
+    row.status === 'missed' || row.status === 'declined' || row.status === 'cancelled' || row.status === 'completed'
+      ? row.status
+      : 'cancelled'
+  return {
+    id: row.id,
+    conversationId: row.conversation_id,
+    callerId: row.caller_id,
+    calleeId: row.callee_id,
+    callType,
+    startedAt: row.started_at,
+    answeredAt: row.answered_at,
+    endedAt: row.ended_at,
+    status,
+    durationSeconds: row.duration_seconds ?? 0,
   }
 }
 
@@ -783,6 +816,51 @@ export const liveChat = {
         if (!row.message_id || !row.user_id || !row.emoji) return
         onChange({ messageId: row.message_id, userId: row.user_id, emoji: row.emoji, removed })
       })
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  },
+
+  async listCalls(conversationId: string): Promise<CallLog[]> {
+    const { data, error } = await client()
+      .from('calls')
+      .select('id, conversation_id, caller_id, callee_id, call_type, started_at, answered_at, ended_at, status, duration_seconds')
+      .eq('conversation_id', conversationId)
+      .order('ended_at', { ascending: true })
+    if (error) throw new Error(error.message)
+    return (data ?? []).map(mapCall)
+  },
+
+  async logCall(input: Omit<CallLog, 'id'>): Promise<CallLog> {
+    const { data, error } = await client()
+      .from('calls')
+      .insert({
+        conversation_id: input.conversationId,
+        caller_id: input.callerId,
+        callee_id: input.calleeId,
+        call_type: input.callType,
+        started_at: input.startedAt,
+        answered_at: input.answeredAt,
+        ended_at: input.endedAt,
+        status: input.status,
+        duration_seconds: input.durationSeconds,
+      })
+      .select('id, conversation_id, caller_id, callee_id, call_type, started_at, answered_at, ended_at, status, duration_seconds')
+      .single()
+    if (error) throw new Error(error.message)
+    return mapCall(data as CallRow)
+  },
+
+  subscribeCalls(conversationId: string, onInsert: (call: CallLog) => void): () => void {
+    const supabase = client()
+    const channel = supabase
+      .channel(`calls-${conversationId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'calls', filter: `conversation_id=eq.${conversationId}` },
+        (payload) => onInsert(mapCall(payload.new as CallRow)),
+      )
       .subscribe()
     return () => {
       void supabase.removeChannel(channel)

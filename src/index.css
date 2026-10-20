@@ -1013,6 +1013,19 @@ textarea:-webkit-autofill {
   box-shadow: none;
 }
 
+.call-log {
+  background: #1f2937;
+  color: #e5e7eb;
+}
+
+.call-log-time {
+  color: #9ca3af;
+}
+
+.call-log-missed {
+  color: #f0b4b4;
+}
+
 /* Midnight. Sent bubbles are #5B4B9A. Creator bubbles are flat plum with a little gold dust. */
 [data-theme='midnight'] .app-canvas {
   background-color: #0f1626;

@@ -1,4 +1,19 @@
 export type MessageKind = 'text' | 'voice' | 'image'
+export type CallType = 'voice' | 'video'
+export type CallStatus = 'completed' | 'missed' | 'declined' | 'cancelled'
+
+export type CallLog = {
+  id: string
+  conversationId: string
+  callerId: string
+  calleeId: string | null
+  callType: CallType
+  startedAt: string
+  answeredAt: string | null
+  endedAt: string
+  status: CallStatus
+  durationSeconds: number
+}
 
 export type ContactStatus = 'pending' | 'accepted' | 'declined'
 

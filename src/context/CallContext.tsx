@@ -48,6 +48,7 @@ import {
   waitForIceCandidate,
   type IcePolicy,
 } from '../lib/webrtc'
+import { endedCallStatus } from '../lib/callLog'
 import { profileIsCreator } from '../services/liveBackend'
 import { closeOutbox, sendSignal, subscribeSignals } from '../services/signaling'
 import type { CallSignal, Profile } from '../types'
@@ -79,7 +80,7 @@ type CallValue = {
 const CallContext = createContext<CallValue | null>(null)
 
 export function CallProvider({ children }: { children: ReactNode }) {
-  const { mode, profile } = useSession()
+  const { mode, profile, chat: api } = useSession()
   const [state, dispatch] = useReducer(callReducer, initialCallState)
   const [banner, setBanner] = useState<string | null>(null)
   const [debug, setDebug] = useState('')
@@ -112,6 +113,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const recoverCooldownUntilRef = useRef(0)
   const recoverRef = useRef<() => Promise<void>>(async () => {})
   const hangupRef = useRef<() => Promise<void>>(async () => {})
+  const startedAtRef = useRef<string | null>(null)
+  const loggedRef = useRef(false)
   stateRef.current = state
   profileRef.current = profile
   modeRef.current = mode
@@ -244,6 +247,32 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
   }, [noteCandidate])
 
+  const recordCall = useCallback((reason: 'hangup' | 'reject' | 'timeout') => {
+    if (loggedRef.current) return
+    const snap = stateRef.current
+    const me = profileRef.current
+    if (!me || !snap.conversationId || !snap.peer || snap.phase === 'idle' || snap.phase === 'failed') return
+    loggedRef.current = true
+    const role = roleRef.current === 'callee' ? 'callee' : 'caller'
+    const answered = Boolean(snap.connectedAt)
+    const endedAt = new Date().toISOString()
+    void api
+      .logCall({
+        conversationId: snap.conversationId,
+        callerId: role === 'callee' ? snap.peer.id : me.id,
+        calleeId: role === 'callee' ? me.id : snap.peer.id,
+        callType: 'voice',
+        startedAt: startedAtRef.current ?? endedAt,
+        answeredAt: snap.connectedAt ? new Date(snap.connectedAt).toISOString() : null,
+        endedAt,
+        status: endedCallStatus({ answered, reason, role }),
+        durationSeconds: answered && snap.connectedAt ? Math.max(0, Math.round((Date.now() - snap.connectedAt) / 1000)) : 0,
+      })
+      .catch(() => {
+        loggedRef.current = false
+      })
+  }, [api])
+
   const failFinal = useCallback(
     (message: string) => {
       if (stateRef.current.phase === 'idle' || stateRef.current.phase === 'failed') return
@@ -251,6 +280,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         scheduleBackgroundRecover()
         return
       }
+      recordCall('timeout')
       clearTimers()
       localRef.current?.getTracks().forEach((track) => track.stop())
       localRef.current = null
@@ -258,7 +288,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       pcRef.current = null
       dispatch({ type: 'fail', error: message })
     },
-    [clearTimers, scheduleBackgroundRecover],
+    [clearTimers, recordCall, scheduleBackgroundRecover],
   )
 
   const publishLink = useCallback(async () => {
@@ -556,6 +586,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
         if (signal.sdp) pendingOfferRef.current = signal.sdp
         if (phase === 'idle' && !activeCallRef.current) {
           activeCallRef.current = signal.conversationId
+          roleRef.current = 'callee'
+          startedAtRef.current = new Date().toISOString()
+          loggedRef.current = false
           const peer = mode === 'live'
             ? { ...signal.from, isCreator: await profileIsCreator(signal.from.id) }
             : signal.from
@@ -798,6 +831,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
       if (!me || stateRef.current.phase !== 'idle') return
       activeCallRef.current = conversationId
       roleRef.current = 'caller'
+      startedAtRef.current = new Date().toISOString()
+      loggedRef.current = false
       relayTriedRef.current = false
       dispatch({ type: 'start', conversationId, peer })
       setBanner(null)
@@ -875,10 +910,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
       if (me && snap.peer && snap.conversationId && mode === 'live' && snap.phase !== 'idle') {
         await deliver(snap.peer, { kind, conversationId: snap.conversationId, from: me }).catch(() => {})
       }
+      recordCall(kind === 'reject' ? 'reject' : 'hangup')
       cleanupMedia()
       dispatch({ type: 'hangup' })
     },
-    [cleanupMedia, deliver, mode],
+    [cleanupMedia, deliver, mode, recordCall],
   )
 
   const reject = useCallback(() => finish('reject'), [finish])

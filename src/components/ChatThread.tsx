@@ -4,6 +4,7 @@ import { useCall } from '../context/CallContext'
 import { useChat } from '../context/ChatContext'
 import { useSession } from '../context/SessionContext'
 import { useTheme } from '../context/ThemeContext'
+import { callLogLabel } from '../lib/callLog'
 import { wallpaperClass } from '../lib/appearance'
 import { chatTitle, isGroup, showSenderName } from '../lib/chatList'
 import { QUICK_REACTIONS, groupPosition, groupedReactions, linkHost, linkParts, type GroupPos } from '../lib/chatView'
@@ -12,7 +13,7 @@ import { messagePreview } from '../lib/messages'
 import { isOnline, presenceLabel } from '../lib/presence'
 import { receiptTick } from '../lib/receipts'
 import { iconButton } from '../lib/styles'
-import type { Conversation, GroupMember, Message, ReplyTarget } from '../types'
+import type { CallLog, Conversation, GroupMember, Message, ReplyTarget } from '../types'
 import { Avatar } from './Avatar'
 import { DisplayName } from './CreatorBadge'
 import { Composer } from './Composer'
@@ -23,7 +24,8 @@ import { BackIcon, CheckIcon, CloseIcon, CopyIcon, DownIcon, MoreIcon, PhoneIcon
 
 export function ChatThread({ conversation }: { conversation: Conversation | undefined }) {
   const navigate = useNavigate()
-  const { profile } = useSession()
+  const { profile, chat: api } = useSession()
+  const [calls, setCalls] = useState<CallLog[]>([])
   const { theme } = useTheme()
   const chat = useChat()
   const call = useCall()
@@ -60,6 +62,30 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
     () => (query ? chat.messages.filter((message) => !message.deletedAt && message.body.toLowerCase().includes(query)) : []),
     [chat.messages, query],
   )
+
+  useEffect(() => {
+    if (!conversation?.id) {
+      setCalls([])
+      return
+    }
+    let stop = () => {}
+    let cancelled = false
+    void api
+      .listCalls(conversation.id)
+      .then((rows) => {
+        if (!cancelled) setCalls(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setCalls([])
+      })
+    stop = api.subscribeCalls(conversation.id, (row) => {
+      setCalls((prev) => (prev.some((item) => item.id === row.id) ? prev : [...prev, row]))
+    })
+    return () => {
+      cancelled = true
+      stop()
+    }
+  }, [api, conversation?.id])
 
   useEffect(() => {
     setReply(null)
@@ -347,13 +373,36 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
 
       <div ref={scroller} className="chat-stream min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-6" onScroll={onScroll}>
         {chat.messagesLoading ? <MessageSkeleton /> : null}
-        {!chat.messagesLoading && chat.messages.length === 0 ? (
+        {!chat.messagesLoading && chat.messages.length === 0 && calls.length === 0 ? (
           <p className="mx-auto mt-16 max-w-xs text-center text-sm leading-6 text-mist">No messages yet. Say hello, send a photo, or tap the mic for a voice note.</p>
         ) : null}
-        {chat.messages.map((message, index) => {
-          const day = dayKey(message.createdAt)
+        {[
+          ...chat.messages.map((message) => ({ kind: 'message' as const, at: message.createdAt, message })),
+          ...calls.map((entry) => ({ kind: 'call' as const, at: entry.endedAt, call: entry })),
+        ]
+          .sort((a, b) => a.at.localeCompare(b.at))
+          .map((item) => {
+          const day = dayKey(item.at)
           const showDay = day !== lastDay
           lastDay = day
+          if (item.kind === 'call') {
+            return (
+              <div key={item.call.id} className="my-2.5">
+                {showDay ? (
+                  <div className="sticky top-2 z-10 my-3 flex justify-center">
+                    <span className="day-chip rounded-full border border-line bg-panel/95 px-3 py-1 text-[11px] font-medium text-mist shadow-sm backdrop-blur">
+                      {formatDayLabel(item.at)}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="flex justify-center">
+                  <CallLogLine call={item.call} meId={profile?.id ?? ''} at={item.at} />
+                </div>
+              </div>
+            )
+          }
+          const message = item.message
+          const index = chat.messages.indexOf(message)
           const mine = message.senderId === profile?.id
           const sender = members.find((member) => member.id === message.senderId)
           const senderName = mine ? profile?.username ?? '' : sender?.username ?? (group ? 'member' : conversation.peer.username)
@@ -758,6 +807,17 @@ export function Welcome() {
         </p>
       </div>
     </div>
+  )
+}
+
+function CallLogLine({ call, meId, at }: { call: CallLog; meId: string; at: string }) {
+  const missed = call.status === 'missed'
+  return (
+    <p className={`call-log inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs ${missed ? 'call-log-missed' : ''}`}>
+      <PhoneIcon className="h-3.5 w-3.5 shrink-0" />
+      <span>{callLogLabel({ ...call, meId })}</span>
+      <span className="call-log-time">{formatMessageTime(at)}</span>
+    </p>
   )
 }
 
