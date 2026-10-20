@@ -74,8 +74,8 @@ type ChatValue = {
   setGroupPhoto: (conversationId: string, file: Blob) => Promise<void>
   leaveGroup: (conversationId: string) => Promise<void>
   deleteGroup: (conversationId: string) => Promise<void>
-  broadcastTyping: (conversationId: string) => void
-  subscribeTyping: (conversationId: string, onTyping: (userId: string) => void) => () => void
+  broadcastTyping: (conversationId: string, typing: boolean) => void
+  subscribeTyping: (conversationId: string, onTyping: (userId: string, typing: boolean) => void) => () => void
   react: (messageId: string, emoji: string) => Promise<void>
 }
 
@@ -559,8 +559,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   )
 
   const broadcastTyping = useCallback(
-    (conversationId: string) => {
-      void chat.broadcastTyping(conversationId).catch(() => undefined)
+    (conversationId: string, typing: boolean) => {
+      void chat.broadcastTyping(conversationId, typing).catch(() => undefined)
     },
     [chat],
   )
@@ -587,7 +587,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   useEffect(() => chat.subscribeReactions(applyReaction), [applyReaction, chat])
 
   const subscribeTyping = useCallback(
-    (conversationId: string, onTyping: (userId: string) => void) => chat.subscribeTyping(conversationId, onTyping),
+    (conversationId: string, onTyping: (userId: string, typing: boolean) => void) => chat.subscribeTyping(conversationId, onTyping),
     [chat],
   )
 

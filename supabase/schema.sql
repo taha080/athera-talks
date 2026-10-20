@@ -1900,6 +1900,34 @@ begin
     return;
   end if;
 
+  if exists (
+    select 1
+    from public.profiles p
+    where p.id <> auth.uid()
+      and not private.users_blocked(auth.uid(), p.id)
+      and lower(p.username) = cleaned
+  ) then
+    return query
+    select
+      p.id,
+      p.username,
+      p.avatar_url,
+      p.favourite_anime,
+      p.is_creator,
+      r.id,
+      r.status,
+      r.from_id
+    from public.profiles p
+    left join public.contact_requests r
+      on least(r.from_id, r.to_id) = least(auth.uid(), p.id)
+     and greatest(r.from_id, r.to_id) = greatest(auth.uid(), p.id)
+    where p.id <> auth.uid()
+      and not private.users_blocked(auth.uid(), p.id)
+      and lower(p.username) = cleaned
+    limit 1;
+    return;
+  end if;
+
   cleaned := replace(replace(replace(cleaned, '\', '\\'), '%', '\%'), '_', '\_');
 
   return query
@@ -1919,7 +1947,9 @@ begin
   where p.id <> auth.uid()
     and not private.users_blocked(auth.uid(), p.id)
     and p.username ilike '%' || cleaned || '%' escape '\'
-  order by p.username
+  order by
+    case when p.username ilike cleaned || '%' escape '\' then 0 else 1 end,
+    p.username
   limit 20;
 end;
 $$;

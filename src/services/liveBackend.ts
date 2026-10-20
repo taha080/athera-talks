@@ -909,12 +909,14 @@ export const liveChat = {
     }
   },
 
-  subscribeTyping(conversationId: string, onTyping: (userId: string) => void): () => void {
+  subscribeTyping(conversationId: string, onTyping: (userId: string, typing: boolean) => void): () => void {
     const supabase = client()
     const channel = supabase.channel(`room:${conversationId}`)
     channel.on('broadcast', { event: 'typing' }, ({ payload }) => {
-      const userId = payload && typeof payload === 'object' && 'userId' in payload ? String(payload.userId) : ''
-      if (userId) onTyping(userId)
+      if (!payload || typeof payload !== 'object' || !('userId' in payload)) return
+      const userId = String(payload.userId)
+      const typing = !('typing' in payload) || payload.typing !== false
+      if (userId) onTyping(userId, typing)
     })
     void channel.subscribe()
     return () => {
@@ -922,9 +924,9 @@ export const liveChat = {
     }
   },
 
-  async broadcastTyping(conversationId: string): Promise<void> {
+  async broadcastTyping(conversationId: string, typing = true): Promise<void> {
     const userId = await currentUserId()
     const channel = client().channel(`room:${conversationId}`)
-    await channel.send({ type: 'broadcast', event: 'typing', payload: { userId } })
+    await channel.send({ type: 'broadcast', event: 'typing', payload: { userId, typing } })
   },
 }

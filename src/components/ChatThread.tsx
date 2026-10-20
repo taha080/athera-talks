@@ -11,6 +11,7 @@ import { QUICK_REACTIONS, groupPosition, groupedReactions, linkHost, linkParts, 
 import { dayKey, formatDayLabel, formatMessageTime } from '../lib/format'
 import { messagePreview } from '../lib/messages'
 import { isOnline, presenceLabel } from '../lib/presence'
+import { TYPING_TTL_MS } from '../lib/typing'
 import { canViewSharedProfile } from '../lib/profileAccess'
 import { receiptTick } from '../lib/receipts'
 import { iconButton } from '../lib/styles'
@@ -186,19 +187,38 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
 
   useEffect(() => {
     if (!conversationId || !peerId) return
-    const stop = subscribeTyping.current(conversationId, (userId) => {
+    const stop = subscribeTyping.current(conversationId, (userId, active) => {
       if (groupChat) {
         if (userId === profile?.id) return
       } else if (userId !== peerId) return
+      if (!active) {
+        if (typingTimer.current) window.clearTimeout(typingTimer.current)
+        setTyping(false)
+        return
+      }
       setTyping(true)
       if (typingTimer.current) window.clearTimeout(typingTimer.current)
-      typingTimer.current = window.setTimeout(() => setTyping(false), 3000)
+      typingTimer.current = window.setTimeout(() => setTyping(false), TYPING_TTL_MS)
     })
     return () => {
       stop()
       if (typingTimer.current) window.clearTimeout(typingTimer.current)
     }
   }, [conversationId, groupChat, peerId, profile?.id])
+
+  const peerMessageId = chat.messages.filter((message) => message.conversationId === conversationId && message.senderId === peerId).at(-1)?.id
+  useEffect(() => {
+    setTyping(false)
+  }, [peerMessageId])
+
+  const broadcastTyping = useRef(chat.broadcastTyping)
+  broadcastTyping.current = chat.broadcastTyping
+  useEffect(() => {
+    const id = conversationId
+    return () => {
+      if (id) broadcastTyping.current(id, false)
+    }
+  }, [conversationId])
 
   useEffect(() => {
     const id = matches[matchIndex]?.id
@@ -220,6 +240,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
       ? ''
       : profile.wallpaperUrl.replace(/"/g, '')
   const group = isGroup(conversation)
+  const pendingRequest = !group && chat.requests.some((request) => request.peer.id === conversation.peer.id && request.status === 'pending')
   const title = chatTitle(conversation)
   const online = group ? false : isOnline(conversation.peer.lastSeenAt)
   const status = typing ? 'typing…' : group ? `${conversation.memberCount ?? members.length} members` : presenceLabel(conversation.peer.lastSeenAt) || 'offline'
@@ -335,7 +356,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
             </span>
           </button>
         )}
-        {group || conversation.blocked ? null : (
+        {group || conversation.blocked || pendingRequest ? null : (
           <button type="button" className={iconButton} aria-label="Start voice call" onClick={() => void call.startCall(conversation.peer, conversation.id)}>
             <PhoneIcon className="h-5 w-5" />
           </button>
@@ -556,7 +577,11 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
         </button>
       ) : null}
       {actionError ? <p className="px-4 pb-1 text-sm text-danger">{actionError}</p> : null}
-      {conversation.blocked ? (
+      {pendingRequest ? (
+        <div className="border-t border-line bg-panel px-4 py-3 text-sm leading-6 text-mist">
+          You can message and call once the contact request is accepted.
+        </div>
+      ) : conversation.blocked ? (
         <div className="border-t border-line bg-panel px-4 py-3 text-sm leading-6 text-mist">
           {conversation.blockedByMe ? (
             <>
@@ -577,7 +602,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
           editing={editing}
           onCancelEdit={() => setEditing(null)}
           onClearReply={() => setReply(null)}
-          onTyping={() => chat.broadcastTyping(conversation.id)}
+          onTyping={(active) => chat.broadcastTyping(conversation.id, active)}
           onSendText={async (body) => {
             nearBottom.current = true
             if (editing) {

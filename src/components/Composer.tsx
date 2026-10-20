@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { shouldAnnounceTyping } from '../lib/typing'
 import { EMOJI } from '../lib/emoji'
 import { fitImage } from '../lib/image'
 import { encodeWaveform, pickAudioMime } from '../lib/voice'
@@ -23,7 +24,7 @@ export function Composer({
   onClearReply: () => void
   onSendText: (body: string) => Promise<void>
   onSendFile: (file: Blob, mime: string, kind: 'voice' | 'image', seconds?: number, waveform?: number[]) => Promise<void>
-  onTyping: () => void
+  onTyping: (typing: boolean) => void
   editing?: { id: string; body: string } | null
   onCancelEdit?: () => void
 }) {
@@ -75,18 +76,47 @@ export function Composer({
     node.style.height = `${Math.min(node.scrollHeight, 128)}px`
   }
 
+  const typingOn = useRef(false)
+  const notifyTyping = useRef(onTyping)
+  notifyTyping.current = onTyping
+
+  function stopTyping() {
+    if (!typingOn.current) return
+    typingOn.current = false
+    notifyTyping.current(false)
+  }
+
   function noteTyping(value: string) {
     setDraft(value)
+    if (editing) return
+    const text = value.trim()
+    if (!text) {
+      stopTyping()
+      return
+    }
     const now = Date.now()
-    if (now - lastType.current < 1500) return
+    if (typingOn.current && !shouldAnnounceTyping(text, lastType.current, now)) return
     lastType.current = now
-    onTyping()
+    typingOn.current = true
+    notifyTyping.current(true)
   }
+
+  useEffect(() => {
+    function onHide() {
+      if (document.visibilityState === 'hidden') stopTyping()
+    }
+    document.addEventListener('visibilitychange', onHide)
+    return () => {
+      document.removeEventListener('visibilitychange', onHide)
+      stopTyping()
+    }
+  }, [])
 
   async function submitText() {
     const body = draft.trim()
     if (!body) return
     setDraft('')
+    stopTyping()
     setEmojiOpen(false)
     if (box.current) box.current.style.height = 'auto'
     setError('')
@@ -236,10 +266,7 @@ export function Composer({
               key={emoji}
               type="button"
               className="hover-wash rounded-lg py-1 text-lg"
-              onClick={() => {
-                setDraft((value) => `${value}${emoji}`)
-                onTyping()
-              }}
+              onClick={() => noteTyping(`${draft}${emoji}`)}
             >
               {emoji}
             </button>
@@ -292,6 +319,7 @@ export function Composer({
               maxLength={4000}
               value={draft}
               placeholder={editing ? 'Edit message' : `Message ${peerName}`}
+              onBlur={() => stopTyping()}
               onChange={(event) => {
                 noteTyping(event.target.value)
                 grow(event.target)

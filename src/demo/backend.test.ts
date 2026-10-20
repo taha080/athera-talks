@@ -108,6 +108,8 @@ describe('demo auth and chat', () => {
     expect(await demo.searchUsers('%')).toEqual([])
     expect(await demo.searchUsers('taha')).toEqual([])
     expect((await demo.searchUsers('aza')).map((person) => person.username)).toEqual(['azan_', 'azanx'])
+    expect((await demo.searchUsers('a')).map((person) => person.username)).toEqual(['azan_', 'azanx', 'mira', 'sakura'])
+    expect((await demo.searchUsers('s')).map((person) => person.username)).toEqual(['sakura'])
     expect((await demo.searchUsers('azan_'))[0]?.avatarUrl).toBe('https://example.com/azan.gif')
     await demo.blockUser(azan)
     expect(await demo.searchUsers('_')).toEqual([])
