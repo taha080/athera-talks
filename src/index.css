@@ -348,7 +348,8 @@ body {
     radial-gradient(circle at 71% 18%, rgb(201 168 90 / 0.4) 0 0.6px, transparent 1.1px),
     radial-gradient(circle at 48% 62%, rgb(201 168 90 / 0.32) 0 0.7px, transparent 1.2px),
     radial-gradient(circle at 33% 78%, rgb(201 168 90 / 0.28) 0 0.55px, transparent 1px),
-    radial-gradient(circle at 84% 46%, rgb(201 168 90 / 0.28) 0 0.55px, transparent 1px);
+    radial-gradient(circle at 84% 46%, rgb(201 168 90 / 0.28) 0 0.55px, transparent 1px),
+    radial-gradient(circle at 58% 88%, rgb(201 168 90 / 0.28) 0 0.55px, transparent 1px);
 }
 
 .bubble-creator > * {
