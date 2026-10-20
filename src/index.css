@@ -358,7 +358,7 @@ body {
 
 @media (prefers-reduced-motion: no-preference) {
   .bubble-creator::before {
-    animation: plum-dust-fall 8s linear infinite;
+    animation: plum-dust-fall 7.6s linear infinite;
   }
 }
 
