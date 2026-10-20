@@ -11,6 +11,7 @@ import { CallScreen } from './CallScreen'
 import { AddContactIcon, ChatsIcon, GearIcon, SignOutIcon } from './Icons'
 import { Credit } from './Credit'
 import { Logo } from './Logo'
+import { MessageNotices } from './MessageNotice'
 import { Sidebar } from './Sidebar'
 
 export function Shell() {
@@ -36,6 +37,7 @@ export function Shell() {
             <Outlet />
           </section>
           <CallScreen />
+          <MessageNotices />
           <Toasts />
         </div>
       </CallProvider>
