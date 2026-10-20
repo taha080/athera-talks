@@ -46,7 +46,7 @@ export function CreatorBadge({ className, size = 18 }: { className?: string; siz
           />
         </svg>
       </span>
-      <span className="relative inline-flex" style={{ width: px, height: px, filter: 'drop-shadow(0 0 3px #f7c94899)' }}>
+      <span className="creator-seal relative inline-flex" style={{ width: px, height: px }}>
         <svg viewBox="0 0 32 32" className="h-full w-full overflow-visible" aria-hidden="true">
           <defs>
             <linearGradient id={gold} x1="4" y1="3" x2="28" y2="29" gradientUnits="userSpaceOnUse">
@@ -82,15 +82,6 @@ export function CreatorBadge({ className, size = 18 }: { className?: string; siz
         </span>
       </span>
     </span>
-  )
-}
-
-export function CreatorMessageHeader() {
-  return (
-    <p className="creator-bubble-head mb-1 flex items-center gap-1">
-      <span>Taha Ahsan</span>
-      <CreatorBadge size={14} />
-    </p>
   )
 }
 

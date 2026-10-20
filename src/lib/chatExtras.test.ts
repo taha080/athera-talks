@@ -18,6 +18,7 @@ describe('appearance', () => {
   it('groups the soft themes and pairs each with a wallpaper', () => {
     const labels = THEME_GROUPS.map((group) => group.label)
     expect(labels).toEqual(['Classic', 'Anime', 'Soft & Pretty'])
+    expect(THEME_GROUPS[0]?.themes[0]?.label).toBe('Midnight')
     const soft = THEME_GROUPS.find((group) => group.id === 'soft')
     expect(soft?.themes).toHaveLength(8)
     expect(soft?.themes.map((theme) => theme.label)).toEqual([

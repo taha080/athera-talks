@@ -64,16 +64,16 @@
 }
 
 [data-theme='midnight'] {
-  --ink: #070b16;
-  --panel: #10182b;
-  --elevated: #18233c;
-  --line: #2c3b5c;
-  --accent: #7aa2ff;
-  --accent-2: #9b7bff;
-  --mist: #a9b4cc;
+  --ink: #0f1626;
+  --panel: #151e31;
+  --elevated: #1f2937;
+  --line: #2a3548;
+  --accent: #5b4b9a;
+  --accent-2: #c4b5fd;
+  --mist: #9ca3af;
   --foam: #5ee0b5;
-  --paper: #f4f7ff;
-  --scrollbar: #31425f;
+  --paper: #e5e7eb;
+  --scrollbar: #2a3548;
   --pattern: none;
 }
 
@@ -343,13 +343,6 @@ body {
   left: 0;
   width: 3px;
   background: linear-gradient(180deg, #fbe08a 0%, #c8901a 100%);
-}
-
-.creator-bubble-head {
-  color: #9a6b0b;
-  font-size: 11.5px;
-  font-weight: 650;
-  line-height: 1.2;
 }
 
 .typing-dot {
@@ -770,6 +763,18 @@ textarea:-webkit-autofill {
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
+.creator-seal {
+  filter: drop-shadow(0 0 3px #f7c94899);
+}
+
+[data-theme='midnight'] .verified-tick {
+  filter: drop-shadow(0 0 1px #f7fbff) drop-shadow(0 0 3px rgb(76 195 255 / 0.95));
+}
+
+[data-theme='midnight'] .creator-seal {
+  filter: drop-shadow(0 0 1px #fff6cc) drop-shadow(0 0 3px rgb(247 201 72 / 0.95));
+}
+
 .creator-shine {
   position: absolute;
   top: -30%;
@@ -927,10 +932,6 @@ textarea:-webkit-autofill {
   max-width: min(78%, 28rem);
 }
 
-[data-theme='light'] .msg-sender {
-  display: none;
-}
-
 [data-theme='light'] .bubble-own,
 [data-theme='light'] .bubble-other,
 [data-theme='light'] .bubble-creator {
@@ -1015,6 +1016,105 @@ textarea:-webkit-autofill {
 [data-theme='light'] .composer-shell .bg-sakura:hover {
   background-color: #d4b3f8;
   color: #2a1840;
+  filter: none;
+  box-shadow: none;
+}
+
+/* Midnight. Flat navy chat. Gold creator bubbles keep their own shine. */
+[data-theme='midnight'] .app-canvas {
+  background-color: #0f1626;
+  background-image: none;
+}
+
+[data-theme='midnight'].wallpaper-plain,
+[data-theme='midnight'] .wallpaper-plain,
+[data-theme='midnight'] .chat-column.wallpaper-plain {
+  background-color: #0f1626;
+  background-image: none;
+}
+
+[data-theme='midnight'] .chat-header {
+  background-color: #151e31;
+  color: #e5e7eb;
+  border-color: #2a3548;
+  box-shadow: none;
+}
+
+[data-theme='midnight'] .chat-header .text-mist {
+  color: #9ca3af;
+}
+
+[data-theme='midnight'] .chat-list a.is-active {
+  background-color: #1c2740;
+}
+
+[data-theme='midnight'] .app-canvas .text-sakura {
+  color: #c4b5fd;
+}
+
+[data-theme='midnight'] .bubble-own {
+  background: #5b4b9a;
+  color: #fff;
+  box-shadow: none;
+}
+
+[data-theme='midnight'] .bubble-other {
+  background: #1f2937;
+  color: #e5e7eb;
+  box-shadow: none;
+}
+
+[data-theme='midnight'] .bubble-own,
+[data-theme='midnight'] .bubble-other {
+  border-radius: 18px;
+}
+
+[data-theme='midnight'] .tail-own::after,
+[data-theme='midnight'] .tail-other::after {
+  content: none;
+}
+
+[data-theme='midnight'] .bubble-own .msg-meta,
+[data-theme='midnight'] .bubble-own .msg-meta svg {
+  color: #ddd6fe;
+}
+
+[data-theme='midnight'] .bubble-other .msg-meta {
+  color: #9ca3af;
+}
+
+[data-theme='midnight'] .bubble-creator .msg-meta {
+  color: #6b4300;
+}
+
+[data-theme='midnight'] .msg-sender {
+  color: #9ca3af;
+}
+
+[data-theme='midnight'] .day-chip {
+  border-color: transparent;
+  background: #1f2937;
+  color: #9ca3af;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+[data-theme='midnight'] .composer-dock {
+  background: #151e31;
+  padding: 8px 10px 14px;
+}
+
+[data-theme='midnight'] .composer-shell {
+  border-color: transparent;
+  border-radius: 24px;
+  background: #121a2c;
+  box-shadow: none;
+}
+
+[data-theme='midnight'] .send-button,
+[data-theme='midnight'] .send-button:hover {
+  background-color: #5b4b9a;
+  color: #fff;
   filter: none;
   box-shadow: none;
 }

@@ -35,9 +35,9 @@ export const THEME_GROUPS: { id: string; label: string; themes: ThemeChoice[] }[
     id: 'classic',
     label: 'Classic',
     themes: [
+      { id: 'midnight', label: 'Midnight', swatch: '#5b4b9a' },
       { id: 'light', label: 'Light', swatch: '#d4b3f8' },
       { id: 'dark', label: 'Dark', swatch: '#141a22' },
-      { id: 'midnight', label: 'Midnight Blue', swatch: '#7aa2ff' },
       { id: 'ocean', label: 'Ocean', swatch: '#2ec4b6' },
       { id: 'forest', label: 'Forest', swatch: '#7dce82' },
       { id: 'amoled', label: 'AMOLED', swatch: '#000000' },

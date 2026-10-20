@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react'
+import { useLayoutEffect, type ReactNode } from 'react'
 import { APP_NAME } from '../lib/brand'
+import { applyTheme, parseTheme } from '../lib/theme'
 import { Logo } from './Logo'
 
 export function AuthFrame({
@@ -15,6 +16,16 @@ export function AuthFrame({
   wide?: boolean
   privacy?: boolean
 }) {
+  useLayoutEffect(() => {
+    const root = document.documentElement
+    root.dataset.auth = 'true'
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#ffffff')
+    return () => {
+      delete root.dataset.auth
+      applyTheme(parseTheme(root.getAttribute('data-theme')))
+    }
+  }, [])
+
   return (
     <div className="auth-canvas flex min-h-dvh flex-col px-4">
       <div className={`mx-auto flex w-full flex-1 flex-col justify-center py-8 ${wide ? 'max-w-lg' : 'max-w-[400px]'}`}>
