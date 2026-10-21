@@ -449,6 +449,36 @@ body {
   clear: both;
 }
 
+/* A reply quote is part of the bubble, so it cannot stretch the bubble past
+   the chat. Two lines, then an ellipsis. Long tokens break anywhere. */
+.msg-group {
+  width: fit-content;
+  max-width: min(80%, 26rem);
+  min-width: 0;
+}
+
+.msg-bubble {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.reply-quote {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.msg-copy {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
 /* Message actions stay hidden until a long-press marks the one open group.
    Hover and tap must not reveal them, including on a mouse or an installed PWA. */
 .msg-actions {
@@ -1005,7 +1035,7 @@ textarea:-webkit-autofill {
 }
 
 [data-theme='light'] .msg-group {
-  max-width: min(78%, 28rem);
+  max-width: min(80%, 26rem);
 }
 
 [data-theme='light'] .bubble-own,

@@ -31,7 +31,7 @@ export function VideoBubble({ src, seconds }: { src: string; seconds?: number | 
   }
 
   return (
-    <div className="relative" data-video-message="true">
+    <div className="relative max-w-full" data-video-message="true">
       <video
         ref={node}
         src={src}
