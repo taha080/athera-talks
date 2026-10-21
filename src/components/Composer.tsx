@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { CHAT_IMAGE_BYTES, imageFromClipboard, isChatImage, prepareChatImage } from '../lib/pasteImage'
+import { createPortal } from 'react-dom'
+import { CHAT_IMAGE_BYTES, isChatImage, prepareChatImage } from '../lib/pasteImage'
+import { assertVideoSize, attachmentFromClipboard, isChatVideo, videoDurationSeconds, videoMime } from '../lib/chatVideo'
 import { shouldAnnounceTyping } from '../lib/typing'
 import { EMOJI } from '../lib/emoji'
 import { encodeWaveform, pickAudioMime } from '../lib/voice'
@@ -25,7 +27,15 @@ export function Composer({
   reply: ReplyTarget | null
   onClearReply: () => void
   onSendText: (body: string) => Promise<void>
-  onSendFile: (file: Blob, mime: string, kind: 'voice' | 'image', seconds?: number, waveform?: number[], caption?: string) => Promise<void>
+  onSendFile: (
+    file: Blob,
+    mime: string,
+    kind: 'voice' | 'image' | 'video',
+    seconds?: number,
+    waveform?: number[],
+    caption?: string,
+    hooks?: { onProgress?: (loaded: number, total: number) => void; signal?: AbortSignal },
+  ) => Promise<void>
   onTyping: (typing: boolean) => void
   editing?: { id: string; body: string } | null
   onCancelEdit?: () => void
@@ -33,7 +43,12 @@ export function Composer({
   onIncomingHandled?: () => void
 }) {
   const [draft, setDraft] = useState('')
-  const [pending, setPending] = useState<{ file: File; url: string } | null>(null)
+  const [pending, setPending] = useState<
+    | { kind: 'image'; file: File; url: string }
+    | { kind: 'video'; file: File; url: string; seconds: number | null }
+    | null
+  >(null)
+  const [upload, setUpload] = useState<{ loaded: number; total: number } | null>(null)
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [phase, setPhase] = useState<Phase>('idle')
   const [seconds, setSeconds] = useState(0)
@@ -84,6 +99,7 @@ export function Composer({
   const typingOn = useRef(false)
   const pendingUrl = useRef<string | null>(null)
   const sendingPhoto = useRef(false)
+  const uploadAbort = useRef<AbortController | null>(null)
   const notifyTyping = useRef(onTyping)
   notifyTyping.current = onTyping
 
@@ -128,12 +144,38 @@ export function Composer({
     if (pendingUrl.current) URL.revokeObjectURL(pendingUrl.current)
     const url = URL.createObjectURL(file)
     pendingUrl.current = url
-    setPending({ file, url })
+    setUpload(null)
+    setPending({ kind: 'image', file, url })
+  }
+
+  function stageVideo(file: File) {
+    if (editing) return
+    setError('')
+    if (!isChatVideo(file)) {
+      setError('Choose an mp4, webm, or mov video.')
+      return
+    }
+    try {
+      assertVideoSize(file.size)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Choose a video under 50 MB.')
+      return
+    }
+    if (pendingUrl.current) URL.revokeObjectURL(pendingUrl.current)
+    const url = URL.createObjectURL(file)
+    pendingUrl.current = url
+    setUpload(null)
+    setPending({ kind: 'video', file, url, seconds: null })
+  }
+
+  function stageAttachment(file: File) {
+    if (isChatVideo(file)) stageVideo(file)
+    else stageImage(file)
   }
 
   useEffect(() => {
     if (!incomingFile) return
-    stageImage(incomingFile)
+    stageAttachment(incomingFile)
     onIncomingHandled?.()
   }, [incomingFile])
 
@@ -152,23 +194,45 @@ export function Composer({
     }
   }, [])
 
+  function cancelStaged() {
+    if (upload) {
+      uploadAbort.current?.abort()
+      return
+    }
+    clearPending()
+  }
+
   async function sendPending() {
     if (!pending || sendingPhoto.current) return
     sendingPhoto.current = true
-    const file = pending.file
+    const staged = pending
     const caption = draft.trim()
     setError('')
+    const controller = new AbortController()
+    uploadAbort.current = controller
     try {
-      const prepared = await prepareChatImage(file)
-      await onSendFile(prepared.blob, prepared.mime, 'image', undefined, undefined, caption)
+      if (staged.kind === 'video') {
+        setUpload({ loaded: 0, total: staged.file.size })
+        await onSendFile(staged.file, videoMime(staged.file), 'video', staged.seconds ?? undefined, undefined, caption, {
+          signal: controller.signal,
+          onProgress: (loaded, total) => setUpload({ loaded, total }),
+        })
+      } else {
+        const prepared = await prepareChatImage(staged.file)
+        await onSendFile(prepared.blob, prepared.mime, 'image', undefined, undefined, caption)
+      }
       clearPending()
+      setUpload(null)
       setDraft('')
       stopTyping()
       setEmojiOpen(false)
       if (box.current) box.current.style.height = 'auto'
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send that photo.')
+      setUpload(null)
+      const message = err instanceof Error ? err.message : 'Could not send that photo.'
+      setError(controller.signal.aborted ? 'Upload cancelled.' : message)
     } finally {
+      uploadAbort.current = null
       sendingPhoto.current = false
     }
   }
@@ -322,7 +386,7 @@ export function Composer({
           </button>
         </div>
       ) : null}
-      {pending && !editing ? (
+      {pending?.kind === 'image' && !editing ? (
         <div className="mb-2 flex items-center gap-2 rounded-lg bg-elevated px-2 py-2" data-photo-preview="true">
           <img src={pending.url} alt="" className="h-14 w-14 rounded-lg object-cover" />
           <p className="min-w-0 flex-1 truncate text-xs text-mist">{draft.trim() ? draft.trim() : 'Photo ready'}</p>
@@ -372,15 +436,18 @@ export function Composer({
             <SmileIcon className="h-5 w-5" />
           </button>
           {editing ? null : (
-          <label className="hover-wash grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full text-mist hover:text-paper" aria-label="Attach a photo">
+          <label className="hover-wash grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full text-mist hover:text-paper" aria-label="Attach a photo or video">
             <ImageIcon className="h-5 w-5" />
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
+              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
               className="sr-only"
               onChange={(event) => {
-                void onImage(event.target.files?.[0])
+                const file = event.target.files?.[0]
                 event.target.value = ''
+                if (!file) return
+                if (isChatVideo(file)) stageVideo(file)
+                else void onImage(file)
               }}
             />
           </label>
@@ -396,10 +463,10 @@ export function Composer({
               placeholder={editing ? 'Edit message' : pending ? 'Add a caption' : `Message ${peerName}`}
               onBlur={() => stopTyping()}
               onPaste={(event) => {
-                const file = imageFromClipboard(event.clipboardData)
+                const file = attachmentFromClipboard(event.clipboardData)
                 if (!file) return
                 event.preventDefault()
-                stageImage(file)
+                stageAttachment(file)
               }}
               onChange={(event) => {
                 noteTyping(event.target.value)
@@ -430,6 +497,53 @@ export function Composer({
         </form>
       )}
       {error ? <p className="px-1 pt-2 text-sm text-danger" role="alert">{error}</p> : null}
+      {pending?.kind === 'video' && !editing
+        ? createPortal(
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-label="Video preview" data-video-preview="true">
+          <div className="w-full max-w-md rounded-2xl border border-line bg-panel p-3 shadow-md">
+            <video
+              src={pending.url}
+              controls
+              playsInline
+              preload="metadata"
+              className="max-h-64 w-full rounded-xl bg-black"
+              onLoadedMetadata={(event) => {
+                const seconds = videoDurationSeconds(event.currentTarget.duration)
+                setPending((current) => (current?.kind === 'video' ? { ...current, seconds } : current))
+              }}
+            />
+            <label className="mt-3 block">
+              <span className="sr-only">Caption</span>
+              <textarea
+                className="max-h-24 w-full resize-none rounded-lg bg-elevated px-3 py-2 text-sm text-paper outline-none placeholder:text-mist/70"
+                rows={2}
+                maxLength={4000}
+                value={draft}
+                placeholder="Add a caption"
+                onChange={(event) => noteTyping(event.target.value)}
+              />
+            </label>
+            {upload ? (
+              <div className="mt-3">
+                <div className="h-1.5 overflow-hidden rounded-full bg-line" data-video-progress="true" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={upload.total > 0 ? Math.round((upload.loaded / upload.total) * 100) : 0}>
+                  <div className="h-full bg-sakura" style={{ width: `${upload.total > 0 ? Math.round((upload.loaded / upload.total) * 100) : 0}%` }} />
+                </div>
+                <p className="mt-1 text-xs text-mist">{upload.total > 0 ? Math.round((upload.loaded / upload.total) * 100) : 0}%</p>
+              </div>
+            ) : null}
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" className="rounded-lg px-3 py-1.5 text-sm text-mist hover:text-paper" onClick={cancelStaged}>
+                Cancel
+              </button>
+              <button type="button" className="rounded-lg bg-sakura px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60" disabled={Boolean(upload)} onClick={() => void sendPending()}>
+                Send
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )
+        : null}
     </div>
   )
 }

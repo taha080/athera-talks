@@ -588,7 +588,7 @@ end $$;
 alter table public.messages drop constraint if exists messages_kind_check;
 alter table public.messages
   add constraint messages_kind_check
-  check (kind in ('text', 'voice', 'image'));
+  check (kind in ('text', 'voice', 'image', 'video'));
 
 alter table public.messages drop constraint if exists messages_body_check;
 alter table public.messages
@@ -597,7 +597,7 @@ alter table public.messages
     char_length(body) <= 4000
     and (
       deleted_at is not null
-      or kind in ('voice', 'image')
+      or kind in ('voice', 'image', 'video')
       or (kind = 'text' and char_length(btrim(body)) between 1 and 4000)
     )
   );
@@ -605,7 +605,11 @@ alter table public.messages
 alter table public.messages drop constraint if exists messages_media_seconds_check;
 alter table public.messages
   add constraint messages_media_seconds_check
-  check (media_seconds is null or media_seconds between 0 and 600);
+  check (
+    media_seconds is null
+    or (kind = 'video' and media_seconds >= 0)
+    or (kind is distinct from 'video' and media_seconds between 0 and 600)
+  );
 
 alter table public.messages drop constraint if exists messages_reply_to_fkey;
 alter table public.messages
@@ -779,6 +783,7 @@ begin
       when lm.deleted_at is not null then 'Message deleted'
       when lm.kind = 'voice' then 'Voice message'
       when lm.kind = 'image' then 'Photo'
+      when lm.kind = 'video' then 'Video'
       else lm.body
     end,
     lm.kind,
@@ -892,6 +897,19 @@ set public = excluded.public,
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
+  'chat-videos',
+  'chat-videos',
+  false,
+  52428800,
+  array['video/mp4', 'video/webm', 'video/quicktime']
+)
+on conflict (id) do update
+set public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
   'wallpapers',
   'wallpapers',
   false,
@@ -992,6 +1010,49 @@ create policy "Members delete own chat images"
   to authenticated
   using (
     bucket_id = 'chat-images'
+    and (storage.foldername(name))[2] = auth.uid()::text
+  );
+
+drop policy if exists "Members read chat videos" on storage.objects;
+create policy "Members read chat videos"
+  on storage.objects for select
+  to authenticated
+  using (
+    bucket_id = 'chat-videos'
+    and public.is_member(((storage.foldername(name))[1])::uuid)
+  );
+
+drop policy if exists "Members upload chat videos" on storage.objects;
+create policy "Members upload chat videos"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'chat-videos'
+    and (storage.foldername(name))[2] = auth.uid()::text
+    and public.is_member(((storage.foldername(name))[1])::uuid)
+  );
+
+drop policy if exists "Members update own chat videos" on storage.objects;
+create policy "Members update own chat videos"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'chat-videos'
+    and (storage.foldername(name))[2] = auth.uid()::text
+    and public.is_member(((storage.foldername(name))[1])::uuid)
+  )
+  with check (
+    bucket_id = 'chat-videos'
+    and (storage.foldername(name))[2] = auth.uid()::text
+    and public.is_member(((storage.foldername(name))[1])::uuid)
+  );
+
+drop policy if exists "Members delete own chat videos" on storage.objects;
+create policy "Members delete own chat videos"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'chat-videos'
     and (storage.foldername(name))[2] = auth.uid()::text
   );
 create table if not exists public.message_reactions (
@@ -1463,6 +1524,7 @@ begin
       when lm.deleted_at is not null then 'Message deleted'
       when lm.kind = 'voice' then 'Voice message'
       when lm.kind = 'image' then 'Photo'
+      when lm.kind = 'video' then 'Video'
       else lm.body
     end,
     lm.kind,
@@ -1968,6 +2030,7 @@ begin
       when lm.deleted_at is not null then 'Message deleted'
       when lm.kind = 'voice' then 'Voice message'
       when lm.kind = 'image' then 'Photo'
+      when lm.kind = 'video' then 'Video'
       else lm.body
     end,
     lm.kind,
@@ -2282,6 +2345,7 @@ begin
       when lm.deleted_at is not null then 'Message deleted'
       when lm.kind = 'voice' then 'Voice message'
       when lm.kind = 'image' then 'Photo'
+      when lm.kind = 'video' then 'Video'
       else lm.body
     end,
     lm.kind,
@@ -3533,6 +3597,7 @@ begin
       when lm.deleted_at is not null then 'This message was deleted'
       when lm.kind = 'voice' then 'Voice message'
       when lm.kind = 'image' then 'Photo'
+      when lm.kind = 'video' then 'Video'
       else lm.body
     end,
     lm.kind,
@@ -4199,6 +4264,7 @@ begin
       when lm.deleted_at is not null then 'This message was deleted'
       when lm.kind = 'voice' then 'Voice message'
       when lm.kind = 'image' then 'Photo'
+      when lm.kind = 'video' then 'Video'
       else lm.body
     end,
     lm.kind,

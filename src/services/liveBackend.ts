@@ -1,9 +1,12 @@
 import { normalizeUsername, usernameIssue } from '../lib/auth'
 import { parseWallpaper } from '../lib/appearance'
 import { baseMime, mediaBucket } from '../lib/media'
+import { assertVideoSize, videoExtension, videoMime } from '../lib/chatVideo'
 import { MESSAGE_PAGE, messageKind, newestFirstPage } from '../lib/messages'
 import { imageExtension } from '../lib/pasteImage'
 import { isPremiumWindow } from '../lib/premium'
+import { readSupabaseEnv } from '../lib/config'
+import { storageResumableEndpoint, uploadChatVideo } from '../lib/tusUpload'
 import { isDuplicateCallInsert } from '../lib/callLog'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform, extensionForMime, parseWaveform } from '../lib/voice'
@@ -280,7 +283,7 @@ export async function profileIsCreator(userId: string): Promise<boolean> {
 async function signMessages(messages: Message[]): Promise<Message[]> {
   const supabase = client()
   const next = messages.map((message) => ({ ...message }))
-  for (const kind of ['voice', 'image'] as const) {
+  for (const kind of ['voice', 'image', 'video'] as const) {
     const bucket = mediaBucket(kind)
     const indexes = next
       .map((message, index) => ({ message, index }))
@@ -462,6 +465,11 @@ async function attachReceipts(conversationId: string, messages: Message[]): Prom
   })
 }
 
+function storedVideoSeconds(seconds: number | undefined): number | null {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return null
+  return Math.round(seconds)
+}
+
 export const liveChat = {
   async listConversations(): Promise<Conversation[]> {
     const { data, error } = await client().rpc('list_my_conversations')
@@ -595,31 +603,56 @@ export const liveChat = {
     const supabase = client()
     const userId = await currentUserId()
     const bucket = mediaBucket(input.kind)
-    const mime = baseMime(input.mime || (input.kind === 'image' ? 'image/jpeg' : 'audio/webm'))
-    const ext = input.kind === 'image' ? imageExtension(mime) : extensionForMime(mime)
+    const mime = input.kind === 'video'
+      ? videoMime({ type: input.mime, name: input.file instanceof File ? input.file.name : '' })
+      : baseMime(input.mime || (input.kind === 'image' ? 'image/jpeg' : 'audio/webm'))
+    const ext = input.kind === 'video' ? videoExtension(mime) : input.kind === 'image' ? imageExtension(mime) : extensionForMime(mime)
     const path = `${input.conversationId}/${userId}/${crypto.randomUUID()}.${ext}`
-    const { error: uploadError } = await supabase.storage.from(bucket).upload(path, input.file, {
-      contentType: mime,
-      upsert: false,
-    })
-    if (uploadError) throw new Error(uploadError.message)
+    const seconds = input.kind === 'video' ? storedVideoSeconds(input.seconds) : input.seconds ?? null
+    if (input.kind === 'video') {
+      assertVideoSize(input.file.size)
+      if (input.signal?.aborted) throw new Error('Upload cancelled.')
+      const env = readSupabaseEnv()
+      const session = await supabase.auth.getSession()
+      if (session.error || !session.data.session) throw new Error('Sign in again to send a video.')
+      await uploadChatVideo({
+        endpoint: storageResumableEndpoint(env.url),
+        accessToken: session.data.session.access_token,
+        anonKey: env.anonKey,
+        bucketName: bucket,
+        objectName: path,
+        file: input.file,
+        contentType: mime,
+        onProgress: input.onProgress,
+        signal: input.signal,
+      })
+    } else {
+      const { error: uploadError } = await supabase.storage.from(bucket).upload(path, input.file, {
+        contentType: mime,
+        upsert: false,
+      })
+      if (uploadError) throw new Error(uploadError.message)
+    }
     const { data, error } = await supabase
       .from('messages')
       .insert({
         conversation_id: input.conversationId,
         sender_id: userId,
-        body: input.kind === 'voice' ? 'Voice message' : input.caption?.trim() || 'Photo',
+        body: input.kind === 'voice' ? 'Voice message' : input.kind === 'video' ? input.caption?.trim() || 'Video' : input.caption?.trim() || 'Photo',
         kind: input.kind,
         media_path: path,
         media_mime: mime,
-        media_seconds: input.seconds ?? null,
+        media_seconds: seconds,
         waveform: input.waveform ? encodeWaveform(input.waveform) : null,
         reply_to: input.reply?.id ?? null,
         reply_preview: input.reply?.preview ?? null,
       })
       .select(MESSAGE_COLUMNS)
       .single()
-    if (error) throw new Error(error.message)
+    if (error) {
+      if (input.kind === 'video') await supabase.storage.from(bucket).remove([path])
+      throw new Error(error.message)
+    }
     const [signed] = await signMessages([mapMessage(data as MessageRow)])
     return signed
   },
@@ -790,7 +823,7 @@ export const liveChat = {
     const { data, error } = await client().rpc('delete_message_for_everyone', { mid: message.id })
     if (error) throw new Error(error.message)
     const path = (typeof data === 'string' && data) || message.mediaPath
-    if (path && (message.kind === 'voice' || message.kind === 'image')) {
+    if (path && (message.kind === 'voice' || message.kind === 'image' || message.kind === 'video')) {
       await client().storage.from(mediaBucket(message.kind)).remove([path])
     }
   },
@@ -905,7 +938,7 @@ export const liveChat = {
 
   async attachMedia(message: Message): Promise<Message> {
     if (!message.mediaPath || message.mediaUrl || message.deletedAt) return message
-    if (message.kind !== 'voice' && message.kind !== 'image') return message
+    if (message.kind !== 'voice' && message.kind !== 'image' && message.kind !== 'video') return message
     const [signed] = await signMessages([message])
     return signed
   },

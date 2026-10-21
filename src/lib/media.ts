@@ -1,5 +1,7 @@
-export function mediaBucket(kind: 'voice' | 'image'): 'voice-messages' | 'chat-images' {
-  return kind === 'image' ? 'chat-images' : 'voice-messages'
+export function mediaBucket(kind: 'voice' | 'image' | 'video'): 'voice-messages' | 'chat-images' | 'chat-videos' {
+  if (kind === 'image') return 'chat-images'
+  if (kind === 'video') return 'chat-videos'
+  return 'voice-messages'
 }
 
 export function baseMime(mime: string): string {

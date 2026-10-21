@@ -1,5 +1,6 @@
 import { normalizeUsername, passwordIssue, usernameIssue } from '../lib/auth'
 import { parseWallpaper } from '../lib/appearance'
+import { assertVideoSize } from '../lib/chatVideo'
 import { messagePreview, newestFirstPage } from '../lib/messages'
 import { hasPremium } from '../lib/premium'
 import { parseTheme } from '../lib/theme'
@@ -19,6 +20,11 @@ import {
 } from './seed'
 
 const STORAGE_KEY = 'tatalk:demo-data-v1'
+
+function storedVideoSeconds(seconds: number | undefined): number | null {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return null
+  return Math.round(seconds)
+}
 
 function grandfatherRequests(data: DemoData): DemoRequest[] {
   return data.conversations.flatMap((conversation) => {
@@ -583,7 +589,7 @@ export function createDemoBackend(options: Options = {}) {
       return message
     },
 
-    deliverIncoming(input: { conversationId: string; senderId: string; body?: string; kind?: 'text' | 'voice' | 'image' }): Message {
+    deliverIncoming(input: { conversationId: string; senderId: string; body?: string; kind?: 'text' | 'voice' | 'image' | 'video' }): Message {
       const conversation = data.conversations.find((item) => item.id === input.conversationId)
       if (!conversation || !conversation.memberIds.includes(input.senderId)) throw new Error('That chat is not yours.')
       const kind = input.kind ?? 'text'
@@ -612,6 +618,7 @@ export function createDemoBackend(options: Options = {}) {
       const conversation = data.conversations.find((item) => item.id === input.conversationId)
       if (!conversation) throw new Error('That chat is not yours.')
       assertCanSend(conversation, me)
+      if (input.kind === 'video') assertVideoSize(input.file.size)
       let mediaUrl: string | null = null
       if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
         mediaUrl = URL.createObjectURL(input.file)
@@ -620,7 +627,7 @@ export function createDemoBackend(options: Options = {}) {
         id: newId('msg'),
         conversationId: input.conversationId,
         senderId: me,
-        body: input.kind === 'voice' ? 'Voice message' : input.caption?.trim() || 'Photo',
+        body: input.kind === 'voice' ? 'Voice message' : input.kind === 'video' ? input.caption?.trim() || 'Video' : input.caption?.trim() || 'Photo',
         createdAt: new Date().toISOString(),
         readAt: null,
         kind: input.kind,
@@ -628,7 +635,7 @@ export function createDemoBackend(options: Options = {}) {
         mediaPath: 'demo',
         mediaUrl,
         mediaMime: input.mime,
-        mediaSeconds: input.seconds ?? null,
+        mediaSeconds: input.kind === 'video' ? storedVideoSeconds(input.seconds) : input.seconds ?? null,
         waveform: input.waveform ?? null,
         replyTo: input.reply?.id ?? null,
         replyPreview: input.reply?.preview ?? null,
