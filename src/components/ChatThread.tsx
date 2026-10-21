@@ -827,7 +827,7 @@ function MessageRow({
 
   return (
     <div
-      className={`msg-group relative flex max-w-[min(78%,26rem)] flex-col ${mine ? 'ml-auto items-end' : 'mr-auto items-start'} ${actionsOpen ? 'is-actions-open' : ''}`}
+      className={`msg-group relative flex w-fit min-w-0 max-w-[min(80%,26rem)] flex-col ${mine ? 'ml-auto items-end' : 'mr-auto items-start'} ${actionsOpen ? 'is-actions-open' : ''}`}
       onPointerDown={onPointerDown}
       onContextMenu={(event) => {
         event.preventDefault()
@@ -852,18 +852,18 @@ function MessageRow({
           <Tiny label="Delete" onClick={onOpenMenu}><TrashIcon className="h-3.5 w-3.5" /></Tiny>
         </div>
       ) : null}
-      <div className={`relative min-w-0 ${highlighted ? 'rounded-[18px] ring-2 ring-sakura/70' : ''}`}>
-        <div data-creator-bubble={gold ? 'true' : undefined} className={`${bubble} bubble-in relative text-left ${radius} ${(image || video) && !gold ? 'overflow-hidden p-1' : 'bubble-pad px-2.5 py-1.5'} ${tail}`}>
+      <div className={`relative min-w-0 max-w-full ${highlighted ? 'rounded-[18px] ring-2 ring-sakura/70' : ''}`}>
+        <div data-creator-bubble={gold ? 'true' : undefined} className={`msg-bubble ${bubble} bubble-in relative w-full min-w-0 max-w-full text-left ${radius} ${(image || video) && !gold ? 'overflow-hidden p-1' : 'bubble-pad px-2.5 py-1.5'} ${tail}`}>
           {message.replyPreview && !deleted ? (
-            <p className={ownTone ? 'mb-1 truncate rounded-md border-l-2 border-white/70 bg-black/10 px-2 py-1 text-xs text-white/85' : 'mb-1 truncate rounded-md border-l-2 border-sakura bg-black/5 px-2 py-1 text-xs text-mist'}>
+            <p className={`reply-quote mb-1 rounded-md border-l-2 px-2 py-1 text-xs ${ownTone ? 'border-white/70 bg-black/10 text-white/85' : 'border-sakura bg-black/5 text-mist'}`}>
               {message.replyPreview}
             </p>
           ) : null}
           {deleted ? <p className="px-1 text-sm italic opacity-80">This message was deleted</p> : null}
           {image ? (
             message.mediaUrl ? (
-              <button type="button" className="block" aria-label="Open photo" onClick={() => onOpenImage(message.mediaUrl as string)}>
-                <img src={message.mediaUrl} alt={message.body && message.body !== 'Photo' ? message.body : 'Photo'} className="max-h-72 rounded-[14px] object-cover" />
+              <button type="button" className="block max-w-full" aria-label="Open photo" onClick={() => onOpenImage(message.mediaUrl as string)}>
+                <img src={message.mediaUrl} alt={message.body && message.body !== 'Photo' ? message.body : 'Photo'} className="max-h-72 max-w-full rounded-[14px] object-cover" />
               </button>
             ) : (
               <p className="px-2 py-1 text-sm">Photo</p>
