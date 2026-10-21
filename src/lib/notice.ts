@@ -28,6 +28,7 @@ export function noticePreview(message: { body: string; kind?: string | null; del
   if (message.deletedAt) return 'This message was deleted'
   if (message.kind === 'voice') return 'Voice note'
   if (message.kind === 'image') return 'Photo'
+  if (message.kind === 'video') return 'Video'
   const text = message.body.replace(/\s+/g, ' ').trim()
   if (text.length <= 90) return text
   return `${text.slice(0, 89)}…`

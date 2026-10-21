@@ -14,10 +14,11 @@ export function messagePreview(message: Pick<Message, 'body' | 'kind' | 'deleted
   if (message.deletedAt) return 'This message was deleted'
   if (message.kind === 'voice') return 'Voice message'
   if (message.kind === 'image') return 'Photo'
+  if (message.kind === 'video') return 'Video'
   return message.body
 }
 
 export function messageKind(value: string | null | undefined): MessageKind {
-  if (value === 'voice' || value === 'image') return value
+  if (value === 'voice' || value === 'image' || value === 'video') return value
   return 'text'
 }

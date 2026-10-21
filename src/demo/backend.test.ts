@@ -100,6 +100,27 @@ describe('demo auth and chat', () => {
     expect(photo.kind).toBe('image')
     expect(photo.mediaMime).toBe('image/gif')
     expect(photo.body).toBe('look')
+    const video = await demo.sendMedia({
+      conversationId: GROUP_CHAT,
+      kind: 'video',
+      file: new Blob(['mp4'], { type: 'video/mp4' }),
+      mime: 'video/mp4',
+      seconds: 7200,
+      caption: 'night watch',
+    })
+    expect(video.kind).toBe('video')
+    expect(video.mediaSeconds).toBe(7200)
+    expect(video.body).toBe('night watch')
+    expect((await demo.listConversations()).find((chat) => chat.id === GROUP_CHAT)?.lastMessage?.body).toBe('Video')
+    const huge = new File([new Uint8Array(8)], 'big.mp4', { type: 'video/mp4' })
+    Object.defineProperty(huge, 'size', { value: 52_428_801 })
+    await expect(demo.sendMedia({
+      conversationId: SAKURA_CHAT,
+      kind: 'video',
+      file: huge,
+      mime: 'video/mp4',
+      seconds: 99999,
+    })).rejects.toThrow(/50 MB/)
   })
 
   it('matches only a full username and hides either side of a block', async () => {

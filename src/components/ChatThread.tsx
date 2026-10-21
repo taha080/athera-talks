@@ -10,7 +10,7 @@ import { chatTitle, isGroup, showSenderName } from '../lib/chatList'
 import { QUICK_REACTIONS, groupPosition, groupedReactions, linkHost, linkParts, type GroupPos } from '../lib/chatView'
 import { dayKey, formatDayLabel, formatMessageTime } from '../lib/format'
 import { messagePreview } from '../lib/messages'
-import { firstImageFile } from '../lib/pasteImage'
+import { firstChatAttachment } from '../lib/chatVideo'
 import { isOnline, presenceLabel } from '../lib/presence'
 import { TYPING_TTL_MS } from '../lib/typing'
 import { canViewSharedProfile } from '../lib/profileAccess'
@@ -18,6 +18,7 @@ import { receiptTick } from '../lib/receipts'
 import { iconButton } from '../lib/styles'
 import type { CallLog, Conversation, GroupMember, Message, ReplyTarget } from '../types'
 import { Avatar } from './Avatar'
+import { VideoBubble } from './VideoBubble'
 import { hasPremium } from '../lib/premium'
 import { DisplayName } from './CreatorBadge'
 import { Composer } from './Composer'
@@ -327,7 +328,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
   }
 
   async function copyMessage(message: Message) {
-    const text = message.kind === 'image' ? 'Photo' : message.kind === 'voice' ? 'Voice message' : message.body
+    const text = message.kind === 'image' ? 'Photo' : message.kind === 'video' ? 'Video' : message.kind === 'voice' ? 'Voice message' : message.body
     try {
       await navigator.clipboard.writeText(text)
       chat.pushToast('Copied')
@@ -362,14 +363,14 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
         setDropHot(false)
         if (pendingRequest || conversation.blocked) return
         event.preventDefault()
-        const file = firstImageFile(event.dataTransfer.files)
+        const file = firstChatAttachment(event.dataTransfer.files)
         if (file) setDropFile(file)
-        else if (event.dataTransfer.files.length > 0) setActionError('Choose an image file.')
+        else if (event.dataTransfer.files.length > 0) setActionError('Choose a photo or video.')
       }}
     >
       {dropHot ? (
         <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center bg-black/45">
-          <p className="rounded-xl border border-line bg-panel px-4 py-2 text-sm text-paper">Drop a photo</p>
+          <p className="rounded-xl border border-line bg-panel px-4 py-2 text-sm text-paper">Drop a photo or video</p>
         </div>
       ) : null}
       <header className="chat-header relative flex h-14 shrink-0 items-center gap-2 border-b border-line bg-panel px-2">
@@ -665,9 +666,20 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
             await chat.send(conversation.id, body, reply)
             setReply(null)
           }}
-          onSendFile={async (file, mime, kind, seconds, waveform, caption) => {
+          onSendFile={async (file, mime, kind, seconds, waveform, caption, hooks) => {
             nearBottom.current = true
-            await chat.sendMedia({ conversationId: conversation.id, kind, file, mime, seconds, waveform, reply, caption })
+            await chat.sendMedia({
+              conversationId: conversation.id,
+              kind,
+              file,
+              mime,
+              seconds,
+              waveform,
+              reply,
+              caption,
+              onProgress: hooks?.onProgress,
+              signal: hooks?.signal,
+            })
             setReply(null)
           }}
         />
@@ -774,6 +786,7 @@ function MessageRow({
     ? tailed ? 'rounded-[18px] rounded-br-[5px]' : 'rounded-[18px]'
     : tailed ? 'rounded-[18px] rounded-bl-[5px]' : 'rounded-[18px]'
   const image = !deleted && message.kind === 'image'
+  const video = !deleted && message.kind === 'video'
   const gold = (senderCreator || senderPremium) && !deleted
   const ownTone = mine || gold
   const reactions = groupedReactions(message.reactions, meId)
@@ -788,7 +801,7 @@ function MessageRow({
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.button !== 0 || deleted) return
     const target = event.target
-    if (!(target instanceof Element) || target.closest('a, input, textarea, label, [role="menuitem"], .msg-actions')) return
+    if (!(target instanceof Element) || target.closest('a, button, input, textarea, label, video, [role="menuitem"], .msg-actions')) return
     const startX = event.clientX
     const startY = event.clientY
     const timer = window.setTimeout(() => {
@@ -840,7 +853,7 @@ function MessageRow({
         </div>
       ) : null}
       <div className={`relative min-w-0 ${highlighted ? 'rounded-[18px] ring-2 ring-sakura/70' : ''}`}>
-        <div data-creator-bubble={gold ? 'true' : undefined} className={`${bubble} bubble-in relative text-left ${radius} ${image && !gold ? 'overflow-hidden p-1' : 'bubble-pad px-2.5 py-1.5'} ${tail}`}>
+        <div data-creator-bubble={gold ? 'true' : undefined} className={`${bubble} bubble-in relative text-left ${radius} ${(image || video) && !gold ? 'overflow-hidden p-1' : 'bubble-pad px-2.5 py-1.5'} ${tail}`}>
           {message.replyPreview && !deleted ? (
             <p className={ownTone ? 'mb-1 truncate rounded-md border-l-2 border-white/70 bg-black/10 px-2 py-1 text-xs text-white/85' : 'mb-1 truncate rounded-md border-l-2 border-sakura bg-black/5 px-2 py-1 text-xs text-mist'}>
               {message.replyPreview}
@@ -856,13 +869,20 @@ function MessageRow({
               <p className="px-2 py-1 text-sm">Photo</p>
             )
           ) : null}
-          {image && message.body.trim() && message.body.trim() !== 'Photo' ? (
+          {video ? (
+            message.mediaUrl ? (
+              <VideoBubble src={message.mediaUrl} seconds={message.mediaSeconds} />
+            ) : (
+              <p className="px-2 py-1 text-sm">Video</p>
+            )
+          ) : null}
+          {(image && message.body.trim() && message.body.trim() !== 'Photo') || (video && message.body.trim() && message.body.trim() !== 'Video') ? (
             <p className="msg-copy whitespace-pre-wrap px-1.5 pb-0.5 pt-1 text-sm leading-5">{message.body}</p>
           ) : null}
           {!deleted && message.kind === 'voice' ? (
             <VoiceBubble src={message.mediaUrl} seconds={message.mediaSeconds} waveform={message.waveform} mine={ownTone} />
           ) : null}
-          {!deleted && message.kind !== 'voice' && message.kind !== 'image' ? (
+          {!deleted && message.kind !== 'voice' && message.kind !== 'image' && message.kind !== 'video' ? (
             <div>
               <p className="msg-copy whitespace-pre-wrap px-0.5 text-sm leading-5">
                 {parts.map((part, index) =>

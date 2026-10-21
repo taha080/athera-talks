@@ -1,4 +1,4 @@
-export type MessageKind = 'text' | 'voice' | 'image'
+export type MessageKind = 'text' | 'voice' | 'image' | 'video'
 export type CallType = 'voice' | 'video'
 export type CallStatus = 'completed' | 'missed' | 'declined' | 'cancelled'
 
@@ -61,13 +61,15 @@ export type ReplyTarget = {
 
 export type OutgoingMedia = {
   conversationId: string
-  kind: 'voice' | 'image'
+  kind: 'voice' | 'image' | 'video'
   file: Blob
   mime: string
   seconds?: number
   waveform?: number[]
   reply?: ReplyTarget | null
   caption?: string
+  onProgress?: (loaded: number, total: number) => void
+  signal?: AbortSignal
 }
 
 export type Reaction = {

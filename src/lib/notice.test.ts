@@ -35,6 +35,7 @@ describe('message notice', () => {
   it('labels voice notes and photos, and trims a long preview', () => {
     expect(noticePreview({ body: '', kind: 'voice' })).toBe('Voice note')
     expect(noticePreview({ body: '', kind: 'image' })).toBe('Photo')
+    expect(noticePreview({ body: 'caption', kind: 'video' })).toBe('Video')
     expect(noticePreview({ body: 'Tea is ready', kind: 'text' })).toBe('Tea is ready')
     expect(noticePreview({ body: 'x'.repeat(120), kind: 'text' }).endsWith('…')).toBe(true)
     expect(noticePreview({ body: 'x'.repeat(120), kind: 'text' }).length).toBe(90)
