@@ -903,7 +903,7 @@ function MessageRow({
         </div>
       ) : null}
       <div className={`relative min-w-0 max-w-full ${highlighted ? 'rounded-[18px] ring-2 ring-sakura/70' : ''}`}>
-        {forger ? <ForgerRose mine={mine} /> : null}
+        {forger ? <ForgerAnya mine={mine} /> : null}
         <div data-forger-bubble={forger ? 'true' : undefined} data-creator-bubble={!forger && senderCreator && !deleted ? 'true' : undefined} data-premium-bubble={!forger && senderPremium && !senderCreator && !deleted ? 'true' : undefined} className={`msg-bubble ${bubble} bubble-in relative min-w-0 max-w-full text-left ${radius} ${(image || video) && !featured ? 'overflow-hidden p-1' : 'bubble-pad'} ${tail}`}>
           {message.replyPreview && !deleted ? (
             <p className={`reply-quote mb-1 rounded-md border-l-2 px-2 py-1 text-xs ${ownTone ? 'border-white/70 bg-black/10 text-white/85' : 'border-sakura bg-black/5 text-mist'}`}>
@@ -1027,15 +1027,45 @@ function MessageRow({
   )
 }
 
-function ForgerRose({ mine }: { mine: boolean }) {
+function ForgerAnya({ mine }: { mine: boolean }) {
   return (
-    <span className={`forger-rose${mine ? ' is-mine' : ''}`} aria-hidden="true">
-      <svg viewBox="0 0 20 20" width="20" height="20">
-        <circle cx="10" cy="11.5" r="3.1" fill="#8e2438" />
-        <circle cx="6.6" cy="8.2" r="2.15" fill="#e56b93" />
-        <circle cx="13.4" cy="8.2" r="2.15" fill="#e56b93" />
-        <circle cx="10" cy="7.1" r="2.15" fill="#f4a0c0" />
-        <circle cx="8.2" cy="10.4" r="1.7" fill="#c45a55" />
+    <span className={`forger-anya${mine ? ' is-mine' : ''}`} aria-hidden="true">
+      <svg viewBox="0 0 64 86" width="25" height="34">
+        <g className="forger-anya-legs">
+          <path d="M23 48c-.5 8-.2 16 .7 24 1.4.6 3.8.4 4.6-.8.6-7.4.1-16-.6-23.4-1.4-.2-3.4-.2-4.7.2z" fill="#ffd3c2" />
+          <path d="M22.2 68.5c.3 3 1.8 5 4.4 5 2.6 0 4.2-1.8 4-4.2-.2-1.6-1.6-2.8-3.6-3-2.4-.2-4.6.2-4.8 2.2z" fill="#22181c" />
+          <path d="M36.2 48c.5 8 .2 16-.7 24-1.4.6-3.8.4-4.6-.8-.6-7.4-.1-16.6.6-23.4 1.4-.2 3.4-.2 4.7.2z" fill="#ffd3c2" />
+          <path d="M33.6 69c.3 2.8 1.8 4.6 4.4 4.6s4-1.8 3.8-4.4c-.2-1.6-1.6-2.6-3.6-2.6-2.4 0-4.4.4-4.6 2.4z" fill="#22181c" />
+        </g>
+        <path d="M17 44c1.2-6.4 5.6-10 15-10s13.8 3.6 15 10c1.2 3.6.2 7.2-2.4 9.2-3.2 2.4-7.4 3.1-12.6 3.1s-9.4-.7-12.6-3.1c-2.6-2-3.6-5.6-2.4-9.2z" fill="#1b1418" />
+        <path d="M21 51.6c3.4 2.2 7.4 3.2 11 3.2s7.6-1 11-3.2" fill="none" stroke="#e6c36a" strokeWidth="1.25" strokeLinecap="round" />
+        <path d="M26.4 38.2h11.2l-2 4.6h-7.2z" fill="#fffaf6" />
+        <path d="M32 38.4v4.2" stroke="#e6c36a" strokeWidth="0.7" />
+        <circle cx="32" cy="46.4" r="1.2" fill="#f3d48a" />
+        <circle cx="32" cy="49.4" r="1.2" fill="#f3d48a" />
+        <ellipse cx="17.2" cy="45.6" rx="3.3" ry="2.2" fill="#ffd3c2" />
+        <ellipse cx="46.8" cy="45.6" rx="3.3" ry="2.2" fill="#ffd3c2" />
+        <circle cx="32" cy="24" r="13.2" fill="#ffd3c2" />
+        <path d="M18.4 25.2C19 14.2 24.6 8 32 8s13 6.2 13.6 17.2c-.7-3.2-3-5.8-6.6-6.6-1.4 3.6-3.6 5.2-7 5.2s-5.6-1.6-7-5.2c-3.6.8-5.9 3.4-6.6 6.6z" fill="#ef6f98" />
+        <path d="M18.6 23c-1.2 6.4.4 11.4 3.2 13.4-2.6-3.6-3-8.6-2-13.4z" fill="#e25b8a" />
+        <path d="M45.4 23c1.2 6.4-.4 11.4-3.2 13.4 2.6-3.6 3-8.6 2-13.4z" fill="#e25b8a" />
+        <path d="M21.6 12.4 24.2 5l3.2 5.8c-1.6.6-3.8.9-5.8 1.6z" fill="#22181c" />
+        <path d="M42.4 12.4 39.8 5l-3.2 5.8c1.6.6 3.8.9 5.8 1.6z" fill="#22181c" />
+        <ellipse cx="26.6" cy="25.6" rx="2.2" ry="2.5" fill="#fff" />
+        <ellipse cx="37.4" cy="25.6" rx="2.2" ry="2.5" fill="#fff" />
+        <circle cx="26.9" cy="26" r="1.45" fill="#2f9a58" />
+        <circle cx="37.7" cy="26" r="1.45" fill="#2f9a58" />
+        <circle cx="26.9" cy="26.1" r="0.72" fill="#173d28" />
+        <circle cx="37.7" cy="26.1" r="0.72" fill="#173d28" />
+        <circle cx="27.4" cy="25.5" r="0.4" fill="#fff" />
+        <circle cx="38.2" cy="25.5" r="0.4" fill="#fff" />
+        <g className="forger-anya-blink">
+          <ellipse cx="26.6" cy="25.8" rx="2.6" ry="2.2" fill="#ffd3c2" />
+          <ellipse cx="37.4" cy="25.8" rx="2.6" ry="2.2" fill="#ffd3c2" />
+        </g>
+        <path d="M29.2 30c.8 1.1 2.2 1.5 2.8 1.5s2-.4 2.8-1.5" fill="none" stroke="#d48984" strokeWidth="0.85" strokeLinecap="round" />
+        <ellipse cx="22.8" cy="28.8" rx="1.6" ry="0.85" fill="#f3a0a8" opacity="0.75" />
+        <ellipse cx="41.2" cy="28.8" rx="1.6" ry="0.85" fill="#f3a0a8" opacity="0.75" />
       </svg>
     </span>
   )
