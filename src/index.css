@@ -21,6 +21,7 @@
 
 :root,
 [data-theme='light'] {
+  color-scheme: light;
   --ink: #f3ebf9;
   --panel: #f8f4fc;
   --elevated: #f1e8f8;
@@ -35,6 +36,7 @@
 }
 
 [data-theme='dark'] {
+  color-scheme: dark;
   --ink: #0c1016;
   --panel: #141a22;
   --elevated: #1c2430;
@@ -50,6 +52,7 @@
 
 /* Night navy and lantern orange, so the chat matches the village landing. */
 [data-theme='naruto'] {
+  color-scheme: dark;
   --ink: #070d18;
   --panel: #101a2c;
   --elevated: #17263f;
@@ -64,6 +67,7 @@
 }
 
 [data-theme='midnight'] {
+  color-scheme: dark;
   --ink: #0f1626;
   --panel: #151e31;
   --elevated: #1f2937;
@@ -78,6 +82,7 @@
 }
 
 [data-theme='sakura'] {
+  color-scheme: dark;
   --ink: #1a0d14;
   --panel: #2a1520;
   --elevated: #3a1d2c;
@@ -92,6 +97,7 @@
 }
 
 [data-theme='ocean'] {
+  color-scheme: dark;
   --ink: #04161a;
   --panel: #0b242b;
   --elevated: #12343d;
@@ -106,6 +112,7 @@
 }
 
 [data-theme='forest'] {
+  color-scheme: dark;
   --ink: #0c1410;
   --panel: #14201a;
   --elevated: #1c2e24;
@@ -120,6 +127,7 @@
 }
 
 [data-theme='amoled'] {
+  color-scheme: dark;
   --ink: #000000;
   --panel: #000000;
   --elevated: #111111;
@@ -134,6 +142,7 @@
 }
 
 [data-theme='blush'] {
+  color-scheme: light;
   --ink: #fff5f7;
   --panel: #fffcfd;
   --elevated: #ffffff;
@@ -148,6 +157,7 @@
 }
 
 [data-theme='lavender'] {
+  color-scheme: light;
   --ink: #f7f4fc;
   --panel: #fcfbfe;
   --elevated: #ffffff;
@@ -162,6 +172,7 @@
 }
 
 [data-theme='peach'] {
+  color-scheme: light;
   --ink: #fff6f0;
   --panel: #fffcf9;
   --elevated: #ffffff;
@@ -176,6 +187,7 @@
 }
 
 [data-theme='rosegold'] {
+  color-scheme: light;
   --ink: #fbf6f3;
   --panel: #fffcfb;
   --elevated: #ffffff;
@@ -190,6 +202,7 @@
 }
 
 [data-theme='cotton'] {
+  color-scheme: light;
   --ink: #f8f4fb;
   --panel: #fdfbfe;
   --elevated: #ffffff;
@@ -204,6 +217,7 @@
 }
 
 [data-theme='mint'] {
+  color-scheme: light;
   --ink: #f3fbf7;
   --panel: #fbfefc;
   --elevated: #ffffff;
@@ -218,6 +232,7 @@
 }
 
 [data-theme='blossom'] {
+  color-scheme: light;
   --ink: #fff7f8;
   --panel: #fffbfc;
   --elevated: #ffffff;
@@ -232,6 +247,7 @@
 }
 
 [data-theme='coquette'] {
+  color-scheme: light;
   --ink: #fbf6ee;
   --panel: #fffcf7;
   --elevated: #ffffff;
@@ -381,11 +397,13 @@ body {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .bubble-creator::before {
+  .bubble-creator::before,
+  .bubble-premium::before {
     animation: plum-dust-fall 7.6s linear infinite;
   }
 
-  .bubble-creator::after {
+  .bubble-creator::after,
+  .bubble-premium::after {
     animation: creator-shine 2.5s linear infinite;
   }
 }
@@ -402,6 +420,102 @@ body {
 .bubble-creator .msg-meta,
 .bubble-creator .msg-meta svg {
   color: #f3eeff;
+}
+
+/* Premium follows the active theme. Hue comes from --accent / --accent-2; lightness stays in a readable band. */
+.bubble-premium {
+  position: relative;
+  overflow: hidden;
+  color: light-dark(#1a1220, #fff);
+  background-color: light-dark(oklch(from var(--accent) 0.9 0.045 h), oklch(from var(--accent) 0.4 0.09 h));
+  background-image: linear-gradient(
+    165deg,
+    light-dark(oklch(from var(--accent) 0.92 0.055 h), oklch(from var(--accent) 0.48 0.11 h)) 0%,
+    light-dark(oklch(from var(--accent-2) 0.86 0.05 h), oklch(from var(--accent-2) 0.34 0.09 h)) 100%
+  );
+  border: 1px solid light-dark(oklch(from var(--accent) 0.48 0.12 h), oklch(from var(--accent) 0.78 0.11 h));
+  box-shadow:
+    0 0 0 1px light-dark(oklch(from var(--accent) 0.55 0.08 h / 0.28), oklch(from var(--accent) 0.72 0.12 h / 0.35)),
+    0 8px 20px light-dark(oklch(from var(--accent) 0.62 0.1 h / 0.22), oklch(from var(--accent) 0.58 0.13 h / 0.32));
+}
+
+.bubble-premium::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 200%;
+  pointer-events: none;
+  background-repeat: repeat-y;
+  background-size: 100% 50%;
+  background-image:
+    radial-gradient(circle at 22% 30%, light-dark(oklch(from var(--accent) 0.5 0.12 h / 0.55), oklch(from var(--accent) 0.86 0.08 h / 0.7)) 0 0.8px, transparent 1.3px),
+    radial-gradient(circle at 71% 18%, light-dark(oklch(from var(--accent-2) 0.46 0.1 h / 0.4), oklch(from var(--accent-2) 0.82 0.08 h / 0.5)) 0 0.6px, transparent 1.1px),
+    radial-gradient(circle at 48% 62%, light-dark(oklch(from var(--accent) 0.52 0.1 h / 0.35), oklch(from var(--accent) 0.8 0.07 h / 0.42)) 0 0.7px, transparent 1.2px),
+    radial-gradient(circle at 84% 46%, light-dark(oklch(from var(--accent-2) 0.48 0.1 h / 0.3), oklch(from var(--accent-2) 0.84 0.07 h / 0.38)) 0 0.55px, transparent 1px);
+}
+
+.bubble-premium > * {
+  position: relative;
+  z-index: 1;
+}
+
+.bubble-premium::after {
+  content: '';
+  position: absolute;
+  top: -55%;
+  bottom: -55%;
+  left: 0;
+  z-index: 2;
+  width: 28%;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    transparent 38%,
+    light-dark(oklch(from var(--accent) 0.72 0.08 h / 0.28), oklch(from var(--accent) 0.94 0.04 h / 0.16)) 46%,
+    light-dark(oklch(from var(--accent) 0.78 0.06 h / 0.72), rgb(255 255 255 / 0.55)) 50%,
+    light-dark(oklch(from var(--accent) 0.72 0.08 h / 0.28), oklch(from var(--accent) 0.94 0.04 h / 0.16)) 54%,
+    transparent 62%,
+    transparent 100%
+  );
+  transform: translateX(-180%) skewX(-18deg);
+}
+
+.bubble-premium .msg-meta,
+.bubble-premium .msg-meta svg {
+  color: light-dark(color-mix(in oklab, #1a1220 74%, var(--accent)), color-mix(in oklab, white 84%, var(--accent)));
+}
+
+.bubble-premium .reply-quote {
+  border-color: light-dark(oklch(from var(--accent) 0.42 0.1 h), rgb(255 255 255 / 0.72));
+  background: light-dark(rgb(255 255 255 / 0.55), rgb(0 0 0 / 0.14));
+  color: light-dark(#1a1220, rgb(255 255 255 / 0.9));
+}
+
+.bubble-premium [class*='text-white'] {
+  color: light-dark(#1a1220, rgb(255 255 255 / 0.9));
+}
+
+.bubble-premium [class*='decoration-white'] {
+  text-decoration-color: light-dark(rgb(26 18 32 / 0.45), rgb(255 255 255 / 0.7));
+}
+
+.bubble-premium [class*='bg-white'] {
+  background-color: light-dark(rgb(26 18 32 / 0.1), rgb(255 255 255 / 0.2));
+}
+
+.bubble-premium [class~='bg-white'] {
+  background-color: light-dark(#1a1220, #fff);
+}
+
+.bubble-premium [class*='bg-black'] {
+  background-color: light-dark(rgb(255 255 255 / 0.46), rgb(0 0 0 / 0.16));
+}
+
+.bubble-premium [class*='border-white'] {
+  border-color: light-dark(oklch(from var(--accent) 0.42 0.1 h), rgb(255 255 255 / 0.7));
 }
 
 .typing-dot {
@@ -1049,6 +1163,8 @@ textarea:-webkit-autofill {
   .verified-tick::after,
   .bubble-creator::before,
   .bubble-creator::after,
+  .bubble-premium::before,
+  .bubble-premium::after,
   .notice-in {
     animation: none;
   }
@@ -1077,7 +1193,8 @@ textarea:-webkit-autofill {
 
 [data-theme='light'] .bubble-own,
 [data-theme='light'] .bubble-other,
-[data-theme='light'] .bubble-creator {
+[data-theme='light'] .bubble-creator,
+[data-theme='light'] .bubble-premium {
   border-radius: 22px;
 }
 

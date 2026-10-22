@@ -787,13 +787,13 @@ function MessageRow({
     : tailed ? 'rounded-[18px] rounded-bl-[5px]' : 'rounded-[18px]'
   const image = !deleted && message.kind === 'image'
   const video = !deleted && message.kind === 'video'
-  const gold = (senderCreator || senderPremium) && !deleted
-  const ownTone = mine || gold
+  const featured = (senderCreator || senderPremium) && !deleted
+  const ownTone = mine || featured
   const reactions = groupedReactions(message.reactions, meId)
   const parts = linkParts(message.body)
   const firstLink = parts.find((part) => part.type === 'link')?.value
-  const bubble = gold ? 'bubble-creator' : mine ? 'bubble-own' : 'bubble-other'
-  const tail = !gold && tailed ? (mine ? 'tail-own' : 'tail-other') : ''
+  const bubble = senderCreator && !deleted ? 'bubble-creator' : senderPremium && !deleted ? 'bubble-premium' : mine ? 'bubble-own' : 'bubble-other'
+  const tail = !featured && tailed ? (mine ? 'tail-own' : 'tail-other') : ''
   const cancelPress = useRef<(() => void) | null>(null)
 
   useEffect(() => () => cancelPress.current?.(), [])
@@ -853,7 +853,7 @@ function MessageRow({
         </div>
       ) : null}
       <div className={`relative min-w-0 max-w-full ${highlighted ? 'rounded-[18px] ring-2 ring-sakura/70' : ''}`}>
-        <div data-creator-bubble={gold ? 'true' : undefined} className={`msg-bubble ${bubble} bubble-in relative min-w-0 max-w-full text-left ${radius} ${(image || video) && !gold ? 'overflow-hidden p-1' : 'bubble-pad'} ${tail}`}>
+        <div data-creator-bubble={senderCreator && !deleted ? 'true' : undefined} data-premium-bubble={senderPremium && !senderCreator && !deleted ? 'true' : undefined} className={`msg-bubble ${bubble} bubble-in relative min-w-0 max-w-full text-left ${radius} ${(image || video) && !featured ? 'overflow-hidden p-1' : 'bubble-pad'} ${tail}`}>
           {message.replyPreview && !deleted ? (
             <p className={`reply-quote mb-1 rounded-md border-l-2 px-2 py-1 text-xs ${ownTone ? 'border-white/70 bg-black/10 text-white/85' : 'border-sakura bg-black/5 text-mist'}`}>
               {message.replyPreview}
