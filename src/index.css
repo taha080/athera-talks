@@ -1393,7 +1393,7 @@ audio[data-call-audio]::-webkit-media-controls-enclosure {
   display: none !important;
 }
 
-/* Taha and Elma only. The family loop covers the chat, with a soft veil so bubbles stay readable. */
+/* Taha and Elma only. The family loop fills the whole chat, including behind the header and composer. */
 .chat-column.wallpaper-forger {
   isolation: isolate;
   overflow: hidden;
@@ -1415,15 +1415,49 @@ audio[data-call-audio]::-webkit-media-controls-enclosure {
 }
 
 .forger-wallpaper img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center;
+  image-rendering: auto;
 }
 
-.forger-wallpaper::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgb(10 16 28 / 0.42);
+.chat-column.wallpaper-forger .chat-header,
+.chat-column.wallpaper-forger .composer-dock {
+  background-color: rgb(255 250 244 / 0.62);
+  border-color: rgb(255 255 255 / 0.4);
+  color: #1b140f;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.chat-column.wallpaper-forger .chat-header {
+  box-shadow: inset 0 -1px 0 rgb(255 255 255 / 0.45);
+}
+
+.chat-column.wallpaper-forger .composer-dock {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4);
+}
+
+.chat-column.wallpaper-forger .chat-title,
+.chat-column.wallpaper-forger .chat-header .hover-wash,
+.chat-column.wallpaper-forger .composer-shell .hover-wash {
+  color: #1b140f;
+}
+
+.chat-column.wallpaper-forger .chat-status.text-mist,
+.chat-column.wallpaper-forger .composer-shell textarea,
+.chat-column.wallpaper-forger .composer-shell textarea::placeholder {
+  color: #5c4638;
+}
+
+.chat-column.wallpaper-forger .composer-shell textarea {
+  color: #1b140f;
+}
+
+.chat-column.wallpaper-forger .composer-shell {
+  background-color: rgb(255 252 248 / 0.78);
+  border-color: rgb(255 255 255 / 0.55);
+  box-shadow: 0 1px 2px rgb(28 20 12 / 0.08);
 }
