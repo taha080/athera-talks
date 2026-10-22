@@ -1166,8 +1166,14 @@ textarea:-webkit-autofill {
   .bubble-premium::before,
   .bubble-premium::after,
   .bubble-forger::after,
+  .forger-anya-legs,
+  .forger-anya-blink,
   .notice-in {
     animation: none;
+  }
+
+  .forger-anya-blink {
+    opacity: 0;
   }
 }
 
@@ -1571,28 +1577,58 @@ audio[data-call-audio]::-webkit-media-controls-enclosure {
   color: #fff8f4;
 }
 
-.forger-rose {
+.forger-anya {
   position: absolute;
-  top: -15px;
-  left: 10px;
-  z-index: 3;
-  display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 2px rgb(28 20 12 / 0.16), 0 6px 14px rgb(28 20 12 / 0.12);
+  top: -19px;
+  left: 8px;
+  z-index: 4;
+  width: 25px;
+  height: 34px;
   pointer-events: none;
 }
 
-.forger-rose.is-mine {
-  right: 10px;
+.forger-anya.is-mine {
+  right: 8px;
   left: auto;
 }
 
-.forger-rose svg {
+.forger-anya svg {
   display: block;
-  width: 20px;
-  height: 20px;
+  width: 25px;
+  height: 34px;
+  overflow: visible;
+  filter: drop-shadow(0 1px 1px rgb(20 10 14 / 0.35));
+}
+
+.forger-anya-legs {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: anya-leg-swing 2.8s ease-in-out infinite;
+}
+
+.forger-anya-blink {
+  opacity: 0;
+  animation: anya-blink 4.8s linear infinite;
+}
+
+@keyframes anya-leg-swing {
+  0%,
+  100% {
+    transform: rotate(-7deg);
+  }
+  50% {
+    transform: rotate(7deg);
+  }
+}
+
+@keyframes anya-blink {
+  0%,
+  88%,
+  100% {
+    opacity: 0;
+  }
+  91%,
+  94% {
+    opacity: 1;
+  }
 }
