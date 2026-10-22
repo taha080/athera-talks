@@ -853,48 +853,71 @@ function MessageRow({
         </div>
       ) : null}
       <div className={`relative min-w-0 max-w-full ${highlighted ? 'rounded-[18px] ring-2 ring-sakura/70' : ''}`}>
-        <div data-creator-bubble={gold ? 'true' : undefined} className={`msg-bubble ${bubble} bubble-in relative w-full min-w-0 max-w-full text-left ${radius} ${(image || video) && !gold ? 'overflow-hidden p-1' : 'bubble-pad px-2.5 py-1.5'} ${tail}`}>
+        <div data-creator-bubble={gold ? 'true' : undefined} className={`msg-bubble ${bubble} bubble-in relative min-w-0 max-w-full text-left ${radius} ${(image || video) && !gold ? 'overflow-hidden p-1' : 'bubble-pad'} ${tail}`}>
           {message.replyPreview && !deleted ? (
             <p className={`reply-quote mb-1 rounded-md border-l-2 px-2 py-1 text-xs ${ownTone ? 'border-white/70 bg-black/10 text-white/85' : 'border-sakura bg-black/5 text-mist'}`}>
               {message.replyPreview}
             </p>
           ) : null}
-          {deleted ? <p className="px-1 text-sm italic opacity-80">This message was deleted</p> : null}
+          {deleted ? (
+            <p className="msg-copy text-sm italic leading-5 opacity-80">
+              This message was deleted
+              <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={false} />
+            </p>
+          ) : null}
           {image ? (
             message.mediaUrl ? (
-              <button type="button" className="block max-w-full" aria-label="Open photo" onClick={() => onOpenImage(message.mediaUrl as string)}>
-                <img src={message.mediaUrl} alt={message.body && message.body !== 'Photo' ? message.body : 'Photo'} className="max-h-72 max-w-full rounded-[14px] object-cover" />
-              </button>
+              <div className="msg-media-frame">
+                <button type="button" className="block max-w-full" aria-label="Open photo" onClick={() => onOpenImage(message.mediaUrl as string)}>
+                  <img src={message.mediaUrl} alt={message.body && message.body !== 'Photo' ? message.body : 'Photo'} className="max-h-72 max-w-full rounded-[14px] object-cover" />
+                </button>
+                {message.body.trim() === 'Photo' ? <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine} onMedia /> : null}
+              </div>
             ) : (
-              <p className="px-2 py-1 text-sm">Photo</p>
+              <p className="msg-copy text-sm leading-5">
+                Photo
+                <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine} />
+              </p>
             )
           ) : null}
           {video ? (
             message.mediaUrl ? (
-              <VideoBubble src={message.mediaUrl} seconds={message.mediaSeconds} />
+              <div className="msg-media-frame">
+                <VideoBubble src={message.mediaUrl} seconds={message.mediaSeconds} />
+                {message.body.trim() === 'Video' ? <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine} onMedia /> : null}
+              </div>
             ) : (
-              <p className="px-2 py-1 text-sm">Video</p>
+              <p className="msg-copy text-sm leading-5">
+                Video
+                <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine} />
+              </p>
             )
           ) : null}
           {(image && message.body.trim() && message.body.trim() !== 'Photo') || (video && message.body.trim() && message.body.trim() !== 'Video') ? (
-            <p className="msg-copy whitespace-pre-wrap px-1.5 pb-0.5 pt-1 text-sm leading-5">{message.body}</p>
+            <p className="msg-copy px-1.5 pt-1 text-sm leading-5">
+              <span className="whitespace-pre-wrap">{message.body}</span>
+              <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine} edited={Boolean(message.editedAt)} />
+            </p>
           ) : null}
           {!deleted && message.kind === 'voice' ? (
-            <VoiceBubble src={message.mediaUrl} seconds={message.mediaSeconds} waveform={message.waveform} mine={ownTone} />
+            <div className="msg-voice flex items-end gap-2">
+              <VoiceBubble src={message.mediaUrl} seconds={message.mediaSeconds} waveform={message.waveform} mine={ownTone} />
+              <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine} />
+            </div>
           ) : null}
           {!deleted && message.kind !== 'voice' && message.kind !== 'image' && message.kind !== 'video' ? (
             <div>
-              <p className="msg-copy whitespace-pre-wrap px-0.5 text-sm leading-5">
+              <p className="msg-copy text-sm leading-5">
                 {parts.map((part, index) =>
                   part.type === 'link' ? (
-                    <a key={`${part.value}-${index}`} href={part.value} target="_blank" rel="noreferrer" className={ownTone ? 'underline decoration-white/70 underline-offset-2' : 'text-sakura underline underline-offset-2'}>
+                    <a key={`${part.value}-${index}`} href={part.value} target="_blank" rel="noreferrer" className={`whitespace-pre-wrap ${ownTone ? 'underline decoration-white/70 underline-offset-2' : 'text-sakura underline underline-offset-2'}`}>
                       {part.value}
                     </a>
                   ) : (
-                    <span key={`${index}-${part.value.slice(0, 8)}`}>{part.value}</span>
+                    <span key={`${index}-${part.value.slice(0, 8)}`} className="whitespace-pre-wrap">{part.value}</span>
                   ),
                 )}
-                <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine && !deleted} edited={Boolean(message.editedAt)} floated />
+                <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine && !deleted} edited={Boolean(message.editedAt)} />
               </p>
               {firstLink ? (
                 <a href={firstLink} target="_blank" rel="noreferrer" className={ownTone ? 'mt-1 block rounded-lg bg-black/15 px-2 py-1.5 text-xs text-white/90' : 'mt-1 block rounded-lg bg-black/[0.04] px-2 py-1.5 text-xs text-mist'}>
@@ -903,9 +926,7 @@ function MessageRow({
                 </a>
               ) : null}
             </div>
-          ) : (
-            <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine && !deleted} edited={Boolean(message.editedAt)} />
-          )}
+          ) : null}
         </div>
         {reactions.length > 0 ? (
           <div className={`msg-reactions mt-1 flex flex-wrap gap-1 ${mine ? 'justify-end' : ''}`}>
@@ -961,17 +982,17 @@ function Meta({
   tick,
   showTick,
   edited = false,
-  floated = false,
+  onMedia = false,
 }: {
   mine: boolean
   createdAt: string
   tick: string
   showTick: boolean
   edited?: boolean
-  floated?: boolean
+  onMedia?: boolean
 }) {
   return (
-    <span className={`msg-meta ${floated ? 'float-right ml-2 mt-1.5' : 'mt-0.5 flex justify-end'} inline-flex items-center gap-1 px-0.5 text-[11px] leading-none ${mine ? 'text-white/75' : 'text-mist'}`}>
+    <span className={`msg-meta text-[11px] ${onMedia ? 'msg-meta-on-media' : ''} ${mine ? 'text-white/75' : 'text-mist'}`}>
       {edited ? <span>edited</span> : null}
       <time dateTime={createdAt}>{formatMessageTime(createdAt)}</time>
       {showTick ? (

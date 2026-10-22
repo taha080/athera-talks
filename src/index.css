@@ -458,9 +458,14 @@ body {
 }
 
 .msg-bubble {
-  width: 100%;
+  width: fit-content;
   max-width: 100%;
   min-width: 0;
+  height: auto;
+}
+
+.bubble-pad {
+  padding: 8px 12px;
 }
 
 .reply-quote {
@@ -476,7 +481,39 @@ body {
 .msg-copy {
   min-width: 0;
   max-width: 100%;
+  margin: 0;
   overflow-wrap: break-word;
+}
+
+/* Time and ticks follow the last word, and wrap under it only when the line is full. */
+.msg-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  white-space: nowrap;
+  vertical-align: bottom;
+  line-height: 1;
+}
+
+.msg-media-frame {
+  position: relative;
+  max-width: 100%;
+}
+
+.msg-voice > .msg-meta {
+  margin-left: 0;
+}
+
+.msg-meta-on-media {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  margin-left: 0;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.45);
+  color: #fff;
 }
 
 /* Message actions stay hidden until a long-press marks the one open group.
@@ -1045,7 +1082,7 @@ textarea:-webkit-autofill {
 }
 
 [data-theme='light'] .bubble-pad {
-  padding: 9px 13px 7px;
+  padding: 8px 12px;
 }
 
 [data-theme='light'] .bubble-own {
