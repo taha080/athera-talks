@@ -7,7 +7,10 @@ describe('conversation wallpaper', () => {
     expect(conversationWallpaperClass('c1000000-0000-4000-8000-000000000001')).toBe('')
     expect(conversationWallpaperClass('elma')).toBe('')
     expect(conversationWallpaperClass(null)).toBe('')
-    expect(conversationWallpaperMedia(FORGER_CHAT_ID)?.gif).toMatch(/taha-elma/)
+    const media = conversationWallpaperMedia(FORGER_CHAT_ID)
+    expect(media?.gif).toMatch(/taha-elma/)
+    expect(media?.mp4).toMatch(/taha-elma/)
+    expect(media?.webm).toMatch(/taha-elma/)
     expect(conversationWallpaperMedia('c1000000-0000-4000-8000-000000000001')).toBeNull()
   })
 

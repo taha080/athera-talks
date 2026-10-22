@@ -56,6 +56,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
   const [dropFile, setDropFile] = useState<File | null>(null)
   const [dropHot, setDropHot] = useState(false)
   const dragDepth = useRef(0)
+  const wallpaperVideo = useRef<HTMLVideoElement>(null)
   const [jumpCount, setJumpCount] = useState(0)
   const [dividerId, setDividerId] = useState<string | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
@@ -98,6 +99,18 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
       stop()
     }
   }, [api, conversation?.id])
+
+  useEffect(() => {
+    const video = wallpaperVideo.current
+    if (!video) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    video.muted = true
+    if (reduce) {
+      video.pause()
+      return
+    }
+    void video.play().catch(() => {})
+  }, [conversation?.id])
 
   useEffect(() => {
     setReply(null)
@@ -373,18 +386,24 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
     >
       {forgerMedia ? (
         <div className="forger-wallpaper" aria-hidden="true">
-          <div className="forger-wallpaper-fill">
-            <picture>
-              <source srcSet={forgerMedia.still} media="(prefers-reduced-motion: reduce)" />
-              <img src={forgerMedia.gif} alt="" />
-            </picture>
-          </div>
-          <div className="forger-wallpaper-stage">
-            <picture>
-              <source srcSet={forgerMedia.still} media="(prefers-reduced-motion: reduce)" />
-              <img src={forgerMedia.gif} alt="" width={498} height={294} />
-            </picture>
-          </div>
+          <picture className="forger-wallpaper-fallback">
+            <source srcSet={forgerMedia.still} media="(prefers-reduced-motion: reduce)" />
+            <img src={forgerMedia.gif} alt="" />
+          </picture>
+          <video
+            ref={wallpaperVideo}
+            poster={forgerMedia.gif}
+            autoPlay
+            muted
+            loop
+            playsInline
+            disablePictureInPicture
+            preload="auto"
+            tabIndex={-1}
+          >
+            <source src={forgerMedia.webm} type="video/webm" />
+            <source src={forgerMedia.mp4} type="video/mp4" />
+          </video>
         </div>
       ) : null}
       {dropHot ? (
