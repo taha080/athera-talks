@@ -1165,6 +1165,7 @@ textarea:-webkit-autofill {
   .bubble-creator::after,
   .bubble-premium::before,
   .bubble-premium::after,
+  .bubble-forger::after,
   .notice-in {
     animation: none;
   }
@@ -1412,15 +1413,47 @@ audio[data-call-audio]::-webkit-media-controls-enclosure {
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
+  background: #140e12;
 }
 
-.forger-wallpaper img {
+.forger-wallpaper-fill,
+.forger-wallpaper-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.forger-wallpaper-fill img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center;
+  filter: blur(26px) brightness(0.72);
+  transform: scale(1.08);
+}
+
+.forger-wallpaper-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgb(18 12 16 / 0.32);
+}
+
+.forger-wallpaper-stage {
+  display: grid;
+  place-items: center;
+  padding: 72px 16px 92px;
+}
+
+.forger-wallpaper-stage img {
+  display: block;
+  width: 498px;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
   image-rendering: auto;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.22);
 }
 
 .chat-column.wallpaper-forger .chat-header,
@@ -1460,4 +1493,114 @@ audio[data-call-audio]::-webkit-media-controls-enclosure {
   background-color: rgb(255 252 248 / 0.78);
   border-color: rgb(255 255 255 / 0.55);
   box-shadow: 0 1px 2px rgb(28 20 12 / 0.08);
+}
+
+/* Rose bubbles for this conversation only. The fill is dark enough to read in light and dark themes. */
+.chat-column.wallpaper-forger .chat-stream {
+  padding-top: 18px;
+}
+
+.chat-column.wallpaper-forger .msg-cluster {
+  margin-top: 22px;
+}
+
+.chat-column.wallpaper-forger .msg-cluster:first-child {
+  margin-top: 4px;
+}
+
+.chat-column.wallpaper-forger .msg-follow {
+  margin-top: 18px;
+}
+
+.chat-column.wallpaper-forger .bubble-forger {
+  position: relative;
+  overflow: hidden;
+  color: #fff8f4;
+  background-color: #4a1524;
+  background-image: linear-gradient(160deg, #1a1214 0%, #4a1524 38%, #8e2438 72%, #c45a55 100%);
+  border: 1px solid rgb(255 214 206 / 0.28);
+  border-radius: 18px;
+  box-shadow: 0 1px 2px rgb(28 20 12 / 0.14), 0 8px 18px rgb(28 20 12 / 0.1);
+}
+
+.chat-column.wallpaper-forger .bubble-forger.bubble-pad {
+  padding: 18px 14px 8px;
+}
+
+.chat-column.wallpaper-forger .bubble-forger > * {
+  position: relative;
+  z-index: 1;
+}
+
+.chat-column.wallpaper-forger .bubble-forger::after {
+  content: '';
+  position: absolute;
+  top: -40%;
+  bottom: -40%;
+  left: 0;
+  z-index: 2;
+  width: 28%;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 34%, rgb(255 170 160 / 0.15) 46%, rgb(255 236 230 / 0.72) 50%, transparent 62%);
+  transform: translate3d(-180%, 0, 0) skewX(-16deg);
+  animation: forger-gleam 3.1s linear infinite;
+  animation-delay: -1.15s;
+  will-change: transform;
+}
+
+@keyframes forger-gleam {
+  from {
+    transform: translate3d(-180%, 0, 0) skewX(-16deg);
+  }
+  to {
+    transform: translate3d(380%, 0, 0) skewX(-16deg);
+  }
+}
+
+.chat-column.wallpaper-forger .bubble-forger .msg-copy,
+.chat-column.wallpaper-forger .bubble-forger .msg-meta,
+.chat-column.wallpaper-forger .bubble-forger .msg-meta time,
+.chat-column.wallpaper-forger .bubble-forger .msg-meta svg {
+  color: #fff8f4;
+}
+
+.chat-column.wallpaper-forger .bubble-forger .msg-meta,
+.chat-column.wallpaper-forger .bubble-forger .msg-meta time {
+  color: rgb(255 220 214 / 0.9);
+}
+
+.chat-column.wallpaper-forger .bubble-forger a {
+  color: #fff8f4;
+}
+
+.chat-column.wallpaper-forger .bubble-forger .reply-quote {
+  border-color: rgb(255 220 214 / 0.72);
+  background: rgb(0 0 0 / 0.2);
+  color: #fff8f4;
+}
+
+.forger-rose {
+  position: absolute;
+  top: -15px;
+  left: 10px;
+  z-index: 3;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(28 20 12 / 0.16), 0 6px 14px rgb(28 20 12 / 0.12);
+  pointer-events: none;
+}
+
+.forger-rose.is-mine {
+  right: 10px;
+  left: auto;
+}
+
+.forger-rose svg {
+  display: block;
+  width: 20px;
+  height: 20px;
 }

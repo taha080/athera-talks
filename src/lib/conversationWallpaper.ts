@@ -13,3 +13,8 @@ export function conversationWallpaperMedia(conversationId: string | null | undef
   if (conversationId !== FORGER_CHAT_ID) return null
   return { gif: wallpaperUrl, still: wallpaperStillUrl }
 }
+
+/** Rose bubbles belong to this conversation only. Other chats keep their own styles. */
+export function conversationUsesForgerBubbles(conversationId: string | null | undefined): boolean {
+  return conversationId === FORGER_CHAT_ID
+}
