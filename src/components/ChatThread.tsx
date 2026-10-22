@@ -6,7 +6,7 @@ import { useSession } from '../context/SessionContext'
 import { useTheme } from '../context/ThemeContext'
 import { callLogLabel } from '../lib/callLog'
 import { wallpaperClass } from '../lib/appearance'
-import { conversationWallpaperClass } from '../lib/conversationWallpaper'
+import { conversationWallpaperClass, conversationWallpaperMedia } from '../lib/conversationWallpaper'
 import { chatTitle, isGroup, showSenderName } from '../lib/chatList'
 import { QUICK_REACTIONS, groupPosition, groupedReactions, linkHost, linkParts, type GroupPos } from '../lib/chatView'
 import { dayKey, formatDayLabel, formatMessageTime } from '../lib/format'
@@ -249,6 +249,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
 
   const wallpaper = profile?.wallpaper ?? 'plain'
   const specialWallpaper = conversationWallpaperClass(conversation.id)
+  const forgerMedia = conversationWallpaperMedia(conversation.id)
   const customImage =
     specialWallpaper || theme === 'midnight' || wallpaper !== 'custom' || !profile?.wallpaperUrl
       ? ''
@@ -370,6 +371,14 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
         else if (event.dataTransfer.files.length > 0) setActionError('Choose a photo or video.')
       }}
     >
+      {forgerMedia ? (
+        <div className="forger-wallpaper" aria-hidden="true">
+          <picture>
+            <source srcSet={forgerMedia.still} media="(prefers-reduced-motion: reduce)" />
+            <img src={forgerMedia.gif} alt="" />
+          </picture>
+        </div>
+      ) : null}
       {dropHot ? (
         <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center bg-black/45">
           <p className="rounded-xl border border-line bg-panel px-4 py-2 text-sm text-paper">Drop a photo or video</p>
