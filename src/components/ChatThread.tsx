@@ -6,6 +6,7 @@ import { useSession } from '../context/SessionContext'
 import { useTheme } from '../context/ThemeContext'
 import { callLogLabel } from '../lib/callLog'
 import { wallpaperClass } from '../lib/appearance'
+import { conversationWallpaperClass } from '../lib/conversationWallpaper'
 import { chatTitle, isGroup, showSenderName } from '../lib/chatList'
 import { QUICK_REACTIONS, groupPosition, groupedReactions, linkHost, linkParts, type GroupPos } from '../lib/chatView'
 import { dayKey, formatDayLabel, formatMessageTime } from '../lib/format'
@@ -247,8 +248,9 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
   }
 
   const wallpaper = profile?.wallpaper ?? 'plain'
+  const specialWallpaper = conversationWallpaperClass(conversation.id)
   const customImage =
-    theme === 'midnight' || wallpaper !== 'custom' || !profile?.wallpaperUrl
+    specialWallpaper || theme === 'midnight' || wallpaper !== 'custom' || !profile?.wallpaperUrl
       ? ''
       : profile.wallpaperUrl.replace(/"/g, '')
   const group = isGroup(conversation)
@@ -341,7 +343,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
 
   return (
     <div
-      className={`chat-column relative flex h-full min-h-0 flex-col ${wallpaperClass(wallpaper)}`}
+      className={`chat-column relative flex h-full min-h-0 flex-col ${specialWallpaper || wallpaperClass(wallpaper)}`}
       style={customImage ? { backgroundImage: `url("${customImage}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
       onDragEnter={(event) => {
         if (pendingRequest || conversation.blocked || !Array.from(event.dataTransfer.types).includes('Files')) return
