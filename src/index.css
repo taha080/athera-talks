@@ -1166,14 +1166,9 @@ textarea:-webkit-autofill {
   .bubble-premium::before,
   .bubble-premium::after,
   .bubble-forger::after,
-  .forger-anya-legs,
-  .forger-anya-blink,
+  .forger-anya img,
   .notice-in {
     animation: none;
-  }
-
-  .forger-anya-blink {
-    opacity: 0;
   }
 }
 
@@ -1495,11 +1490,11 @@ audio[data-call-audio]::-webkit-media-controls-enclosure {
 
 /* Rose bubbles for this conversation only. The fill is dark enough to read in light and dark themes. */
 .chat-column.wallpaper-forger .chat-stream {
-  padding-top: 30px;
+  padding-top: 44px;
 }
 
 .chat-column.wallpaper-forger .msg-cluster {
-  margin-top: 32px;
+  margin-top: 46px;
 }
 
 .chat-column.wallpaper-forger .msg-cluster:first-child {
@@ -1507,7 +1502,7 @@ audio[data-call-audio]::-webkit-media-controls-enclosure {
 }
 
 .chat-column.wallpaper-forger .msg-follow {
-  margin-top: 28px;
+  margin-top: 40px;
 }
 
 .chat-column.wallpaper-forger .bubble-forger {
@@ -1522,7 +1517,7 @@ audio[data-call-audio]::-webkit-media-controls-enclosure {
 }
 
 .chat-column.wallpaper-forger .bubble-forger.bubble-pad {
-  padding: 20px 14px 8px;
+  padding: 22px 14px 8px;
 }
 
 .chat-column.wallpaper-forger .bubble-forger > * {
@@ -1579,11 +1574,11 @@ audio[data-call-audio]::-webkit-media-controls-enclosure {
 
 .forger-anya {
   position: absolute;
-  top: -28px;
+  top: -39px;
   left: 8px;
   z-index: 4;
-  width: 38px;
-  height: 42px;
+  width: 32.5px;
+  height: 56px;
   pointer-events: none;
 }
 
@@ -1592,43 +1587,36 @@ audio[data-call-audio]::-webkit-media-controls-enclosure {
   left: auto;
 }
 
-.forger-anya svg {
+.forger-anya img {
+  position: relative;
+  z-index: 1;
   display: block;
-  width: 38px;
-  height: 42px;
-  overflow: visible;
-  filter: drop-shadow(0 1px 1px rgb(20 10 14 / 0.28));
+  width: 32.5px;
+  height: 56px;
+  animation: anya-bob 2.6s ease-in-out infinite;
+  transform-origin: 50% 70%;
 }
 
-.forger-anya-legs {
-  transform-box: fill-box;
-  transform-origin: 50% 0;
-  animation: anya-leg-swing 2.8s ease-in-out infinite;
+.forger-anya::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  left: 14%;
+  right: 14%;
+  top: 36px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgb(20 8 12 / 0.5);
+  filter: blur(1.6px);
+  pointer-events: none;
 }
 
-.forger-anya-blink {
-  opacity: 0;
-  animation: anya-blink 4.8s linear infinite;
-}
-
-@keyframes anya-leg-swing {
+@keyframes anya-bob {
   0%,
   100% {
-    transform: rotate(-7deg);
+    transform: translate3d(0, 0, 0);
   }
   50% {
-    transform: rotate(7deg);
-  }
-}
-
-@keyframes anya-blink {
-  0%,
-  88%,
-  100% {
-    opacity: 0;
-  }
-  91%,
-  94% {
-    opacity: 1;
+    transform: translate3d(0, -1.5px, 0);
   }
 }
