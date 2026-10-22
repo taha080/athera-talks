@@ -59,7 +59,7 @@ export function VoiceBubble({
   const elapsed = total > 0 ? Math.round(progress * total) : 0
 
   return (
-    <div className="flex min-w-[200px] items-center gap-2">
+    <div className="flex items-center gap-2">
       <button
         type="button"
         className={mine ? 'grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/20' : 'grid h-9 w-9 shrink-0 place-items-center rounded-full bg-sakura/15 text-sakura'}
@@ -69,7 +69,7 @@ export function VoiceBubble({
       >
         {playing ? <PauseIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
       </button>
-      <div className="min-w-0 flex-1">
+      <div>
         <div className="flex h-8 items-end gap-[3px]" aria-hidden="true">
           {bars.map((height, index) => {
             const active = bars.length > 0 && index / bars.length <= progress
