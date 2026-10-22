@@ -6,7 +6,7 @@ import { useSession } from '../context/SessionContext'
 import { useTheme } from '../context/ThemeContext'
 import { callLogLabel } from '../lib/callLog'
 import { wallpaperClass } from '../lib/appearance'
-import { conversationWallpaperClass, conversationWallpaperMedia } from '../lib/conversationWallpaper'
+import { conversationUsesForgerBubbles, conversationWallpaperClass, conversationWallpaperMedia } from '../lib/conversationWallpaper'
 import { chatTitle, isGroup, showSenderName } from '../lib/chatList'
 import { QUICK_REACTIONS, groupPosition, groupedReactions, linkHost, linkParts, type GroupPos } from '../lib/chatView'
 import { dayKey, formatDayLabel, formatMessageTime } from '../lib/format'
@@ -373,10 +373,18 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
     >
       {forgerMedia ? (
         <div className="forger-wallpaper" aria-hidden="true">
-          <picture>
-            <source srcSet={forgerMedia.still} media="(prefers-reduced-motion: reduce)" />
-            <img src={forgerMedia.gif} alt="" />
-          </picture>
+          <div className="forger-wallpaper-fill">
+            <picture>
+              <source srcSet={forgerMedia.still} media="(prefers-reduced-motion: reduce)" />
+              <img src={forgerMedia.gif} alt="" />
+            </picture>
+          </div>
+          <div className="forger-wallpaper-stage">
+            <picture>
+              <source srcSet={forgerMedia.still} media="(prefers-reduced-motion: reduce)" />
+              <img src={forgerMedia.gif} alt="" width={498} height={294} />
+            </picture>
+          </div>
         </div>
       ) : null}
       {dropHot ? (
@@ -563,6 +571,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
               <MessageRow
                 message={message}
                 mine={mine}
+                forgerChat={conversationUsesForgerBubbles(conversation.id)}
                 pos={pos}
                 meId={profile?.id ?? ''}
                 senderName={senderName}
@@ -740,6 +749,7 @@ function placeMenu(x: number, y: number, canEdit: boolean): { position: 'fixed';
 function MessageRow({
   message,
   mine,
+  forgerChat,
   pos,
   meId,
   senderName,
@@ -766,6 +776,7 @@ function MessageRow({
 }: {
   message: Message
   mine: boolean
+  forgerChat: boolean
   pos: GroupPos
   meId: string
   senderName: string
@@ -798,13 +809,22 @@ function MessageRow({
     : tailed ? 'rounded-[18px] rounded-bl-[5px]' : 'rounded-[18px]'
   const image = !deleted && message.kind === 'image'
   const video = !deleted && message.kind === 'video'
+  const forger = forgerChat && !deleted && !image && !video
   const featured = (senderCreator || senderPremium) && !deleted
-  const ownTone = mine || featured
+  const ownTone = mine || featured || forger
   const reactions = groupedReactions(message.reactions, meId)
   const parts = linkParts(message.body)
   const firstLink = parts.find((part) => part.type === 'link')?.value
-  const bubble = senderCreator && !deleted ? 'bubble-creator' : senderPremium && !deleted ? 'bubble-premium' : mine ? 'bubble-own' : 'bubble-other'
-  const tail = !featured && tailed ? (mine ? 'tail-own' : 'tail-other') : ''
+  const bubble = forger
+    ? 'bubble-forger'
+    : senderCreator && !deleted
+      ? 'bubble-creator'
+      : senderPremium && !deleted
+        ? 'bubble-premium'
+        : mine
+          ? 'bubble-own'
+          : 'bubble-other'
+  const tail = forger || featured || !tailed ? '' : mine ? 'tail-own' : 'tail-other'
   const cancelPress = useRef<(() => void) | null>(null)
 
   useEffect(() => () => cancelPress.current?.(), [])
@@ -864,7 +884,8 @@ function MessageRow({
         </div>
       ) : null}
       <div className={`relative min-w-0 max-w-full ${highlighted ? 'rounded-[18px] ring-2 ring-sakura/70' : ''}`}>
-        <div data-creator-bubble={senderCreator && !deleted ? 'true' : undefined} data-premium-bubble={senderPremium && !senderCreator && !deleted ? 'true' : undefined} className={`msg-bubble ${bubble} bubble-in relative min-w-0 max-w-full text-left ${radius} ${(image || video) && !featured ? 'overflow-hidden p-1' : 'bubble-pad'} ${tail}`}>
+        {forger ? <ForgerRose mine={mine} /> : null}
+        <div data-forger-bubble={forger ? 'true' : undefined} data-creator-bubble={!forger && senderCreator && !deleted ? 'true' : undefined} data-premium-bubble={!forger && senderPremium && !senderCreator && !deleted ? 'true' : undefined} className={`msg-bubble ${bubble} bubble-in relative min-w-0 max-w-full text-left ${radius} ${(image || video) && !featured ? 'overflow-hidden p-1' : 'bubble-pad'} ${tail}`}>
           {message.replyPreview && !deleted ? (
             <p className={`reply-quote mb-1 rounded-md border-l-2 px-2 py-1 text-xs ${ownTone ? 'border-white/70 bg-black/10 text-white/85' : 'border-sakura bg-black/5 text-mist'}`}>
               {message.replyPreview}
@@ -984,6 +1005,20 @@ function MessageRow({
         ) : null}
       </div>
     </div>
+  )
+}
+
+function ForgerRose({ mine }: { mine: boolean }) {
+  return (
+    <span className={`forger-rose${mine ? ' is-mine' : ''}`} aria-hidden="true">
+      <svg viewBox="0 0 20 20" width="20" height="20">
+        <circle cx="10" cy="11.5" r="3.1" fill="#8e2438" />
+        <circle cx="6.6" cy="8.2" r="2.15" fill="#e56b93" />
+        <circle cx="13.4" cy="8.2" r="2.15" fill="#e56b93" />
+        <circle cx="10" cy="7.1" r="2.15" fill="#f4a0c0" />
+        <circle cx="8.2" cy="10.4" r="1.7" fill="#c45a55" />
+      </svg>
+    </span>
   )
 }
 
