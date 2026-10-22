@@ -1392,3 +1392,38 @@ audio[data-call-audio] {
 audio[data-call-audio]::-webkit-media-controls-enclosure {
   display: none !important;
 }
+
+/* Taha and Elma only. The family loop covers the chat, with a soft veil so bubbles stay readable. */
+.chat-column.wallpaper-forger {
+  isolation: isolate;
+  overflow: hidden;
+  background-color: #1a2430;
+  background-image: none;
+}
+
+[data-theme='midnight'] .chat-column.wallpaper-forger {
+  background-color: #1a2430;
+  background-image: none;
+}
+
+.forger-wallpaper {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.forger-wallpaper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.forger-wallpaper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgb(10 16 28 / 0.42);
+}
