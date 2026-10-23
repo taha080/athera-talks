@@ -267,6 +267,15 @@ body,
   min-height: 100%;
 }
 
+html.app-locked,
+html.app-locked body,
+html.app-locked #root {
+  height: var(--app-height, 100dvh);
+  max-height: var(--app-height, 100dvh);
+  min-height: 0;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   overflow-x: hidden;
@@ -722,7 +731,24 @@ textarea:-webkit-autofill {
 }
 
 .app-canvas {
+  height: var(--app-height, 100dvh);
+  max-height: var(--app-height, 100dvh);
   background-color: var(--ink);
+}
+
+.chat-column {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.chat-column > :not(.chat-stream) {
+  flex-shrink: 0;
+}
+
+.chat-column > .chat-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
 }
 
 [data-theme='light'] .app-canvas,
