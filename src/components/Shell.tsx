@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { CallProvider } from '../context/CallContext'
 import { ChatProvider, useChat } from '../context/ChatContext'
@@ -20,6 +20,7 @@ export function Shell() {
   const chatOpen = location.pathname.startsWith('/c/')
   const settingsOpen = location.pathname.startsWith('/settings') || location.pathname.startsWith('/profile')
   const showList = !chatOpen && !settingsOpen
+  useVisualViewport()
 
   return (
     <ChatProvider>
@@ -44,6 +45,37 @@ export function Shell() {
       </CallProvider>
     </ChatProvider>
   )
+}
+
+function useVisualViewport() {
+  useEffect(() => {
+    const root = document.documentElement
+    let frame = 0
+    const apply = () => {
+      const viewport = window.visualViewport
+      const height = viewport?.height ?? window.innerHeight
+      root.style.setProperty('--app-height', `${Math.round(height)}px`)
+      if ((viewport?.offsetTop ?? 0) > 0 || window.scrollY > 0) window.scrollTo(0, 0)
+    }
+    const schedule = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(apply)
+    }
+    root.classList.add('app-locked')
+    schedule()
+    const viewport = window.visualViewport
+    viewport?.addEventListener('resize', schedule)
+    viewport?.addEventListener('scroll', schedule)
+    window.addEventListener('resize', schedule)
+    return () => {
+      cancelAnimationFrame(frame)
+      viewport?.removeEventListener('resize', schedule)
+      viewport?.removeEventListener('scroll', schedule)
+      window.removeEventListener('resize', schedule)
+      root.classList.remove('app-locked')
+      root.style.removeProperty('--app-height')
+    }
+  }, [])
 }
 
 function NavRail() {
