@@ -4,7 +4,7 @@ export function routerBasename(baseUrl: string): string | undefined {
 }
 
 // Password emails always return to the live site, never localhost or the Supabase Site URL.
-export const PASSWORD_RESET_REDIRECT = 'https://taha080.github.io/ta-talk/'
+export const PASSWORD_RESET_REDIRECT = 'https://taha080.github.io/athera-talks/'
 
 export function isPasswordRecoveryUrl(href: string): boolean {
   try {
