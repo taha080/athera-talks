@@ -2,7 +2,7 @@
 
 **T.A.Talk** — Private messages and voice calls.
 
-Live site: [https://taha080.github.io/ta-talk/](https://taha080.github.io/ta-talk/)
+Live site: [https://taha080.github.io/athera-talks/](https://taha080.github.io/athera-talks/)
 
 Athera Talks (T.A.Talk) is a browser app for private messages and voice calls. You sign in, find a person by their exact username, and talk one to one or in a group. A voice button in a direct chat starts a WebRTC call. Each profile holds a username, an avatar, and a favourite anime. Created by Taha Ahsan.
 
@@ -104,8 +104,8 @@ The client is created only when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
 3. Under **Authentication → URL configuration**, set **Site URL** to `http://localhost:5173` while you develop.
 4. Add redirect URLs:
    - `http://localhost:5173/**`
-   - `https://taha080.github.io/ta-talk/**` for the published site
-   - `https://<github-username>.github.io/ta-talk/**` if you publish your own fork
+   - `https://taha080.github.io/athera-talks/**` for the published site
+   - `https://<github-username>.github.io/athera-talks/**` if you publish your own fork
    - Your Vercel origin with `/**`, if you use Vercel
 
 The reset-password link returns to `/reset-password`. The wildcards above cover that path.
@@ -134,7 +134,7 @@ cp .env.example .env
 | `VITE_SUPABASE_URL` | Project URL from Supabase → Project Settings → API |
 | `VITE_SUPABASE_ANON_KEY` | Anon public key from the same page |
 | `VITE_SUPABASE_GOOGLE_ENABLED` | `true` after the Google provider is enabled |
-| `VITE_BASE_PATH` | `/ta-talk/` on GitHub Pages. Leave unset locally and on Vercel |
+| `VITE_BASE_PATH` | `/athera-talks/` on GitHub Pages. Leave unset locally and on Vercel |
 | `VITE_TURN_URLS` | Optional relay URLs, or `none` for STUN only |
 | `VITE_TURN_USERNAME` | Optional relay username |
 | `VITE_TURN_CREDENTIAL` | Optional relay credential |
@@ -217,9 +217,9 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request,
 
 ### GitHub Pages
 
-`.github/workflows/deploy.yml` builds with `VITE_BASE_PATH` set to `/ta-talk/` and publishes the `dist` folder. The build copies `index.html` to `404.html` so routes such as `/c/...` still open the app.
+`.github/workflows/deploy.yml` builds with `VITE_BASE_PATH` set to `/athera-talks/` and publishes the `dist` folder. The build copies `index.html` to `404.html` so routes such as `/c/...` still open the app. The manifest `start_url` and `scope` are `.`, so they resolve from the manifest URL to `https://taha080.github.io/athera-talks/`. The app does not register a service worker.
 
-1. The repository name for this site is `ta-talk`. A different name needs a matching `VITE_BASE_PATH`.
+1. The repository name for this site is `athera-talks`. A different name needs a matching `VITE_BASE_PATH`.
 2. Under **Settings → Secrets and variables → Actions**, add `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_SUPABASE_GOOGLE_ENABLED`. Optional relay overrides use `VITE_TURN_URLS`, `VITE_TURN_USERNAME`, `VITE_TURN_CREDENTIAL`, and `VITE_TURN_SECRET`.
 3. Under **Settings → Pages → Build and deployment**, set the source to **GitHub Actions**.
 4. A push to `main` runs **Deploy to GitHub Pages**.

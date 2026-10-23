@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-// GitHub Pages project sites live under /<repo>/. Local dev and Vercel stay at "/".
+// GitHub Pages serves this repo at /athera-talks/. Local dev and Vercel stay at "/".
 const base = process.env.VITE_BASE_PATH || '/'
 
 export default defineConfig({
