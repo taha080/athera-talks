@@ -1,128 +1,154 @@
 # Athera Talks
 
-Real-time chat and browser voice calls for anime fans. Created by Taha Ahsan.
+**T.A.Talk** — Private messages and voice calls.
 
-Sign in with email or Google, search a username, and talk one to one. A voice button in the chat starts a WebRTC call. Profiles hold a username, an avatar, and a favourite anime.
+Live site: [https://taha080.github.io/ta-talk/](https://taha080.github.io/ta-talk/)
 
-If Supabase keys are missing, the app shows a setup screen instead of crashing. **Preview the demo** walks through the whole interface with sample fans stored in this browser.
+Athera Talks (T.A.Talk) is a browser app for private messages and voice calls. You sign in, find a person by their exact username, and talk one to one or in a group. A voice button in a direct chat starts a WebRTC call. Each profile holds a username, an avatar, and a favourite anime. Created by Taha Ahsan.
+
+If the Supabase settings are missing, the app opens a setup screen instead of crashing. **Preview the app** walks through the interface with sample data stored in this browser.
 
 ## Features
 
-- Email sign up and sign in, with a session that survives refresh
-- Sign up asks for a username and checks that it is free
-- Continue with Google (Supabase OAuth), disabled with an explanation until you turn it on
-- Forgot-password email, then a screen to choose a new password
-- Sign out from the chat list and from the profile page
-- One-to-one chat: search, conversation list, timestamps, read check marks
-- Voice calls: start, incoming accept or decline, mute, hang up, call timer
-- Profile: username, avatar upload, favourite anime
-- Dark theme by default, plus a Naruto night-village theme (navy, lantern orange, geometric kunai) saved in this browser
+### Accounts
 
-## Screenshots
+- Email sign-up and sign-in. The session stays after a refresh.
+- Sign-up asks for a username of 3–20 letters, numbers, or underscores, and checks that it is free.
+- Passwords are 6 to 72 characters.
+- Continue with Google when `VITE_SUPABASE_GOOGLE_ENABLED` is turned on. Until then the button stays disabled, with a short note.
+- Forgot-password email, then a page to choose a new password.
+- Sign out from the side navigation on a wide screen, and from Settings → Privacy on any screen.
 
-![Sign in](docs/screenshots/sign-in.png)
+### Chat
 
-![Sign up](docs/screenshots/sign-up.png)
+- A conversation list with timestamps, unread counts, and delivery and read ticks.
+- Filters for all chats and unread chats. Up to three chats can be pinned. Chats can be muted or archived.
+- Text, emoji, images, short videos, and voice notes. Images can be pasted. Videos upload in chunks.
+- Replies, reactions, copy, edit, delete for everyone, and hide for yourself.
+- Search inside a conversation. Links in a message stay tappable.
+- A typing indicator, a message chime, and optional desktop alerts.
+- Call history in the thread: completed, missed, declined, or cancelled.
 
-![Forgot password](docs/screenshots/forgot-password.png)
+### Message requests
 
-![Chat list](docs/screenshots/chat-list.png)
+Search matches one username exactly (a leading `@` is ignored). A direct chat, a message, or a call starts only after the other person accepts the request. Incoming requests appear under Requests, with a count on the badge.
 
-![Chat on a phone](docs/screenshots/chat-mobile.png)
+### Groups
 
-![Incoming call](docs/screenshots/incoming-call.png)
+Create a group from people you already chat with. Admins can rename the group, set a photo, add or remove members, and change roles. Any member can leave. Admins can delete the group.
 
-![Profile](docs/screenshots/profile.png)
+### Voice calls
 
-![Naruto setup](docs/screenshots/naruto-setup.png)
+Start a call, accept or decline an incoming call, mute, switch the speaker, and hang up. A timer runs once the peers connect. The screen shows Calling, Ringing, Connecting, the timer, or a failure reason. A blocked microphone is reported there. Both people need Athera Talks open. In the browser preview, the call screen works and the microphone stays off.
 
-![Naruto sign up](docs/screenshots/naruto-sign-up.png)
+### Premium
 
-![Naruto sign in](docs/screenshots/naruto-sign-in.png)
+Premium is a time window stored on the profile (`premium_from` through `premium_until`). While it is active, the name shows a verified tick, GIF avatars keep animating, and messages use the premium bubble. After the window ends, a GIF avatar stops animating. Settings has no switch for it. An operator grants or revokes it in the database with `grant_premium` and `revoke_premium`.
 
-![Naruto chat list](docs/screenshots/naruto-chat-list.png)
+The creator account is a separate flag. It shows the creator badge, can read the Reports list in Settings, and can still see last seen and read receipts when another person has hidden them. Animated GIF avatars are limited to Premium and the creator. Everyone else can upload PNG, JPEG, or WebP.
 
-![Naruto chat](docs/screenshots/naruto-chat.png)
+### Themes
 
-## Folder structure
+Sixteen themes, in Classic, Anime, and Soft & Pretty groups. The signed-in default is Midnight. Soft themes also apply a matching wallpaper. Settings includes pattern wallpapers and a photo wallpaper. The choice is saved on the profile, so it follows the account. Before sign-in, the last theme is kept in this browser under `tatalk:theme`. Colours and patterns in the theme set are original.
 
-```text
-src/
-  components/     shared UI (sidebar, chat thread, call screen, setup)
-  context/        session, chat list, and the voice-call state
-  demo/           sample fans used when Supabase is not configured
-  lib/            small helpers (time, username rules, WebRTC, Supabase client)
-  pages/          landing auth, reset password, home, profile
-  services/       live Supabase queries and call signaling
-supabase/schema.sql
-.github/workflows/   CI plus GitHub Pages deploy
-```
+### Privacy and safety
 
-## Create a Supabase project
+- Last seen and read receipts can be turned off. Someone is shown as online when they were here in the last 45 seconds.
+- Block stops messages and calls in both directions. Settings lists blocked people so you can unblock them.
+- Report reasons are Spam, Harassment, Impersonation, and Other.
+- A profile opens for someone who already shares a direct chat or a group with you.
 
-1. Create a free project at [supabase.com](https://supabase.com).
-2. Wait until the database is ready.
-3. Open **SQL Editor → New query**, paste the whole of `supabase/schema.sql`, and run it.
-4. The script creates `profiles`, `conversations`, `conversation_members`, and `messages`, indexes, Row Level Security, the signup trigger, Realtime for `messages`, and a public `avatars` bucket.
+A privacy policy ships at `public/privacy.html`.
 
-You only read and update your own profile row. Chats and messages are limited to members. Search and the chat list use small database functions that return a username, avatar, and favourite anime — nothing else.
+## How it works
+
+The interface is a React 19 single-page app, built with Vite 6 and styled with Tailwind CSS 4. React Router 7 handles the pages. Lucide supplies the icons.
+
+| Path | Page |
+| --- | --- |
+| `/login`, `/signup`, `/forgot-password` | Email and Google auth |
+| `/reset-password` | Choose a new password after the email link |
+| `/` | Chat list, or the welcome pane |
+| `/c/:conversationId` | An open chat |
+| `/?requests=1` | Message requests |
+| `/settings`, `/settings/appearance`, `/settings/privacy` | Profile, themes, and privacy |
+| `/settings/reports` | Reports, for the creator account |
+| `/profile` | Redirects to Settings |
+
+Supabase provides four pieces:
+
+- **Auth.** Email and password, optional Google OAuth, and PKCE sessions that persist in the browser.
+- **Database.** Postgres tables for profiles, conversations, members, messages, reactions, receipts, hides, contact requests, call signals, call history, blocks, reports, and chat preferences. Row Level Security is enabled on those tables. You read and update your own profile. Chats and messages are limited to members, and a direct chat also requires an accepted contact request. Search and chat headers go through database functions that return a username, avatar, favourite anime, and request state.
+- **Storage.** Public buckets `avatars` and `group-photos`. Private buckets `voice-messages`, `chat-images`, `chat-videos`, and `wallpapers`, with policies so chat members can read the files for their conversations. Chat videos use resumable uploads (`tus-js-client`). Rough size caps in the schema are 30 MB for avatars and chat images, 50 MB for chat videos, 8 MB for voice notes, and 3 MB for wallpaper photos.
+- **Realtime.** The browser listens for inserts and updates on messages, receipts, reactions, contact requests, call signals, and call history. Typing is a broadcast on a channel named `room:<conversation id>`, not a table row.
+
+A voice call does not use a media server in this repo. Each browser opens a WebRTC peer connection. The offer, answer, and network candidates are rows in `call_signals`. Realtime delivers inserts on `call-signals:<user id>`. The database rejects a signal unless the two people are accepted contacts in that chat.
+
+Before a live call, the browser asks the `turn-credentials` Edge Function for ICE servers. The function checks the caller’s session, reads the secret `METERED_API_KEY`, and returns `{ iceServers }`. Keep `METERED_API_KEY` as an Edge Function secret so the client bundle never contains it. If that request fails, the app uses its built-in relay fallback. About eight seconds into a failed connect, the caller retries through the relay and the screen says it is retrying. If the call is still down after 25 seconds, it stops and asks you to check the network. **Details** on the call screen lists the connection path that was gathered. Set `VITE_TURN_URLS` to `none` to stay on STUN only. Set `VITE_TURN_URLS` with `VITE_TURN_USERNAME` and `VITE_TURN_CREDENTIAL`, or with `VITE_TURN_SECRET`, to point a build at another relay.
+
+The client is created only when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` look real. Placeholder values from `.env.example` count as unset. A configured build stays in live mode. With no configuration, **Preview the app** stores sample conversations in `localStorage` on this browser.
+
+## Set up
+
+1. Create a project at [supabase.com](https://supabase.com) and wait until the database is ready.
+2. Open **SQL Editor → New query**, paste `supabase/schema.sql`, and run it. The script is safe to run again: policies are replaced, and existing tables stay.
+3. Run these two files next, in order. They add call history, which `schema.sql` does not create:
+   - `supabase/migrations/20261020220000_call_history.sql`
+   - `supabase/migrations/20261020230000_call_log_once.sql`
+4. The `supabase/migrations/` folder is the ordered history of the same schema. On a project that already has an older copy, apply the later files in filename order instead of starting over.
 
 ### Email auth
 
 1. Open **Authentication → Providers → Email** and leave it enabled.
-2. Leave **Confirm email** off. New accounts are confirmed on the server, and sign-up opens the app. There is no confirmation email.
+2. Leave **Confirm email** off. New accounts are confirmed on the server, and sign-up opens the app.
 3. Under **Authentication → URL configuration**, set **Site URL** to `http://localhost:5173` while you develop.
-4. Add these **Redirect URLs**:
+4. Add redirect URLs:
    - `http://localhost:5173/**`
-   - `https://<github-username>.github.io/ta-talk/**` (if you use GitHub Pages)
-   - Your Vercel URL with `/**`, if you use Vercel
+   - `https://taha080.github.io/ta-talk/**` for the published site
+   - `https://<github-username>.github.io/ta-talk/**` if you publish your own fork
+   - Your Vercel origin with `/**`, if you use Vercel
 
-The reset-password link brings people back to `/reset-password`. The wildcard above covers that path.
+The reset-password link returns to `/reset-password`. The wildcards above cover that path.
 
 ### Google sign-in
 
-The **Continue with Google** button stays disabled until you opt in. That way a project without Google configured does not fail on click. The demo always enables a pretend Google account so you can preview the button.
+The **Continue with Google** button stays disabled until you opt in, so a project without Google configured does not fail on click. The browser preview always enables a pretend Google button.
 
-1. In [Google Cloud Console](https://console.cloud.google.com/), create an OAuth client:
-   - **APIs & Services → OAuth consent screen**. External is fine. Add yourself as a test user while the app is in testing.
-   - **Credentials → Create credentials → OAuth client ID → Web application**.
-   - Authorized JavaScript origins: `http://localhost:5173` and your production origin (no path).
-   - Authorized redirect URI: `https://<project-ref>.supabase.co/auth/v1/callback`
-     Find `<project-ref>` in Supabase → **Project Settings → General**.
-2. In Supabase, open **Authentication → Providers → Google**. Turn it on and paste the client ID and client secret.
-3. Confirm the redirect URLs from the email section are saved. Google returns to Supabase, then Supabase returns to your Site URL.
-4. In `.env` set:
+1. In Google Cloud Console, create an OAuth client for a web application. Add `http://localhost:5173` and your production origin as JavaScript origins. Set the authorized redirect URI to the Supabase Auth callback shown under **Authentication → Providers → Google**.
+2. In Supabase, turn the Google provider on and paste the client ID and client secret there.
+3. In `.env`, set `VITE_SUPABASE_GOOGLE_ENABLED` to `true`.
+4. Restart `npm run dev`.
 
-   ```bash
-   VITE_SUPABASE_GOOGLE_ENABLED=true
-   ```
+For GitHub Pages, add a repository secret with the same name, `VITE_SUPABASE_GOOGLE_ENABLED`, set to `true`. Leave the variable unset or `false` and the live button stays disabled.
 
-5. Restart `npm run dev`.
-6. For GitHub Pages, add a repository secret named `VITE_SUPABASE_GOOGLE_ENABLED` with the value `true`, next to the two Supabase secrets below.
+### Environment variables
 
-Leave the flag unset or `false` and the button stays disabled, with a short note on the landing page.
+Copy the example file and set the variables below. Keep `.env` out of git. Put the anon key in `VITE_SUPABASE_ANON_KEY` and leave the service-role key on the server. Row Level Security is what keeps rows private.
 
-### Copy the API keys
+```bash
+cp .env.example .env
+```
 
-1. Open **Project Settings → API**.
-2. Copy the **Project URL** and the **anon public** key.
-3. In this repo:
+| Variable | Role |
+| --- | --- |
+| `VITE_SUPABASE_URL` | Project URL from Supabase → Project Settings → API |
+| `VITE_SUPABASE_ANON_KEY` | Anon public key from the same page |
+| `VITE_SUPABASE_GOOGLE_ENABLED` | `true` after the Google provider is enabled |
+| `VITE_BASE_PATH` | `/ta-talk/` on GitHub Pages. Leave unset locally and on Vercel |
+| `VITE_TURN_URLS` | Optional relay URLs, or `none` for STUN only |
+| `VITE_TURN_USERNAME` | Optional relay username |
+| `VITE_TURN_CREDENTIAL` | Optional relay credential |
+| `VITE_TURN_SECRET` | Optional secret used to build a short-lived relay credential |
 
-   ```bash
-   cp .env.example .env
-   ```
+`METERED_API_KEY` belongs in Supabase **Edge Functions → Secrets**, or in `supabase secrets set`. Leave it out of `.env`.
 
-4. Paste the real values into `.env`:
+### Voice relay function
 
-   ```bash
-   VITE_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
-   VITE_SUPABASE_ANON_KEY=your-anon-key
-   VITE_SUPABASE_GOOGLE_ENABLED=false
-   ```
+The source is `supabase/functions/turn-credentials/index.ts`. Deploy it as `turn-credentials` with JWT verification on. Then store `METERED_API_KEY`. Until that secret exists, a signed-in call receives an error from the function and uses the built-in relay fallback.
 
-The anon key is meant for the browser. Row Level Security is what keeps data private. Do not put the service-role key in `.env` or in the frontend.
+## Run locally
 
-## Run it locally
+Use Node.js 22, the version CI installs.
 
 ```bash
 npm install
@@ -133,85 +159,93 @@ Open `http://localhost:5173`.
 
 | Script | What it does |
 | --- | --- |
-| `npm run dev` | Local app |
-| `npm test` | Unit tests |
+| `npm run dev` | Vite dev server |
+| `npm test` | Vitest unit tests |
 | `npm run lint` | ESLint |
-| `npm run build` | Typecheck and production build |
-| `npm run preview` | Serve the build |
+| `npm run build` | Typecheck, production build, and a `404.html` copy for GitHub Pages |
+| `npm run preview` | Serve the production build |
 
-## Demo mode
+## Usage
 
-With no `.env` (or with the placeholder values still in place), the first screen explains how to connect Supabase. **Preview the demo** stores a sample circle in `localStorage`.
+**Live site or a configured local app**
 
-- Sign in as `taha@tatalk.app` / `tatalk1`, or sign up with a new username
-- **Continue with Google** signs in as Taha
-- **Forgot password?** lets you set a new demo password on the next screen (no email is sent)
-- Sign out, refresh, and the session is still there
-- **Preview incoming call** on the chat list opens the accept / decline screen
-- **Reset demo chats** on the profile puts the sample messages back
+1. Open the site and create an account, or sign in. Use Google only after that provider is enabled.
+2. Search an exact username and send a contact request.
+3. When the request is accepted, open the chat. Send text, a photo, a video, or a voice note. Reply, react, or edit from the message menu.
+4. Press the phone button for a voice call. The other person accepts or declines.
+5. Use the plus menu for a new group. Use Settings for your username, avatar, favourite anime, theme, wallpaper, last seen, receipts, alerts, and blocked people.
 
-Nothing in demo mode is stored on a server.
+**Browser preview**
 
-## Themes
+With no `.env`, or with the placeholder values still in place, the first screen explains how to connect Supabase. **Preview the app** keeps sample conversations in this browser. You can sign up with a new username, use the pretend Google button, and reset the sample chats from Settings. **Preview call** on the chat list opens the incoming-call screen. Sign out and refresh, and the preview session is still there. Nothing in preview mode is stored on a server.
 
-The setup screen, landing page, chat list, and profile include a **Dark / Naruto** switch. Dark is the plain sakura and violet look. With Naruto selected, the missing-keys setup card and the sign-in / sign-up pages share a night-village scene: original mountain and roof silhouettes, mist, lantern glow, a glass card with an orange edge, and a geometric kunai mark. Chat uses the same night navy and lantern orange. The choice is stored in `localStorage` under `tatalk:theme`, so a refresh keeps it. The village, lanterns, and kunai are original SVG and CSS, not official artwork.
+## Project structure
 
-## How chat and calls work
-
-Chat writes a row in `messages`. The browser listens on Supabase Realtime for inserts in conversations you belong to.
-
-A voice call does not go through a media server. Each browser opens a WebRTC peer connection and exchanges the offer, answer, and network candidates on a Realtime broadcast channel named `inbox:<user id>`. Both people need Athera Talks open. Before every call the browser asks the `turn-credentials` Edge Function for Metered ICE servers. When that path is still down after a few seconds, the caller retries through TURN and the screen says "Couldn't connect, retrying via relay…". If the call is still down after 25 seconds, it stops with "Couldn't connect. The voice relay did not come up within 25 seconds. Check the network and try again." The timer starts when the peers connect and counts from that moment. Details lists the ICE candidate types that were gathered (`host`, `srflx`, `prflx`, `relay`) and the path that was selected.
-
-The function reads the secret `METERED_API_KEY` and requests `https://taha-turn-996755.metered.live/api/v1/turn/credentials`. It returns `{ iceServers }`. The API key is not a `VITE_` variable and is not in the client. If that request fails, the client uses these static Metered servers, with username `8c806b1e87da68a6d13d1051` and credential `CWOTQy7sg1frPlo+` on the TURN entries:
-
-- `stun:stun.relay.metered.ca:80`
-- `turn:global.relay.metered.ca:80`
-- `turn:global.relay.metered.ca:80?transport=tcp`
-- `turn:global.relay.metered.ca:443`
-- `turns:global.relay.metered.ca:443?transport=tcp`
-
-Set `VITE_TURN_URLS=none` to stay on STUN only, or set `VITE_TURN_URLS`, `VITE_TURN_USERNAME`, and `VITE_TURN_CREDENTIAL` to point a local build at another relay. The call screen shows Calling, Ringing, Connecting, Connected, or Call failed with the reason. A blocked microphone is reported on that screen. The call timer, mute, and hang-up controls still work in the demo without a microphone. Signaling does not use a database table, so no extra SQL is required. `public.messages` is already in the `supabase_realtime` publication.
-
-### Deploy the voice relay
-
-The function source is `supabase/functions/turn-credentials/index.ts`. Deploy it with the Supabase MCP tool `deploy_edge_function`:
-
-- `project_id`: `jvjgouivqzklfzshmdti`
-- `name`: `turn-credentials`
-- `entrypoint_path`: `index.ts`
-- `verify_jwt`: `true`
-- `files`: one file named `index.ts` whose content is that source
-
-Then store the Metered API key as an Edge Function secret named `METERED_API_KEY`. The MCP tool list cannot write secrets. In the Supabase dashboard open **Edge Functions → Secrets** and add `METERED_API_KEY`, or with the CLI:
-
-```bash
-supabase secrets set METERED_API_KEY=<your Metered API key> --project-ref jvjgouivqzklfzshmdti
+```text
+src/
+  components/     shared UI (sidebar, thread, composer, call screen, settings pieces)
+  context/        session, chat, voice-call state, and theme
+  demo/           in-browser preview used when Supabase is not configured
+  lib/            helpers (auth, themes, WebRTC, formatting) and unit tests
+  pages/          auth, home, settings, reset password, and the 404 page
+  services/       live Supabase queries and call signaling
+  assets/         images used by the interface
+public/           icons, web app manifest, and the privacy policy
+supabase/
+  schema.sql      full script for a new project
+  migrations/     ordered SQL changes
+  functions/turn-credentials/   Edge Function that returns ICE servers
+.github/workflows/  CI, and the GitHub Pages deploy
+scripts/copy-404.mjs
 ```
 
-Do not commit the key. Until the secret is set, a signed-in call gets `503` from the function and uses the static servers above.
+The site includes a web app manifest, so a browser can offer to install it.
 
-## Deploy to GitHub Pages
+## Tests
 
-The workflow in `.github/workflows/deploy.yml` builds with Vite base `/ta-talk/` and deploys the `dist` folder. A copy of `index.html` is saved as `404.html` so routes like `/c/...` still open the app.
+Unit tests live next to the code in `src/**/*.test.ts` and run in Node with Vitest:
 
-1. Push the repo to GitHub. The repository name should be `ta-talk`. If you use another name, change `VITE_BASE_PATH` in the workflow and the base path in this README.
-2. In the repo, open **Settings → Secrets and variables → Actions** and add:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
-   - `VITE_SUPABASE_GOOGLE_ENABLED` (`true` or `false`)
-3. Open **Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**.
-4. Merge to `main`. The **Deploy to GitHub Pages** workflow publishes the site.
-5. Add `https://<github-username>.github.io/ta-talk/**` to the Supabase redirect URLs.
+```bash
+npm test
+```
 
-The build step passes repository secrets `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` into Vite (project `jvjgouivqzklfzshmdti`). When those are set, the published site opens real Sign in / Sign up and does not offer **Preview the demo**. If the secrets are missing, the Pages build still succeeds and the site opens the setup screen.
+They cover auth rules, themes, premium windows, chat list order, message formatting, WebRTC helpers, the preview backend, and related pure functions. The suite runs in Node.
 
-## Deploy to Vercel
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request, on Node.js 22: `npm ci`, `npm run lint`, `npm test`, and `npm run build`. The CI build does not receive Supabase secrets, so the production build must succeed in setup mode.
 
-1. Import the GitHub repo. Framework preset: Vite.
-2. Add the same three environment variables. Do **not** set `VITE_BASE_PATH` (Vercel serves the site from `/`).
-3. Deploy. `vercel.json` rewrites every path to `index.html` so the router works.
-4. Add the Vercel URL to the Supabase redirect allow list.
+## Deploy
 
-## Credits
+### GitHub Pages
 
-Created by Taha Ahsan.
+`.github/workflows/deploy.yml` builds with `VITE_BASE_PATH` set to `/ta-talk/` and publishes the `dist` folder. The build copies `index.html` to `404.html` so routes such as `/c/...` still open the app.
+
+1. The repository name for this site is `ta-talk`. A different name needs a matching `VITE_BASE_PATH`.
+2. Under **Settings → Secrets and variables → Actions**, add `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_SUPABASE_GOOGLE_ENABLED`. Optional relay overrides use `VITE_TURN_URLS`, `VITE_TURN_USERNAME`, `VITE_TURN_CREDENTIAL`, and `VITE_TURN_SECRET`.
+3. Under **Settings → Pages → Build and deployment**, set the source to **GitHub Actions**.
+4. A push to `main` runs **Deploy to GitHub Pages**.
+5. Add the Pages origin to the Supabase redirect allow list, as in the email section above.
+
+When the URL and anon key secrets are set, the published site opens real sign-in. If those secrets are missing, the Pages build still succeeds and the site opens the setup screen.
+
+### Vercel
+
+1. Import the GitHub repo and choose the Vite preset.
+2. Add `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_SUPABASE_GOOGLE_ENABLED`. Leave `VITE_BASE_PATH` unset so the site is served from `/`.
+3. Deploy. `vercel.json` rewrites every path to `index.html`.
+4. Add the Vercel origin to the Supabase redirect allow list.
+
+## Screenshots
+
+![Sign in](docs/screenshots/sign-in.png)
+
+![Chat list](docs/screenshots/chat-list.png)
+
+![Chat on a phone](docs/screenshots/chat-mobile.png)
+
+![Incoming call](docs/screenshots/incoming-call.png)
+
+![Profile](docs/screenshots/profile.png)
+
+## License
+
+This repository does not include a `LICENSE` file, and `package.json` does not declare one. Until a license is added, all rights are reserved. Packages installed from npm keep the licenses recorded in `package-lock.json`.
