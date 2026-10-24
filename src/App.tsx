@@ -9,6 +9,7 @@ import { APP_NAME } from './lib/brand'
 import { accountTheme } from './lib/theme'
 import { routerBasename } from './lib/url'
 import { AuthScreen } from './pages/AuthScreen'
+import { CommunitiesPage } from './components/CommunitiesPage'
 import { HomePage } from './pages/HomePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
@@ -43,6 +44,8 @@ function Gate() {
         <Route element={<Shell />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/c/:conversationId" element={<HomePage />} />
+          <Route path="/communities" element={<CommunitiesPage />} />
+          <Route path="/communities/:communityId" element={<CommunitiesPage />} />
           <Route path="/profile" element={<Navigate to="/settings" replace />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/:section" element={<SettingsPage />} />

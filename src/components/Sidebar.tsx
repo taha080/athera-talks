@@ -16,7 +16,7 @@ import { Avatar } from './Avatar'
 import { DisplayName } from './CreatorBadge'
 import { NewGroup } from './NewGroup'
 import { ReportDialog } from './ReportDialog'
-import { ArchiveIcon, CheckIcon, GearIcon, PhoneIcon, PinIcon, PlusIcon, SearchIcon, MoreIcon, VolumeIcon } from './Icons'
+import { ArchiveIcon, CheckIcon, CommunityIcon, GearIcon, PhoneIcon, PinIcon, PlusIcon, SearchIcon, MoreIcon, VolumeIcon } from './Icons'
 
 export function Sidebar() {
   const { mode, profile } = useSession()
@@ -236,6 +236,10 @@ export function Sidebar() {
           <Link to="/settings" className="hover-wash flex items-center gap-2 rounded-lg px-3 py-2 text-sm" onClick={() => setMenuOpen(false)}>
             <GearIcon className="h-4 w-4" />
             Settings
+          </Link>
+          <Link to="/communities" className="hover-wash flex items-center gap-2 rounded-lg px-3 py-2 text-sm" onClick={() => setMenuOpen(false)}>
+            <CommunityIcon className="h-4 w-4" />
+            Communities
           </Link>
           {mode === 'demo' ? (
             <button
