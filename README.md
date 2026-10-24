@@ -43,7 +43,13 @@ Start a call, accept or decline an incoming call, mute, switch the speaker, and 
 
 ### Premium
 
-Premium is a time window stored on the profile (`premium_from` through `premium_until`). While it is active, the name shows a verified tick, GIF avatars keep animating, and messages use the premium bubble. After the window ends, a GIF avatar stops animating. Settings has no switch for it. An operator grants or revokes it in the database with `grant_premium` and `revoke_premium`.
+Premium is a time window stored on the profile (`premium_from` through `premium_until`). While it is active, the name shows a verified tick, GIF avatars keep animating, and messages use the premium bubble. After the window ends, a GIF avatar stops animating.
+
+### Admin premium
+
+The creator account can grant or revoke Premium in Settings > Admin premium: enter a username and a number of days (1–365, with 7 / 30 / 90 presets). Granting sets `premium_from` to now and extends `premium_until`, so the verified tick, gold ring, animated GIF avatar and premium bubble appear automatically. Only the creator sees this section, and the server checks that the caller is the creator.
+
+This needs `supabase/migrations/20261024130000_grant_premium_by_creator.sql` applied in the Supabase SQL editor, together with the Communities migration if that is still unapplied. Until it is applied, the panel reports the database error instead of granting. The older service_role functions `grant_premium` and `revoke_premium` are unchanged and still work from the SQL editor or a service-role connection.
 
 The creator account is a separate flag. It shows the creator badge, can read the Reports list in Settings, and can still see last seen and read receipts when another person has hidden them. Animated GIF avatars are limited to Premium and the creator. Everyone else can upload PNG, JPEG, or WebP.
 

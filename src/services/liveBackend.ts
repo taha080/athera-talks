@@ -4,6 +4,7 @@ import { baseMime, mediaBucket } from '../lib/media'
 import { assertVideoSize, videoExtension, videoMime } from '../lib/chatVideo'
 import { MESSAGE_PAGE, messageKind, newestFirstPage } from '../lib/messages'
 import { imageExtension } from '../lib/pasteImage'
+import { grantDaysIssue, normalizeGrantUsername } from '../lib/grantPremium'
 import { isPremiumWindow } from '../lib/premium'
 import { readSupabaseEnv } from '../lib/config'
 import { storageResumableEndpoint, uploadChatVideo } from '../lib/tusUpload'
@@ -317,6 +318,27 @@ export async function usernameAvailable(name: string): Promise<boolean> {
   const { data, error } = await client().rpc('username_available', { name: normalizeUsername(name) })
   if (error) throw new Error(error.message)
   return Boolean(data)
+}
+
+// Creator-only premium grants. The server checks the caller is the creator
+// (grant_premium_by_creator) and sets premium_from / premium_until, which is
+// what drives the verified tick, gold ring, animated GIF avatar and premium
+// chat bubble. Requires supabase/migrations/20261024130000_grant_premium_by_creator.sql.
+export async function grantPremium(username: string, days: number): Promise<string> {
+  const name = normalizeGrantUsername(username)
+  if (!name) throw new Error('Enter a username.')
+  const issue = grantDaysIssue(days)
+  if (issue) throw new Error(issue)
+  const { data, error } = await client().rpc('grant_premium_by_creator', { p_username: name, p_days: days })
+  if (error) throw new Error(error.message)
+  return String(data)
+}
+
+export async function revokePremium(username: string): Promise<void> {
+  const name = normalizeGrantUsername(username)
+  if (!name) throw new Error('Enter a username.')
+  const { error } = await client().rpc('revoke_premium_by_creator', { p_username: name })
+  if (error) throw new Error(error.message)
 }
 
 export async function saveProfile(
