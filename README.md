@@ -74,6 +74,7 @@ The interface is a React 19 single-page app, built with Vite 6 and styled with T
 | `/settings`, `/settings/appearance`, `/settings/privacy` | Profile, themes, and privacy |
 | `/settings/reports` | Reports, for the creator account |
 | `/profile` | Redirects to Settings |
+| `/communities`, `/communities/:communityId` | Communities: channels, events, voice rooms, members and moderation |
 
 Supabase provides four pieces:
 
@@ -96,6 +97,12 @@ The client is created only when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
    - `supabase/migrations/20261020220000_call_history.sql`
    - `supabase/migrations/20261020230000_call_log_once.sql`
 4. The `supabase/migrations/` folder is the ordered history of the same schema. On a project that already has an older copy, apply the later files in filename order instead of starting over.
+
+### Communities
+
+Communities are a separate, multi-user layer beside chats and groups: create a community (public, private or invite-only), discover and join it, run text and announcement channels with pinned messages and polls, schedule events with RSVPs, open group voice rooms, and moderate with owner/admin/member/pending roles, reports, mutes, bans, slow mode and a basic word filter. Member profiles reuse the existing profile model (username, avatar, favourite anime).
+
+To share communities across devices, apply `supabase/migrations/20261024120000_communities.sql` in Supabase (SQL Editor, or `supabase db push`). Until that migration is applied, the Communities page shows a banner and runs in local demo mode in that browser only, so the rest of the site is never broken by a missing table. Group voice rooms reuse the existing WebRTC TURN/ICE helpers over a Supabase Realtime broadcast channel; they are a small-room peer mesh, not a media server.
 
 ### Email auth
 

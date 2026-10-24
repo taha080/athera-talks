@@ -9,7 +9,7 @@ import { isOnline } from '../lib/presence'
 import { hasPremium } from '../lib/premium'
 import { Avatar } from './Avatar'
 import { CallScreen } from './CallScreen'
-import { AddContactIcon, ChatsIcon, GearIcon, SignOutIcon } from './Icons'
+import { AddContactIcon, ChatsIcon, CommunityIcon, GearIcon, SignOutIcon } from './Icons'
 import { Credit } from './Credit'
 import { Logo } from './Logo'
 import { MessageNotices } from './MessageNotice'
@@ -19,7 +19,8 @@ export function Shell() {
   const location = useLocation()
   const chatOpen = location.pathname.startsWith('/c/')
   const settingsOpen = location.pathname.startsWith('/settings') || location.pathname.startsWith('/profile')
-  const showList = !chatOpen && !settingsOpen
+  const communitiesOpen = location.pathname.startsWith('/communities')
+  const showList = !chatOpen && !settingsOpen && !communitiesOpen
   useVisualViewport()
 
   return (
@@ -84,6 +85,7 @@ function NavRail() {
   const { profile, signOut } = useSession()
   const { incomingRequests } = useChat()
   const settings = location.pathname.startsWith('/settings')
+  const communities = location.pathname.startsWith('/communities')
   const requestsOpen = location.pathname === '/' && new URLSearchParams(location.search).get('requests') === '1'
   return (
     <nav aria-label="Primary" className="hidden h-full w-16 shrink-0 flex-col items-center justify-between border-r border-line bg-panel py-3 md:flex">
@@ -91,8 +93,11 @@ function NavRail() {
         <Link to="/" aria-label="Athera Talks home" className="mb-2 rounded-lg">
           <Logo className="h-9 w-9" />
         </Link>
-        <RailLink to="/" label="Chats" active={!settings && !requestsOpen}>
+        <RailLink to="/" label="Chats" active={!settings && !communities && !requestsOpen}>
           <ChatsIcon className="h-5 w-5" />
+        </RailLink>
+        <RailLink to="/communities" label="Communities" active={communities}>
+          <CommunityIcon className="h-5 w-5" />
         </RailLink>
         <RailLink to="/?requests=1" label="Requests" active={requestsOpen} badge={incomingRequests}>
           <AddContactIcon className="h-5 w-5" />

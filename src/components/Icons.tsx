@@ -28,6 +28,7 @@ import {
   Smile,
   Trash2,
   UserPlus,
+  Users,
   Volume2,
   VolumeX,
   X,
@@ -162,4 +163,8 @@ export function BlockIcon({ className }: IconProps) {
 
 export function PencilIcon({ className }: IconProps) {
   return glyph(Pencil, className)
+}
+
+export function CommunityIcon({ className }: IconProps) {
+  return glyph(Users, className)
 }
