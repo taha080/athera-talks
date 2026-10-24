@@ -20,6 +20,7 @@ import {
 } from '../lib/appearance'
 import { cn } from '../lib/cn'
 import { type ThemeName } from '../lib/theme'
+import { grantPremium, revokePremium } from '../services/liveBackend'
 import { dangerButton, fieldClass, ghostButton, primaryButton } from '../lib/styles'
 import type { BlockedPerson, UserReport } from '../types'
 import { formatListTime } from '../lib/format'
@@ -36,8 +37,11 @@ type Section = (typeof SECTIONS)[number]['id']
 export function SettingsPage() {
   const { section } = useParams()
   const { profile } = useSession()
-  const sections = profile?.isCreator ? [...SECTIONS, { id: 'reports' as const, label: 'Reports' }] : SECTIONS
-  const current: Section | 'reports' = section === 'appearance' || section === 'privacy' || (section === 'reports' && profile?.isCreator) ? section : 'profile'
+  const sections = profile?.isCreator
+    ? [...SECTIONS, { id: 'reports' as const, label: 'Reports' }, { id: 'premium' as const, label: 'Admin premium' }]
+    : SECTIONS
+  const current: Section | 'reports' | 'premium' =
+    section === 'appearance' || section === 'privacy' || ((section === 'reports' || section === 'premium') && profile?.isCreator) ? section : 'profile'
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex h-14 items-center gap-2 border-b border-line bg-panel px-2">
@@ -67,6 +71,7 @@ export function SettingsPage() {
           {current === 'appearance' ? <AppearanceSection /> : null}
           {current === 'privacy' ? <PrivacySection /> : null}
           {current === 'reports' ? <ReportsSection /> : null}
+          {current === 'premium' ? <PremiumSection /> : null}
         </div>
       </div>
     </div>
@@ -419,6 +424,98 @@ function PrivacySection() {
         Sign out
       </button>
     </div>
+  )
+}
+
+function PremiumSection() {
+  const session = useSession()
+  const profile = session.profile
+  const [username, setUsername] = useState('')
+  const [days, setDays] = useState(30)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  if (!profile?.isCreator) return null
+  const live = session.mode === 'live'
+
+  async function grant(event: FormEvent) {
+    event.preventDefault()
+    setError('')
+    setMessage('')
+    if (!live) {
+      setError('Premium grants need the live Supabase connection. This demo cannot grant Premium.')
+      return
+    }
+    setBusy(true)
+    try {
+      const until = await grantPremium(username, days)
+      const name = username.trim().replace(/^@+/, '')
+      setMessage(`Premium granted to @${name} until ${new Date(until).toLocaleString()}.`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not grant Premium.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function revoke() {
+    setError('')
+    setMessage('')
+    if (!live) {
+      setError('Premium grants need the live Supabase connection. This demo cannot revoke Premium.')
+      return
+    }
+    setBusy(true)
+    try {
+      await revokePremium(username)
+      const name = username.trim().replace(/^@+/, '')
+      setMessage(`Premium removed from @${name}.`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not revoke Premium.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={grant} className="mx-auto max-w-lg space-y-4 px-5 py-8">
+      <h2 className="text-sm font-semibold">Admin premium</h2>
+      <p className="text-xs leading-5 text-mist">
+        Only the creator can use this. Premium gives the verified tick, gold ring, animated GIF avatar and premium chat bubble until the date shown.
+      </p>
+      {!live ? <p className="text-sm text-mist">Demo mode: connect the live Supabase project first, and apply supabase/migrations/20261024130000_grant_premium_by_creator.sql in Supabase.</p> : null}
+      <label className="block text-sm">
+        <span className="mb-1.5 block text-mist">Username</span>
+        <input className={fieldClass} value={username} onChange={(event) => setUsername(event.target.value)} placeholder="sakura" autoComplete="username" />
+      </label>
+      <div>
+        <span className="mb-1.5 block text-sm text-mist">Days</span>
+        <div className="flex flex-wrap gap-2">
+          {[7, 30, 90].map((preset) => (
+            <button key={preset} type="button" className={days === preset ? primaryButton : ghostButton} onClick={() => setDays(preset)}>
+              {preset} days
+            </button>
+          ))}
+          <input
+            className={`${fieldClass} w-28`}
+            type="number"
+            min={1}
+            max={365}
+            value={days}
+            onChange={(event) => setDays(Number(event.target.value))}
+            aria-label="Custom days"
+          />
+        </div>
+      </div>
+      {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
+      {message ? <p className="text-sm text-foam">{message}</p> : null}
+      <button type="submit" className={`${primaryButton} w-full`} disabled={busy || !live}>
+        {busy ? 'Granting…' : 'Grant Premium'}
+      </button>
+      <button type="button" className={`${dangerButton} w-full`} disabled={busy || !live} onClick={() => void revoke()}>
+        Revoke Premium
+      </button>
+    </form>
   )
 }
 
