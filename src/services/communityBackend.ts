@@ -190,6 +190,21 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
       ])
       return community
     },
+    async deleteCommunity(communityId) {
+      const role = await myRole(communityId)
+      if (role !== 'owner') throw new Error('Only the community owner can delete it.')
+      const { error } = await client()
+        .from('communities')
+        .delete()
+        .eq('id', communityId)
+        .eq('owner_id', me.id)
+      if (error) notReady(error)
+      // Child rows (members, channels, messages, events, voice rooms,
+      // reports, bans) are removed by the ON DELETE CASCADE foreign keys.
+      // Deleting the community itself also needs the "Owners delete a
+      // community" RLS policy from
+      // supabase/migrations/20261027130000_community_delete.sql.
+    },
     async joinCommunity(communityId, inviteCode) {
       const { data, error } = await client()
         .from('communities')
