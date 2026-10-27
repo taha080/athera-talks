@@ -19,7 +19,18 @@ function isMissingTable(error: unknown): boolean {
 
 function notReady(error: unknown): never {
   if (isMissingTable(error)) throw new CommunitiesNotReadyError()
-  throw error instanceof Error ? error : new Error('Communities could not be loaded.')
+  throw new Error(communityErrorMessage(error))
+}
+
+// PostgREST errors are plain objects ({ message, code, ... }), not Error
+// instances, so `instanceof Error` hid the real message behind the generic
+// "Communities could not be loaded." text. Keep the real message so the
+// next failure can actually be diagnosed.
+export function communityErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message
+  const message = (error as { message?: unknown })?.message
+  if (typeof message === 'string' && message) return message
+  return 'Communities could not be loaded.'
 }
 
 function roleOf(value: string | null | undefined): CommunityRole {
@@ -38,11 +49,9 @@ type CommunityRow = {
   slow_mode_seconds: number | null
   word_filter: string[] | null
   created_at: string
-  community_members?: { user_id: string; role: string }[] | null
 }
 
-function mapCommunity(row: CommunityRow, meId: string): Community {
-  const members = row.community_members ?? []
+function mapCommunity(row: CommunityRow, myRole: CommunityRole | null, memberCount: number): Community {
   return {
     id: row.id,
     name: row.name,
@@ -51,8 +60,8 @@ function mapCommunity(row: CommunityRow, meId: string): Community {
     inviteCode: row.invite_code ?? '',
     ownerId: row.owner_id,
     favouriteAnime: row.favourite_anime,
-    memberCount: members.length,
-    myRole: members.find((item) => item.user_id === meId)?.role ? roleOf(members.find((item) => item.user_id === meId)?.role) : null,
+    memberCount,
+    myRole,
     slowModeSeconds: row.slow_mode_seconds ?? 0,
     wordFilter: row.word_filter ?? [],
     createdAt: row.created_at,
@@ -101,8 +110,29 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
     if (!supabase) throw new CommunitiesNotReadyError()
     return supabase
   }
-  const communityColumns = 'id, name, description, visibility, invite_code, owner_id, favourite_anime, slow_mode_seconds, word_filter, created_at, community_members(user_id, role)'
+  const communityColumns = 'id, name, description, visibility, invite_code, owner_id, favourite_anime, slow_mode_seconds, word_filter, created_at'
   const memberColumns = 'user_id, role, muted_until, joined_at, profiles(username, avatar_url, favourite_anime)'
+
+  // Membership rows are read with a plain query instead of an embedded
+  // `community_members(...)` join on communities: the embedded join made
+  // PostgREST evaluate the membership RLS policies inside the communities
+  // query, which is where the recursion error came from. RLS still limits
+  // these rows to what the user may see, so memberCount stays the same
+  // visible-members count as before.
+  async function membershipByCommunity(): Promise<Map<string, { count: number; myRole: CommunityRole | null }>> {
+    const { data, error } = await client()
+      .from('community_members')
+      .select('community_id, user_id, role')
+    if (error) notReady(error)
+    const byCommunity = new Map<string, { count: number; myRole: CommunityRole | null }>()
+    for (const row of (data ?? []) as { community_id: string; user_id: string; role: string }[]) {
+      const entry = byCommunity.get(row.community_id) ?? { count: 0, myRole: null }
+      entry.count += 1
+      if (row.user_id === me.id) entry.myRole = roleOf(row.role)
+      byCommunity.set(row.community_id, entry)
+    }
+    return byCommunity
+  }
 
   async function myRole(communityId: string): Promise<CommunityRole | null> {
     const { data, error } = await client()
@@ -130,7 +160,11 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
         .select(communityColumns)
         .order('created_at', { ascending: false })
       if (error) notReady(error)
-      return ((data ?? []) as CommunityRow[]).map((row) => mapCommunity(row, me.id))
+      const membership = await membershipByCommunity()
+      return ((data ?? []) as CommunityRow[]).map((row) => {
+        const entry = membership.get(row.id)
+        return mapCommunity(row, entry?.myRole ?? null, entry?.count ?? 0)
+      })
     },
     async createCommunity(input) {
       const { data, error } = await client()
@@ -145,7 +179,7 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
         .select(communityColumns)
         .single()
       if (error) notReady(error)
-      const community = mapCommunity(data as CommunityRow, me.id)
+      const community = mapCommunity(data as CommunityRow, 'owner', 1)
       const { error: memberError } = await client()
         .from('community_members')
         .insert({ community_id: community.id, user_id: me.id, role: 'owner' })
@@ -154,7 +188,7 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
         { community_id: community.id, name: 'general', kind: 'text' },
         { community_id: community.id, name: 'announcements', kind: 'announcements' },
       ])
-      return { ...community, memberCount: 1, myRole: 'owner' }
+      return community
     },
     async joinCommunity(communityId, inviteCode) {
       const { data, error } = await client()
@@ -163,16 +197,18 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
         .eq('id', communityId)
         .single()
       if (error) notReady(error)
-      const community = mapCommunity(data as CommunityRow, me.id)
-      if (community.visibility === 'invite-only' && inviteCode?.trim().toUpperCase() !== community.inviteCode) {
+      const row = data as CommunityRow
+      if (row.visibility === 'invite-only' && inviteCode?.trim().toUpperCase() !== (row.invite_code ?? '')) {
         throw new Error('That invite code does not match this community.')
       }
-      const role: CommunityRole = community.visibility === 'public' ? 'member' : 'pending'
+      const role: CommunityRole = row.visibility === 'public' ? 'member' : 'pending'
       const { error: joinError } = await client()
         .from('community_members')
         .upsert({ community_id: communityId, user_id: me.id, role }, { onConflict: 'community_id,user_id' })
       if (joinError) notReady(joinError)
-      return community
+      const membership = await membershipByCommunity()
+      const entry = membership.get(communityId)
+      return mapCommunity(row, role, entry?.count ?? 0)
     },
     async approveMember(communityId, userId) {
       await requireManager(communityId)
