@@ -34,7 +34,7 @@ import {
   type CommunityVisibility,
   type CommunityVoiceRoom as CommunityVoiceRoomData,
 } from '../lib/communities'
-import { fieldClass, ghostButton, primaryButton } from '../lib/styles'
+import { dangerButton, fieldClass, ghostButton, primaryButton } from '../lib/styles'
 import { createLocalCommunityStore, type CommunityStore } from '../services/communityStore'
 import { trySupabaseCommunityStore } from '../services/communityBackend'
 import { Avatar } from './Avatar'
@@ -185,6 +185,19 @@ export function CommunitiesPage() {
     }
   }
 
+  async function handleDeleteCommunity(id: string) {
+    if (!store) return
+    setError('')
+    try {
+      await store.deleteCommunity(id)
+      setNotice('Community deleted.')
+      navigate('/communities')
+      await refresh(store, null)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not delete that community.')
+    }
+  }
+
   if (!profile) return <p className="px-4 py-10 text-center text-sm text-mist">Sign in to use Communities.</p>
   if (loading) return <p className="px-4 py-10 text-center text-sm text-mist">Loading communities…</p>
 
@@ -231,6 +244,7 @@ export function CommunitiesPage() {
             onSelectChannel={(id) => setActiveChannelId(id)}
             onSelectRoom={(id) => setActiveRoomId(id)}
             onRun={run}
+            onDelete={(id) => void handleDeleteCommunity(id)}
             store={store}
           />
         ) : (
@@ -361,6 +375,7 @@ function CommunityDetail(props: {
   onSelectChannel: (id: string) => void
   onSelectRoom: (id: string) => void
   onRun: (task: () => Promise<unknown>, done?: string) => Promise<void>
+  onDelete: (communityId: string) => void
   store: CommunityStore | null
 }) {
   const { community, manager, meId, members, channels, activeChannel, messages, pinned, events, voiceRooms, reports, banned, activeRoomId, store } = props
@@ -375,6 +390,7 @@ function CommunityDetail(props: {
   const [roomName, setRoomName] = useState('')
   const [slowMode, setSlowMode] = useState(community.slowModeSeconds)
   const [filterText, setFilterText] = useState(community.wordFilter.join(', '))
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [reportingId, setReportingId] = useState<string | null>(null)
   const [reportReason, setReportReason] = useState('Spam')
   const [reportDetails, setReportDetails] = useState('')
@@ -726,6 +742,34 @@ function CommunityDetail(props: {
               </ul>
             </div>
           ) : null}
+        </section>
+      ) : null}
+
+      {community.myRole === 'owner' ? (
+        <section className="rounded-xl border border-line bg-panel p-3">
+          <h3 className="text-sm font-semibold">Danger zone</h3>
+          <p className="mt-1 text-sm text-mist">
+            Deleting removes this community, its channels, messages, events and voice rooms for everyone. This cannot be undone.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={dangerButton}
+              onClick={() => {
+                if (!confirmDelete) {
+                  setConfirmDelete(true)
+                  return
+                }
+                setConfirmDelete(false)
+                props.onDelete(community.id)
+              }}
+            >
+              {confirmDelete ? 'Click again to delete this community' : 'Delete community'}
+            </button>
+            {confirmDelete ? (
+              <button type="button" className={ghostButton} onClick={() => setConfirmDelete(false)}>Cancel</button>
+            ) : null}
+          </div>
         </section>
       ) : null}
     </div>

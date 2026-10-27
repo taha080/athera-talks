@@ -34,6 +34,7 @@ export class CommunitiesNotReadyError extends Error {
 export type CommunityStore = {
   listCommunities(): Promise<Community[]>
   createCommunity(input: { name: string; description: string; visibility: CommunityVisibility; favouriteAnime: string | null }): Promise<Community>
+  deleteCommunity(communityId: string): Promise<void>
   joinCommunity(communityId: string, inviteCode?: string): Promise<Community>
   approveMember(communityId: string, userId: string): Promise<void>
   declineMember(communityId: string, userId: string): Promise<void>
@@ -283,6 +284,23 @@ export function createLocalCommunityStore(me: Profile): CommunityStore {
       )
       save()
       return community
+    },
+    async deleteCommunity(communityId) {
+      const community = communityOf(communityId)
+      const membership = myMembership(communityId)
+      if (!membership || membership.role !== 'owner' || community.ownerId !== me.id) {
+        throw new Error('Only the community owner can delete it.')
+      }
+      const channelIds = new Set(state.channels.filter((item) => item.communityId === communityId).map((item) => item.id))
+      state.communities = state.communities.filter((item) => item.id !== communityId)
+      delete state.members[communityId]
+      delete state.banned[communityId]
+      state.channels = state.channels.filter((item) => item.communityId !== communityId)
+      state.messages = state.messages.filter((item) => !channelIds.has(item.channelId))
+      state.events = state.events.filter((item) => item.communityId !== communityId)
+      state.voiceRooms = state.voiceRooms.filter((item) => item.communityId !== communityId)
+      state.reports = state.reports.filter((item) => item.communityId !== communityId)
+      save()
     },
     async joinCommunity(communityId, inviteCode) {
       const community = communityOf(communityId)
