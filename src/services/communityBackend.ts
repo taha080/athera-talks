@@ -288,7 +288,11 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
       await requireManager(communityId)
       const { data, error } = await client()
         .from('community_bans')
-        .select('user_id, created_at, profiles(username, avatar_url, favourite_anime)')
+        // community_bans links to profiles twice (user_id and banned_by),
+        // so the embedded join must name which relationship to use,
+        // otherwise PostgREST refuses with "more than one relationship
+        // was found for 'community_bans' and 'profiles'".
+        .select('user_id, created_at, profiles!community_bans_user_id_fkey(username, avatar_url, favourite_anime)')
         .eq('community_id', communityId)
       if (error) notReady(error)
       return ((data ?? []) as unknown as { user_id: string; created_at: string; profiles?: { username: string; avatar_url: string | null; favourite_anime: string | null } | null }[]).map((row) => ({
