@@ -93,7 +93,7 @@ export function Avatar({
   )
   return (
     <span className="relative inline-flex shrink-0">
-      <span className={cn('inline-flex overflow-hidden rounded-full', ring)}>{face}</span>
+      <span className={cn('inline-flex overflow-hidden rounded-full shadow-[0_1px_4px_rgb(15_23_42/0.30)]', ring)}>{face}</span>
       {online ? <span className="absolute bottom-0 right-0 z-10 h-3 w-3 rounded-full border-2 border-panel bg-foam" aria-label="Online" /> : null}
     </span>
   )

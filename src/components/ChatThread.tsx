@@ -1085,9 +1085,9 @@ function MessageSkeleton() {
 export function Welcome() {
   return (
     <div className="chat-wallpaper wallpaper-plain grid h-full place-items-center px-8 text-center">
-      <div>
+      <div className="rounded-3xl border border-line bg-panel px-10 py-12 shadow-[0_16px_48px_rgb(15_23_42/0.18)]">
         <EmptyArt />
-        <p className="mt-4 text-lg font-semibold tracking-tight">Select a chat</p>
+        <p className="mt-4 text-xl font-bold tracking-tight">Select a chat</p>
         <p className="mx-auto mt-1 max-w-xs text-sm leading-6 text-mist">
           Messages, photos, and voice notes show up here. Start one from the list.
         </p>

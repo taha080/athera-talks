@@ -102,7 +102,7 @@ function NavRail() {
   const communities = location.pathname.startsWith('/communities')
   const requestsOpen = location.pathname === '/' && new URLSearchParams(location.search).get('requests') === '1'
   return (
-    <nav aria-label="Primary" className="hidden h-full w-16 shrink-0 flex-col items-center justify-between border-r border-line bg-panel py-3 md:flex">
+    <nav aria-label="Primary" className="hidden h-full w-16 shrink-0 flex-col items-center justify-between border-r border-line bg-elevated py-3 md:flex">
       <div className="flex flex-col items-center gap-1">
         <Link to="/" aria-label="Athera Talks home" className="mb-2 rounded-lg">
           <Logo className="h-9 w-9" />

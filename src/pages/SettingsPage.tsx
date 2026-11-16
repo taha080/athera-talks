@@ -271,7 +271,7 @@ function AppearanceSection() {
                     type="button"
                     aria-pressed={theme === choice.id}
                     onClick={() => void chooseTheme(choice.id)}
-                    className={cn('hover-wash rounded-lg border px-3 py-3 text-left text-sm transition', theme === choice.id ? 'border-sakura ring-2 ring-sakura/30' : 'border-line')}
+                    className={cn('theme-card hover-wash rounded-lg border px-3 py-3 text-left text-sm transition', theme === choice.id ? 'border-sakura ring-2 ring-sakura/30' : 'border-line')}
                   >
                     <span
                       data-theme={choice.id}
@@ -296,7 +296,7 @@ function AppearanceSection() {
               type="button"
               aria-pressed={wallpaper === choice.id}
               onClick={() => void chooseWallpaper(choice.id)}
-              className={cn('overflow-hidden rounded-2xl border text-left', wallpaper === choice.id ? 'border-sakura' : 'border-line')}
+              className={cn('theme-card overflow-hidden rounded-2xl border text-left', wallpaper === choice.id ? 'border-sakura' : 'border-line')}
             >
               <span className={cn('block h-14', wallpaperClass(choice.id))} />
               <span className="block px-2 py-1.5 text-xs">{choice.label}</span>
