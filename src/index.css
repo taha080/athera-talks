@@ -844,10 +844,12 @@ textarea:-webkit-autofill {
 /* Default light chat only. Near-white, flat, and matte. Other themes stay as they are. */
 [data-theme='light'] .chat-header {
   height: 3.75rem;
-  background-color: #ffffff;
+  background-color: rgb(255 255 255 / 0.88);
   color: #1c1428;
   border-color: #ececf1;
-  box-shadow: none;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 4px 16px rgb(15 23 42 / 0.08);
 }
 
 [data-theme='light'] .chat-header .text-mist {
@@ -1363,11 +1365,15 @@ textarea:-webkit-autofill {
 
 [data-theme='light'] .composer-shell {
   border: 1px solid #ece8f2;
-  border-radius: 28px;
+  border-radius: 999px;
   background: #ffffff;
   box-shadow:
     0 8px 28px rgb(36 24 48 / 0.07),
     0 1px 2px rgb(36 24 48 / 0.04);
+}
+
+[data-theme='light'] .composer-shell.composer-expanded {
+  border-radius: 26px;
 }
 
 [data-theme='light'] .composer-shell textarea {
@@ -1414,10 +1420,12 @@ textarea:-webkit-autofill {
 }
 
 [data-theme='midnight'] .chat-header {
-  background-color: #151e31;
+  background-color: rgb(21 30 49 / 0.88);
   color: #e5e7eb;
   border-color: #2a3548;
-  box-shadow: none;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.35);
 }
 
 [data-theme='midnight'] .chat-header .text-mist {
@@ -1435,13 +1443,17 @@ textarea:-webkit-autofill {
 [data-theme='midnight'] .bubble-own {
   background: #5b4b9a;
   color: #fff;
-  box-shadow: none;
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 0.35),
+    0 4px 14px rgb(91 75 154 / 0.35);
 }
 
 [data-theme='midnight'] .bubble-other {
   background: #1f2937;
   color: #e5e7eb;
-  box-shadow: none;
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 0.30),
+    0 4px 12px rgb(0 0 0 / 0.25);
 }
 
 [data-theme='midnight'] .bubble-own,
@@ -1482,9 +1494,15 @@ textarea:-webkit-autofill {
 
 [data-theme='midnight'] .composer-shell {
   border-color: transparent;
-  border-radius: 24px;
+  border-radius: 999px;
   background: #121a2c;
-  box-shadow: none;
+  box-shadow:
+    0 10px 28px rgb(0 0 0 / 0.45),
+    0 1px 3px rgb(0 0 0 / 0.4);
+}
+
+[data-theme='midnight'] .composer-shell.composer-expanded {
+  border-radius: 26px;
 }
 
 [data-theme='midnight'] .send-button,
@@ -1852,7 +1870,8 @@ audio[data-call-audio]::-webkit-media-controls-enclosure {
   .chat-list label input,
   .composer-shell,
   .send-button,
-  .story-circle {
+  .story-circle,
+  .theme-card {
     transition-duration: 0.01ms !important;
   }
 
@@ -1862,6 +1881,109 @@ audio[data-call-audio]::-webkit-media-controls-enclosure {
   .story-circle:active {
     transform: none;
   }
+}
+
+/* Premium polish, round 3 — bolder, visible changes ----------------- */
+/* The user said the first two passes were too subtle. These are meant
+   to be visible at a glance: a real pill composer, glassy headers,
+   borderless bubbles, elevated list rows, and a clearer type scale.
+   Everything here rides on theme tokens, so all themes pick it up. */
+
+/* --- Composer pill (headline fix) --- */
+/* The old shell read as a big square box, mostly because the focused
+   textarea drew a square :focus-visible outline inside the rounded
+   shell. The shell is now a true pill; the shell's own focus-within
+   ring is the only focus indicator, and it follows the pill radius.
+   A tall field (multi-line, emoji panel, reply/edit banner) drops to
+   a large 26px radius via .composer-expanded. */
+.composer-shell {
+  border-radius: 999px;
+  box-shadow:
+    0 10px 30px rgb(15 23 42 / 0.16),
+    0 1px 3px rgb(15 23 42 / 0.10);
+  transition: border-color 160ms ease, box-shadow 200ms ease, border-radius 220ms ease;
+}
+
+.composer-shell.composer-expanded {
+  border-radius: 26px;
+}
+
+/* Never draw the square focus outline inside the pill. */
+.composer-shell textarea:focus-visible {
+  outline: none;
+}
+
+.composer-shell textarea {
+  caret-color: var(--accent);
+}
+
+/* --- Glassy headers --- */
+/* Headers float above the content now: translucent panel + blur + a
+   soft drop shadow, so the layers read as stacked instead of flat. */
+.chat-header {
+  background: color-mix(in oklab, var(--panel) 88%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 4px 16px rgb(15 23 42 / 0.08);
+}
+
+/* --- Bubbles: borderless, softer, more air --- */
+/* The incoming bubble's 1px inset border made it read as an outlined
+   chip. Borders are gone; depth comes from layered soft shadows. */
+.bubble-other {
+  box-shadow:
+    0 1px 3px rgb(15 23 42 / 0.10),
+    0 4px 14px rgb(15 23 42 / 0.06);
+}
+
+.bubble-own {
+  box-shadow:
+    0 1px 3px rgb(15 23 42 / 0.14),
+    0 4px 14px color-mix(in oklab, var(--accent) 28%, transparent);
+}
+
+.bubble-pad {
+  padding: 9px 13px;
+}
+
+/* --- Chat list: the active row has presence --- */
+.chat-list a.is-active {
+  box-shadow:
+    inset 2px 0 0 var(--accent),
+    0 2px 10px rgb(15 23 42 / 0.12);
+}
+
+/* The list reads as its own panel next to the thread. */
+.chat-list {
+  box-shadow: 8px 0 24px rgb(15 23 42 / 0.06);
+}
+
+/* --- Type scale: titles lead, names stand out --- */
+.chat-title {
+  font-weight: 700;
+}
+
+/* --- Story rings: thicker ring, stronger glow for unseen --- */
+.story-ring[data-unseen='true'] {
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--accent) 30%, transparent),
+    0 4px 16px color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+/* --- Theme + wallpaper cards: lift on hover, ring when picked --- */
+.theme-card {
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 160ms ease;
+}
+
+.theme-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgb(15 23 42 / 0.16);
+}
+
+.theme-card[aria-pressed='true'] {
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--accent) 45%, transparent),
+    0 10px 24px rgb(15 23 42 / 0.14);
 }
 
 /* ------------------------------------------------------------------ */

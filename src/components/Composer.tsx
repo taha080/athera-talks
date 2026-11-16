@@ -53,6 +53,7 @@ export function Composer({
   const [phase, setPhase] = useState<Phase>('idle')
   const [seconds, setSeconds] = useState(0)
   const [error, setError] = useState('')
+  const [tall, setTall] = useState(false)
   const recorder = useRef<MediaRecorder | null>(null)
   const chunks = useRef<Blob[]>([])
   const stream = useRef<MediaStream | null>(null)
@@ -94,6 +95,8 @@ export function Composer({
     if (!node) return
     node.style.height = '0px'
     node.style.height = `${Math.min(node.scrollHeight, 128)}px`
+    // Single line stays a pill; a taller field drops to a large radius.
+    setTall(node.scrollHeight > 56)
   }
 
   const typingOn = useRef(false)
@@ -226,6 +229,7 @@ export function Composer({
       setDraft('')
       stopTyping()
       setEmojiOpen(false)
+      setTall(false)
       if (box.current) box.current.style.height = 'auto'
     } catch (err) {
       setUpload(null)
@@ -247,6 +251,7 @@ export function Composer({
     setDraft('')
     stopTyping()
     setEmojiOpen(false)
+    setTall(false)
     if (box.current) box.current.style.height = 'auto'
     setError('')
     try {
@@ -369,7 +374,7 @@ export function Composer({
   const recording = phase !== 'idle'
 
   return (
-    <div className="composer-shell rounded-2xl border border-line bg-panel px-2 py-1.5 shadow-md">
+    <div className={`composer-shell ${tall || emojiOpen || reply || editing || pending ? 'composer-expanded' : ''} border border-line bg-panel px-1.5 py-1 shadow-md`}>
       {editing ? (
         <div className="mb-2 flex items-center gap-2 rounded-lg border-l-4 border-sakura bg-elevated px-3 py-2 text-sm">
           <p className="min-w-0 flex-1 truncate text-mist">Editing message</p>
@@ -417,10 +422,10 @@ export function Composer({
           <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#e5484d]" />
           <p className="tabular-nums text-sm font-medium">{formatDuration(seconds)}</p>
           <span className="min-w-0 flex-1" />
-          <button type="button" className="hover-wash grid h-11 w-11 shrink-0 place-items-center rounded-full text-mist hover:text-paper" aria-label="Discard recording" onClick={() => void finish(false)}>
+          <button type="button" className="hover-wash grid h-10 w-10 shrink-0 place-items-center rounded-full text-mist hover:text-paper" aria-label="Discard recording" onClick={() => void finish(false)}>
             <TrashIcon className="h-5 w-5" />
           </button>
-          <button type="button" className="send-button grid h-11 w-11 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label="Send voice message" onClick={() => void finish(true)}>
+          <button type="button" className="send-button grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label="Send voice message" onClick={() => void finish(true)}>
             <SendIcon className="h-5 w-5" />
           </button>
         </div>
@@ -432,11 +437,11 @@ export function Composer({
             void submitText()
           }}
         >
-          <button type="button" className="hover-wash grid h-11 w-11 shrink-0 place-items-center rounded-full text-mist hover:text-paper" aria-label="Emoji" aria-expanded={emojiOpen} onClick={() => setEmojiOpen((open) => !open)}>
+          <button type="button" className="hover-wash grid h-10 w-10 shrink-0 place-items-center rounded-full text-mist hover:text-paper" aria-label="Emoji" aria-expanded={emojiOpen} onClick={() => setEmojiOpen((open) => !open)}>
             <SmileIcon className="h-5 w-5" />
           </button>
           {editing ? null : (
-          <label className="hover-wash grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-full text-mist hover:text-paper" aria-label="Attach a photo or video">
+          <label className="hover-wash grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full text-mist hover:text-paper" aria-label="Attach a photo or video">
             <ImageIcon className="h-5 w-5" />
             <input
               type="file"
@@ -456,7 +461,7 @@ export function Composer({
             <span className="sr-only">Message</span>
             <textarea
               ref={box}
-              className="max-h-32 min-h-10 w-full resize-none bg-transparent px-1 py-2.5 text-sm leading-5 text-paper outline-none placeholder:text-mist/70"
+              className="max-h-32 min-h-10 w-full resize-none bg-transparent px-1 py-2 text-sm leading-5 text-paper outline-none placeholder:text-mist/70"
               rows={1}
               maxLength={4000}
               value={draft}
@@ -481,13 +486,13 @@ export function Composer({
             />
           </label>
           {draft.trim() || editing || pending ? (
-            <button type="submit" className="send-button grid h-11 w-11 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label={editing ? 'Save edit' : 'Send message'}>
+            <button type="submit" className="send-button grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label={editing ? 'Save edit' : 'Send message'}>
               <SendIcon className="h-5 w-5" />
             </button>
           ) : (
             <button
               type="button"
-              className="send-button grid h-11 w-11 shrink-0 touch-manipulation place-items-center rounded-full bg-sakura text-white transition hover:brightness-110"
+              className="send-button grid h-10 w-10 shrink-0 touch-manipulation place-items-center rounded-full bg-sakura text-white transition hover:brightness-110"
               aria-label="Record voice message"
               onClick={() => void startRecording()}
             >

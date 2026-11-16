@@ -207,7 +207,7 @@ function StoryCircle({
     <button type="button" className="story-circle flex w-14 shrink-0 flex-col items-center" onClick={onOpen} aria-label={hasStories ? `View ${name}'s stories` : 'Add a story'}>
       <span className="relative">
         <span
-          className="story-ring block rounded-full p-[2.5px]"
+          className="story-ring block rounded-full p-[3px]"
           data-unseen={hasStories && unseen ? 'true' : undefined}
           style={
             hasStories

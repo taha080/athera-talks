@@ -172,7 +172,7 @@ export function Sidebar() {
   return (
     <div className="chat-list relative flex h-full min-h-0 flex-col bg-panel">
       <header className="chat-header flex h-14 items-center gap-2 px-3">
-        <h1 className="min-w-0 flex-1 text-lg font-semibold tracking-tight">{showRequests ? 'Requests' : 'Chats'}</h1>
+        <h1 className="min-w-0 flex-1 text-[22px] font-bold tracking-tight">{showRequests ? 'Requests' : 'Chats'}</h1>
         <Link
           to={showRequests ? '/' : '/?requests=1'}
           className="relative grid h-10 place-items-center rounded-lg px-2 text-sm font-medium text-mist hover:text-paper md:hidden"
@@ -264,7 +264,7 @@ export function Sidebar() {
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-mist" />
           <input
             ref={searchRef}
-            className="h-10 w-full rounded-lg border border-line bg-elevated pl-9 pr-3 text-sm text-paper outline-none transition placeholder:text-mist/70 focus:border-sakura focus:ring-2 focus:ring-sakura/30"
+            className="h-10 w-full rounded-full border border-line bg-elevated pl-9 pr-3 text-sm text-paper outline-none transition placeholder:text-mist/70 focus:border-sakura focus:ring-2 focus:ring-sakura/30"
             value={query}
             onChange={(event) => void onSearch(event.target.value)}
             placeholder="Search username"
