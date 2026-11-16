@@ -91,35 +91,47 @@ export function StoriesRow({ me }: { me: Profile }) {
   const ownGroup = groups.find((group) => group.author.id === me.id)
   const others = groups.filter((group) => group.author.id !== me.id)
 
-  async function handleViewed(storyId: string) {
+  // Stable identity matters here: StoryViewer runs an effect on `onViewed`,
+  // so a new callback every render would re-fire it, and the setStories call
+  // below would loop forever (React error #185). The updater returns the
+  // same array when the story is already viewed, so a repeat call is a
+  // no-op instead of a re-render.
+  const handleViewed = useCallback((storyId: string) => {
     const active = storeRef.current
     if (!active) return
-    try {
-      await active.markViewed(storyId)
-    } catch {
-      // A missed view is not worth an error banner; the ring just stays.
-      return
-    }
-    setStories((current) =>
-      current.map((story) =>
-        story.id === storyId && !story.viewedByMe
-          ? { ...story, viewedByMe: true, viewCount: story.viewCount + 1 }
-          : story,
-      ),
-    )
-  }
+    void (async () => {
+      try {
+        await active.markViewed(storyId)
+      } catch {
+        // A missed view is not worth an error banner; the ring just stays.
+        return
+      }
+      setStories((current) => {
+        const target = current.find((story) => story.id === storyId)
+        if (!target || target.viewedByMe) return current
+        return current.map((story) =>
+          story.id === storyId ? { ...story, viewedByMe: true, viewCount: story.viewCount + 1 } : story,
+        )
+      })
+    })()
+  }, [])
 
-  async function handleDelete(storyId: string) {
-    const active = storeRef.current
-    if (!active) return
-    setError('')
-    try {
-      await active.deleteStory(storyId)
-      await refresh()
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not delete that story.')
-    }
-  }
+  const handleDelete = useCallback(
+    async (storyId: string) => {
+      const active = storeRef.current
+      if (!active) return
+      setError('')
+      try {
+        await active.deleteStory(storyId)
+        await refresh()
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : 'Could not delete that story.')
+      }
+    },
+    [refresh],
+  )
+
+  const closeViewer = useCallback(() => setViewer(null), [])
 
   return (
     <div className="shrink-0 border-b border-line/70 px-3 pb-2 pt-2">
@@ -165,9 +177,9 @@ export function StoriesRow({ me }: { me: Profile }) {
           meId={me.id}
           startAuthorId={viewer.authorId}
           startStoryId={viewer.storyId}
-          onClose={() => setViewer(null)}
+          onClose={closeViewer}
           onDelete={handleDelete}
-          onViewed={(storyId) => void handleViewed(storyId)}
+          onViewed={handleViewed}
         />
       ) : null}
       {composerOpen && store ? (

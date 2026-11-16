@@ -106,7 +106,7 @@ export function StoryComposer({
       <div className="w-full max-w-md rounded-2xl border border-line bg-panel p-4 shadow-md">
         <header className="flex items-center justify-between">
           <h2 className="text-base font-semibold">New story</h2>
-          <button type="button" className="grid h-9 w-9 place-items-center rounded-lg text-mist hover:text-paper" onClick={onClose} aria-label="Close composer">
+          <button type="button" className="grid h-10 w-10 place-items-center rounded-lg text-mist hover:text-paper" onClick={onClose} aria-label="Close composer">
             <CloseIcon className="h-5 w-5" />
           </button>
         </header>
@@ -152,7 +152,7 @@ export function StoryComposer({
             {preview ? (
               <button
                 type="button"
-                className={cn(ghostButton, 'h-9 px-3 text-xs')}
+                className={cn(ghostButton, 'h-10 px-3 text-xs')}
                 onClick={() => {
                   if (previewRef.current) URL.revokeObjectURL(previewRef.current)
                   previewRef.current = null
@@ -203,7 +203,7 @@ export function StoryComposer({
                     aria-label={item.label}
                     title={item.label}
                     className={cn(
-                      'h-8 w-8 rounded-full transition',
+                      'h-10 w-10 rounded-full transition',
                       background === item.id ? 'ring-2 ring-sakura ring-offset-2 ring-offset-panel' : 'opacity-80 hover:opacity-100',
                     )}
                     style={{ background: item.css }}

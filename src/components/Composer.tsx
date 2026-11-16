@@ -417,10 +417,10 @@ export function Composer({
           <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#e5484d]" />
           <p className="tabular-nums text-sm font-medium">{formatDuration(seconds)}</p>
           <span className="min-w-0 flex-1" />
-          <button type="button" className="hover-wash grid h-10 w-10 shrink-0 place-items-center rounded-full text-mist hover:text-paper" aria-label="Discard recording" onClick={() => void finish(false)}>
+          <button type="button" className="hover-wash grid h-11 w-11 shrink-0 place-items-center rounded-full text-mist hover:text-paper" aria-label="Discard recording" onClick={() => void finish(false)}>
             <TrashIcon className="h-5 w-5" />
           </button>
-          <button type="button" className="send-button grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label="Send voice message" onClick={() => void finish(true)}>
+          <button type="button" className="send-button grid h-11 w-11 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label="Send voice message" onClick={() => void finish(true)}>
             <SendIcon className="h-5 w-5" />
           </button>
         </div>
@@ -432,11 +432,11 @@ export function Composer({
             void submitText()
           }}
         >
-          <button type="button" className="hover-wash grid h-10 w-10 shrink-0 place-items-center rounded-full text-mist hover:text-paper" aria-label="Emoji" aria-expanded={emojiOpen} onClick={() => setEmojiOpen((open) => !open)}>
+          <button type="button" className="hover-wash grid h-11 w-11 shrink-0 place-items-center rounded-full text-mist hover:text-paper" aria-label="Emoji" aria-expanded={emojiOpen} onClick={() => setEmojiOpen((open) => !open)}>
             <SmileIcon className="h-5 w-5" />
           </button>
           {editing ? null : (
-          <label className="hover-wash grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full text-mist hover:text-paper" aria-label="Attach a photo or video">
+          <label className="hover-wash grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-full text-mist hover:text-paper" aria-label="Attach a photo or video">
             <ImageIcon className="h-5 w-5" />
             <input
               type="file"
@@ -481,13 +481,13 @@ export function Composer({
             />
           </label>
           {draft.trim() || editing || pending ? (
-            <button type="submit" className="send-button grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label={editing ? 'Save edit' : 'Send message'}>
+            <button type="submit" className="send-button grid h-11 w-11 shrink-0 place-items-center rounded-full bg-sakura text-white transition hover:brightness-110" aria-label={editing ? 'Save edit' : 'Send message'}>
               <SendIcon className="h-5 w-5" />
             </button>
           ) : (
             <button
               type="button"
-              className="send-button grid h-10 w-10 shrink-0 touch-manipulation place-items-center rounded-full bg-sakura text-white transition hover:brightness-110"
+              className="send-button grid h-11 w-11 shrink-0 touch-manipulation place-items-center rounded-full bg-sakura text-white transition hover:brightness-110"
               aria-label="Record voice message"
               onClick={() => void startRecording()}
             >

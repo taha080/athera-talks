@@ -78,7 +78,7 @@ export function CallScreen() {
           ) : null}
           <CallPortrait name={peer?.username ?? 'caller'} url={peer?.avatarUrl} creator={peer?.isCreator} premium={hasPremium(peer)} />
         </div>
-        <h2 className="mt-6 flex items-center justify-center gap-1.5 text-3xl font-semibold tracking-tight">
+        <h2 className="mt-6 flex items-center justify-center gap-1.5 px-4 text-center text-2xl font-semibold tracking-tight sm:text-3xl">
           <DisplayName name={`@${peer?.username ?? 'caller'}`} creator={peer?.isCreator} premium={hasPremium(peer)} />
         </h2>
         {call.error ? <p className="mx-auto mt-4 max-w-sm text-sm text-danger">{call.error}</p> : null}

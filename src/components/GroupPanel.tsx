@@ -58,7 +58,7 @@ export function GroupPanel({
           <p className="truncate text-sm font-semibold">{conversation.title || 'Group'}</p>
           <p className="mt-1 text-xs text-mist">{members.length} members</p>
         </div>
-        <button type="button" className="grid h-8 w-8 place-items-center rounded-lg text-mist hover:text-paper" aria-label="Close details" onClick={onClose}>
+        <button type="button" className="grid h-10 w-10 place-items-center rounded-lg text-mist hover:text-paper" aria-label="Close details" onClick={onClose}>
           <CloseIcon className="h-4 w-4" />
         </button>
       </div>
@@ -148,12 +148,12 @@ export function GroupPanel({
               <span className="flex shrink-0 gap-1">
                 <button
                   type="button"
-                  className="rounded-md px-1.5 py-1 text-[11px] text-mist hover:text-paper"
+                  className="rounded-md px-2.5 py-2 text-xs text-mist hover:text-paper"
                   onClick={() => void run(onRole(member.id, member.role === 'admin' ? 'member' : 'admin'))}
                 >
                   {member.role === 'admin' ? 'Dismiss' : 'Make admin'}
                 </button>
-                <button type="button" className="rounded-md px-1.5 py-1 text-[11px] text-danger" onClick={() => void run(onRemove(member.id))}>
+                <button type="button" className="rounded-md px-2.5 py-2 text-xs text-danger" onClick={() => void run(onRemove(member.id))}>
                   Remove
                 </button>
               </span>

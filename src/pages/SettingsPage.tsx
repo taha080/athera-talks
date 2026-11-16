@@ -51,7 +51,10 @@ export function SettingsPage() {
         <h1 className="text-lg font-semibold">Settings</h1>
       </header>
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <nav className="flex gap-1 overflow-x-auto border-b border-line px-3 py-3 md:w-48 md:flex-col md:border-b-0 md:border-r" aria-label="Settings">
+        <nav
+          className="flex gap-1 overflow-x-auto border-b border-line px-3 py-3 [mask-image:linear-gradient(to_right,black_88%,transparent)] md:w-48 md:flex-col md:border-b-0 md:border-r md:[mask-image:none]"
+          aria-label="Settings"
+        >
           {sections.map((item) => (
             <Link
               key={item.id}
@@ -162,7 +165,7 @@ function ProfileSection() {
         </label>
         <div className="mt-3 flex flex-wrap gap-2">
           {SUGGESTIONS.map((title) => (
-            <button key={title} type="button" className="rounded-full border border-line px-3 py-1 text-xs text-mist hover:text-paper" onClick={() => setFavourite(title)}>
+            <button key={title} type="button" className="rounded-full border border-line px-3 py-1.5 text-xs text-mist hover:text-paper" onClick={() => setFavourite(title)}>
               {title}
             </button>
           ))}

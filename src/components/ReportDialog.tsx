@@ -38,7 +38,7 @@ export function ReportDialog({
             <h2 className="text-sm font-semibold">Report @{username}</h2>
             <p className="mt-1 text-xs leading-5 text-mist">The creator reviews reports. This person is not told that you sent one.</p>
           </div>
-          <button type="button" className="grid h-8 w-8 place-items-center rounded-lg text-mist hover:text-paper" aria-label="Close report" onClick={onClose}>
+          <button type="button" className="grid h-10 w-10 place-items-center rounded-lg text-mist hover:text-paper" aria-label="Close report" onClick={onClose}>
             <CloseIcon className="h-4 w-4" />
           </button>
         </div>

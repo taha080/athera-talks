@@ -499,14 +499,14 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
             <div className="mt-3 flex gap-2">
               <button
                 type="button"
-                className="h-9 flex-1 rounded-lg border border-line px-2 text-xs font-medium"
+                className="h-10 flex-1 rounded-lg border border-line px-2 text-xs font-medium"
                 onClick={() => void act(conversation.blockedByMe ? chat.unblockUser(conversation.peer.id) : chat.blockUser(conversation.peer.id))}
               >
                 {conversation.blockedByMe ? 'Unblock' : 'Block'}
               </button>
               <button
                 type="button"
-                className="h-9 flex-1 rounded-lg border border-line px-2 text-xs font-medium"
+                className="h-10 flex-1 rounded-lg border border-line px-2 text-xs font-medium"
                 onClick={() => setReporting({ id: conversation.peer.id, username: conversation.peer.username })}
               >
                 Report
@@ -518,7 +518,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
       {searchOpen ? (
         <div className="flex items-center gap-2 border-b border-line bg-panel px-3 py-2">
           <input
-            className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-elevated px-3 text-sm outline-none focus:border-sakura focus:ring-2 focus:ring-sakura/30"
+            className="h-10 min-w-0 flex-1 rounded-lg border border-line bg-elevated px-3 text-sm outline-none focus:border-sakura focus:ring-2 focus:ring-sakura/30"
             value={search}
             onChange={(event) => {
               setSearch(event.target.value)
@@ -1066,7 +1066,7 @@ function Meta({
 
 function Tiny({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (
-    <button type="button" aria-label={label} className="hover-wash grid h-7 w-7 place-items-center rounded-full text-mist hover:text-paper" onClick={onClick}>
+    <button type="button" aria-label={label} className="hover-wash grid h-9 w-9 place-items-center rounded-full text-mist hover:text-paper" onClick={onClick}>
       {children}
     </button>
   )
