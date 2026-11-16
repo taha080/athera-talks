@@ -26,7 +26,7 @@ If the Supabase settings are missing, the app opens a setup screen instead of cr
 - Text, emoji, images, short videos, and voice notes. Images can be pasted. Videos upload in chunks.
 - Replies, reactions, copy, edit, delete for everyone, and hide for yourself.
 - Search inside a conversation. Links in a message stay tappable.
-- A typing indicator, a message chime, and optional desktop alerts.
+- A typing indicator, a message chime, and optional desktop alerts. Push notifications arrive even when the app is closed, once they are set up (see Push notifications below).
 - Call history in the thread: completed, missed, declined, or cancelled.
 
 ### Message requests
@@ -117,6 +117,31 @@ Stories sit at the top of the chat list, WhatsApp Status style: your own circle 
 The full-screen viewer shows progress bars, auto-advances (5 seconds for a photo, 7 for text), and moves between stories and authors with a tap left/right or the arrow keys. Opening a story marks it seen; your own stories show a view count and a delete button.
 
 To share stories across devices, apply `supabase/migrations/20261026120000_stories.sql` in Supabase (SQL Editor, or `supabase db push`). It creates the `stories` and `story_views` tables with Row Level Security (insert your own, read only your own and your accepted contacts', delete your own) and a private `stories` storage bucket readable only by accepted contacts. Until that migration is applied, the stories row shows a banner and runs in local demo mode in that browser only, so the rest of the site is never broken by a missing table.
+
+### Push notifications
+
+When someone sends you a message, a notification appears even when Athera Talks is closed. That is real Web Push, not an in-app toast: the browser's push service wakes the service worker (`public/sw.js`), which shows the notification with the sender's name and a short preview. Tapping it opens that chat. If you are already looking at that conversation, the worker stays quiet. A muted conversation sends nothing to the person who muted it.
+
+The switch is in Settings → Privacy → **Message notifications**. It shows the real state: on, off, not supported (this browser cannot do push), permission denied (blocked in the browser settings), or not set up yet (the steps below are missing). Only signed-in users on the live Supabase connection can turn it on; one subscription is stored per device/browser, and turning it off removes it. The app never asks for permission on its own — only the toggle does, from a tap.
+
+**Privacy:** a notification shows the sender's name and a short message preview, like WhatsApp or Telegram. No message content is stored in the subscriptions table. To show only the name, change `previewText()` in `supabase/functions/send-push/index.ts` to return a fixed string such as `'New message'` and redeploy the function.
+
+**Set up (all four steps, in order):**
+
+1. **Migration** — in Supabase, open **SQL Editor → New query**, paste `supabase/migrations/20261116120000_push_subscriptions.sql`, and run it. It creates the `push_subscriptions` table with Row Level Security (each user reads and manages only their own rows). Until this is applied, the Settings toggle says "not set up yet" and the app works exactly as before.
+2. **Secrets** — in Supabase, open **Edge Functions → Secrets** (or run `supabase secrets set`), and set:
+   - `VAPID_PUBLIC_KEY` — the app's public push key (it is also in `src/lib/push.ts` as `PUSH_VAPID_PUBLIC_KEY`; the two must match).
+   - `VAPID_PRIVATE_KEY` — the matching private key. **Never commit this, and never paste it into the app code.** If it ever leaks, generate a new pair, update the constant and this secret, and every device re-subscribes from Settings.
+   - `VAPID_SUBJECT` — who sends the push, e.g. `https://taha080.github.io/athera-talks/`.
+   - `PUSH_WEBHOOK_SECRET` — any long random string you choose; the database webhook must send the same value.
+   `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected by Supabase automatically.
+3. **Deploy the function** — `supabase/functions/send-push/` is the Edge Function that sends the notifications. Deploy it with JWT verification **off** (a database webhook cannot present a Supabase user JWT; it proves itself with the shared secret instead):
+   ```bash
+   supabase functions deploy send-push --no-verify-jwt
+   ```
+4. **Database webhook** — in Supabase, open **Database → Webhooks → Create a new webhook**: table `public.messages`, event **INSERT**, method **POST**, URL `https://<project-ref>.supabase.co/functions/v1/send-push`, and add the HTTP header `x-webhook-secret: <the same PUSH_WEBHOOK_SECRET>`. From then on, every new message triggers the function, which notifies every other member of that conversation (except muted ones) and deletes subscriptions whose push endpoint answers 404 or 410 (expired).
+
+**Limits, honestly:** iOS only delivers web push to a website installed to the home screen (Safari 16.4+, the app must be added as a PWA) — in mobile Safari without installing, the toggle reports "not supported". On desktop, Chrome, Edge, and Firefox deliver while the browser is closed only while its background mode is on (Chrome on Windows runs in the background by default). If the browser is fully quit with background mode off, the notification arrives the next time it opens. The VAPID keys were generated for this app on 16 Nov 2026; rotating them is step 2 again, plus updating `PUSH_VAPID_PUBLIC_KEY` in `src/lib/push.ts`.
 
 ### Welcome splash
 
@@ -215,11 +240,12 @@ src/
   pages/          auth, home, settings, reset password, and the 404 page
   services/       live Supabase queries and call signaling
   assets/         images used by the interface
-public/           icons, web app manifest, and the privacy policy
+public/           icons, web app manifest, service worker (sw.js), and the privacy policy
 supabase/
   schema.sql      full script for a new project
   migrations/     ordered SQL changes
   functions/turn-credentials/   Edge Function that returns ICE servers
+  functions/send-push/         Edge Function that sends push notifications
 .github/workflows/  CI, and the GitHub Pages deploy
 scripts/copy-404.mjs
 ```
@@ -242,7 +268,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request,
 
 ### GitHub Pages
 
-`.github/workflows/deploy.yml` builds with `VITE_BASE_PATH` set to `/athera-talks/` and publishes the `dist` folder. The build copies `index.html` to `404.html` so routes such as `/c/...` still open the app. The manifest `start_url` and `scope` are `.`, so they resolve from the manifest URL to `https://taha080.github.io/athera-talks/`. The app does not register a service worker.
+`.github/workflows/deploy.yml` builds with `VITE_BASE_PATH` set to `/athera-talks/` and publishes the `dist` folder. The build copies `index.html` to `404.html` so routes such as `/c/...` still open the app. The manifest `start_url` and `scope` are `.`, so they resolve from the manifest URL to `https://taha080.github.io/athera-talks/`. The app registers a service worker (`public/sw.js`, copied to `dist/` by the build) for signed-in users; it only handles push notifications and notification clicks, and caches nothing.
 
 1. The repository name for this site is `athera-talks`. A different name needs a matching `VITE_BASE_PATH`.
 2. Under **Settings → Secrets and variables → Actions**, add `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_SUPABASE_GOOGLE_ENABLED`. Optional relay overrides use `VITE_TURN_URLS`, `VITE_TURN_USERNAME`, `VITE_TURN_CREDENTIAL`, and `VITE_TURN_SECRET`.

@@ -7,6 +7,7 @@ import { cn } from '../lib/cn'
 import { dangerButton, iconButton } from '../lib/styles'
 import { isOnline } from '../lib/presence'
 import { hasPremium } from '../lib/premium'
+import { syncPushSubscription } from '../lib/push'
 import { reducedMotionPreferred, shouldShowWelcome, type WelcomeStorage } from '../lib/welcome'
 import { Avatar } from './Avatar'
 import { CallScreen } from './CallScreen'
@@ -35,6 +36,7 @@ export function Shell() {
   const [storage] = useState(welcomeStorage)
   const [welcome, setWelcome] = useState(() => shouldShowWelcome(storage, reducedMotionPreferred()))
   useVisualViewport()
+  usePushNotifications()
 
   return (
     <ChatProvider>
@@ -91,6 +93,20 @@ function useVisualViewport() {
       root.style.removeProperty('--app-height')
     }
   }, [])
+}
+
+// Push notifications arrive even when the app is closed, so the service
+// worker must be registered for every signed-in user — not only when
+// they open Settings. This only registers the worker and re-saves an
+// existing subscription; it never asks for permission on its own (the
+// Settings toggle does that, from a tap). Best-effort: any failure here
+// leaves the app working exactly as before.
+function usePushNotifications() {
+  const { mode, profile } = useSession()
+  useEffect(() => {
+    if (mode !== 'live' || !profile) return
+    void syncPushSubscription(profile.id)
+  }, [mode, profile])
 }
 
 function NavRail() {
