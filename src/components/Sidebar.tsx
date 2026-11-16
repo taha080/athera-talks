@@ -16,6 +16,7 @@ import { Avatar } from './Avatar'
 import { DisplayName } from './CreatorBadge'
 import { NewGroup } from './NewGroup'
 import { ReportDialog } from './ReportDialog'
+import { StoriesRow } from './StoriesRow'
 import { ArchiveIcon, CheckIcon, CommunityIcon, GearIcon, PhoneIcon, PinIcon, PlusIcon, SearchIcon, MoreIcon, VolumeIcon } from './Icons'
 
 export function Sidebar() {
@@ -288,6 +289,8 @@ export function Sidebar() {
           ))}
         </div>
       </div>
+
+      {!showRequests && profile ? <StoriesRow me={profile} /> : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {groupOpen ? (

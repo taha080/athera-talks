@@ -162,7 +162,7 @@ function Toasts() {
         <button
           key={toast.id}
           type="button"
-          className="toast-in pointer-events-auto rounded-lg border border-line bg-panel px-3 py-2 text-left text-sm text-paper shadow-md"
+          className="toast-in pointer-events-auto rounded-xl border border-line bg-panel px-3 py-2 text-left text-sm text-paper shadow-md"
           onClick={() => dismissToast(toast.id)}
         >
           {toast.text}

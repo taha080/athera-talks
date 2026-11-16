@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronLeft,
   Copy,
+  Eye,
   Plus,
   Reply,
   Image,
@@ -27,6 +28,7 @@ import {
   Settings,
   Smile,
   Trash2,
+  Type,
   UserPlus,
   Users,
   Volume2,
@@ -167,4 +169,12 @@ export function PencilIcon({ className }: IconProps) {
 
 export function CommunityIcon({ className }: IconProps) {
   return glyph(Users, className)
+}
+
+export function EyeIcon({ className }: IconProps) {
+  return glyph(Eye, className)
+}
+
+export function TextIcon({ className }: IconProps) {
+  return glyph(Type, className)
 }
