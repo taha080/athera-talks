@@ -204,10 +204,11 @@ function StoryCircle({
   onOpen: () => void
 }) {
   return (
-    <button type="button" className="flex w-14 shrink-0 flex-col items-center" onClick={onOpen} aria-label={hasStories ? `View ${name}'s stories` : 'Add a story'}>
+    <button type="button" className="story-circle flex w-14 shrink-0 flex-col items-center" onClick={onOpen} aria-label={hasStories ? `View ${name}'s stories` : 'Add a story'}>
       <span className="relative">
         <span
-          className="block rounded-full p-[2.5px]"
+          className="story-ring block rounded-full p-[2.5px]"
+          data-unseen={hasStories && unseen ? 'true' : undefined}
           style={
             hasStories
               ? unseen

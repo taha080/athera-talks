@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { CallProvider } from '../context/CallContext'
 import { ChatProvider, useChat } from '../context/ChatContext'
@@ -7,6 +7,7 @@ import { cn } from '../lib/cn'
 import { dangerButton, iconButton } from '../lib/styles'
 import { isOnline } from '../lib/presence'
 import { hasPremium } from '../lib/premium'
+import { reducedMotionPreferred, shouldShowWelcome, type WelcomeStorage } from '../lib/welcome'
 import { Avatar } from './Avatar'
 import { CallScreen } from './CallScreen'
 import { AddContactIcon, ChatsIcon, CommunityIcon, GearIcon, SignOutIcon } from './Icons'
@@ -14,6 +15,15 @@ import { Credit } from './Credit'
 import { Logo } from './Logo'
 import { MessageNotices } from './MessageNotice'
 import { Sidebar } from './Sidebar'
+import { WelcomeSplash } from './WelcomeSplash'
+
+function welcomeStorage(): WelcomeStorage | null {
+  try {
+    return window.sessionStorage
+  } catch {
+    return null
+  }
+}
 
 export function Shell() {
   const location = useLocation()
@@ -21,6 +31,9 @@ export function Shell() {
   const settingsOpen = location.pathname.startsWith('/settings') || location.pathname.startsWith('/profile')
   const communitiesOpen = location.pathname.startsWith('/communities')
   const showList = !chatOpen && !settingsOpen && !communitiesOpen
+  // The welcome splash shows once per tab session, on a fresh open.
+  const [storage] = useState(welcomeStorage)
+  const [welcome, setWelcome] = useState(() => shouldShowWelcome(storage, reducedMotionPreferred()))
   useVisualViewport()
 
   return (
@@ -42,6 +55,7 @@ export function Shell() {
           <CallScreen />
           <MessageNotices />
           <Toasts />
+          {welcome ? <WelcomeSplash storage={storage} onDone={() => setWelcome(false)} /> : null}
         </div>
       </CallProvider>
     </ChatProvider>
@@ -145,7 +159,7 @@ function RailLink({
     >
       {children}
       {badge > 0 ? (
-        <span className="absolute right-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-sakura px-1 text-[10px] font-semibold text-white">
+        <span className="unread-badge absolute right-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-sakura px-1 text-[10px] font-semibold text-white">
           {badge}
         </span>
       ) : null}

@@ -1729,3 +1729,257 @@ audio[data-call-audio]::-webkit-media-controls-enclosure {
     transform: translate3d(0, -1.5px, 0);
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Premium polish, round 2 — how the app FEELS. Refine, don't redesign. */
+/* Everything here rides the theme tokens (--accent, --line, --paper),  */
+/* so every theme picks it up the same way: Midnight, Light, Dark,     */
+/* Ocean, Forest, AMOLED, Naruto, Sakura and the soft light themes.    */
+/* ------------------------------------------------------------------ */
+
+/* Motion and interaction feel --------------------------------------- */
+
+/* Hover washes ease in colour as well as background now, so buttons,
+   list rows and menu items feel less snappy. */
+.hover-wash {
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+/* Chat list rows: a soft glide on hover, and the active chat gets a
+   slim accent edge so the eye lands on it first. */
+.chat-list a {
+  transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.chat-list a.is-active {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* Unread badges sit a touch proud of the row. */
+.unread-badge {
+  box-shadow: 0 1px 4px rgb(15 23 42 / 0.28);
+}
+
+/* Search field: border, ring and background all ease together. */
+.chat-list label input {
+  transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+}
+
+/* Composer: a clear focus ring so the eye knows where to type. */
+.composer-shell {
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.composer-shell:focus-within {
+  border-color: color-mix(in oklab, var(--accent) 55%, var(--line));
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--accent) 18%, transparent),
+    0 8px 28px rgb(36 24 48 / 0.07);
+}
+
+/* Send button: a soft shadow, a gentle lift on hover, a press on tap. */
+.send-button {
+  transition: transform 140ms ease, filter 140ms ease, box-shadow 160ms ease;
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--accent) 40%, transparent);
+}
+
+.send-button:hover {
+  transform: translateY(-1px);
+}
+
+.send-button:active {
+  transform: scale(0.9);
+}
+
+/* Story rings lift a little on hover; unseen rings carry a soft glow. */
+.story-circle {
+  transition: transform 160ms ease;
+}
+
+.story-circle:hover {
+  transform: translateY(-1px);
+}
+
+.story-circle:active {
+  transform: scale(0.96);
+}
+
+.story-ring[data-unseen='true'] {
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--accent) 22%, transparent),
+    0 2px 10px color-mix(in oklab, var(--accent) 35%, transparent);
+}
+
+/* Depth and layering ------------------------------------------------ */
+
+/* Headers get a hairline under the shadow, so sidebar, chat list and
+   thread read as stacked layers instead of one flat sheet. */
+.chat-header {
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.06),
+    inset 0 -1px 0 color-mix(in oklab, var(--line) 65%, transparent);
+}
+
+/* Chat thread polish ------------------------------------------------ */
+
+/* New messages settle in with a softer ease instead of a straight line. */
+.bubble-in {
+  animation: bubble-in 200ms cubic-bezier(0.21, 1.02, 0.73, 1) both;
+}
+
+/* Date separators: a whisper more letter-spacing so they read as labels. */
+.day-chip {
+  letter-spacing: 0.03em;
+}
+
+/* Time and ticks fade between states instead of snapping. */
+.msg-meta {
+  transition: color 160ms ease;
+}
+
+.msg-sender {
+  transition: color 140ms ease;
+}
+
+/* Reduced motion: transitions settle instantly, like the animations. */
+@media (prefers-reduced-motion: reduce) {
+  .hover-wash,
+  .chat-list a,
+  .chat-list label input,
+  .composer-shell,
+  .send-button,
+  .story-circle {
+    transition-duration: 0.01ms !important;
+  }
+
+  .send-button:hover,
+  .send-button:active,
+  .story-circle:hover,
+  .story-circle:active {
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Welcome splash — full screen video, about 4 seconds, fresh open     */
+/* only. Plays the user's welcome video (Goku, golden aura) full       */
+/* screen; the "ATHERA TALKS" title fades in during the last second.   */
+/* The splash keeps its own deep-violet look in every theme, so it     */
+/* feels the same whether the app is Midnight, Light, Naruto or        */
+/* anything else.                                                      */
+/* ------------------------------------------------------------------ */
+
+.welcome-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  overflow: hidden;
+  color: #fff;
+  text-align: center;
+  background: #0f0620;
+  transition: opacity 220ms ease;
+  cursor: pointer;
+}
+
+.welcome-splash.is-leaving {
+  opacity: 0;
+}
+
+.welcome-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Bold modern anime-style title, glowing, fading in for the last
+   second of the video (the video itself has no title text). */
+.welcome-brand {
+  position: absolute;
+  right: 0;
+  bottom: max(48px, env(safe-area-inset-bottom));
+  left: 0;
+  padding: 0 16px;
+  font-size: clamp(30px, 8vw, 48px);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  text-shadow:
+    0 0 18px rgb(168 85 247 / 0.9),
+    0 0 42px rgb(124 58 237 / 0.6),
+    0 2px 10px rgb(0 0 0 / 0.6);
+  opacity: 0;
+  transition: opacity 400ms ease;
+  pointer-events: none;
+}
+
+.welcome-brand.is-visible {
+  opacity: 1;
+}
+
+/* The bar fills with the video's playback position. */
+.welcome-progress {
+  position: absolute;
+  right: 0;
+  bottom: max(28px, env(safe-area-inset-bottom));
+  left: 0;
+  width: min(220px, 60vw);
+  height: 3px;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.18);
+}
+
+.welcome-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #c4b5fd;
+}
+
+.welcome-sound {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: #2a1250;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  animation: welcome-rise 400ms ease both;
+}
+
+.welcome-skip {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  right: 16px;
+  padding: 8px 14px;
+  border: 1px solid rgb(255 255 255 / 0.25);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.08);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@keyframes welcome-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 8px));
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}

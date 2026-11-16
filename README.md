@@ -118,6 +118,10 @@ The full-screen viewer shows progress bars, auto-advances (5 seconds for a photo
 
 To share stories across devices, apply `supabase/migrations/20261026120000_stories.sql` in Supabase (SQL Editor, or `supabase db push`). It creates the `stories` and `story_views` tables with Row Level Security (insert your own, read only your own and your accepted contacts', delete your own) and a private `stories` storage bucket readable only by accepted contacts. Until that migration is applied, the stories row shows a banner and runs in local demo mode in that browser only, so the rest of the site is never broken by a missing table.
 
+### Welcome splash
+
+On a fresh open — after the app was closed, not on in-app navigation — a full-screen welcome video plays for about 4 seconds, then dismisses itself when the video ends. The video is the user's own clip (`src/assets/welcome-video.mp4`, Goku with a golden aura, 720x1280); the "ATHERA TALKS" title fades in over the video during its last second, because the video itself has no title text. A tap anywhere, or Skip, dismisses it early. Browsers block autoplay with sound, so the video first tries to play with sound; if that is blocked it plays muted and a "Tap for sound" button appears. It shows once per tab session (`sessionStorage`, `tatalk:welcome-shown`) and never for people who prefer reduced motion.
+
 ### Email auth
 
 1. Open **Authentication → Providers → Email** and leave it enabled.

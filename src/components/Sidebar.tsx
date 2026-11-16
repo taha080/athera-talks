@@ -180,7 +180,7 @@ export function Sidebar() {
         >
           {showRequests ? 'Chats' : 'Requests'}
           {!showRequests && chat.incomingRequests > 0 ? (
-            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-sakura px-1 text-[10px] font-semibold text-white">
+            <span className="unread-badge absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-sakura px-1 text-[10px] font-semibold text-white">
               {chat.incomingRequests}
             </span>
           ) : null}
@@ -546,7 +546,7 @@ function ChatRow({
               <span className="truncate">{preview}</span>
             </span>
             {conversation.unread > 0 ? (
-              <span className="grid h-5 min-w-5 place-items-center rounded-full bg-sakura px-1.5 text-[11px] font-semibold text-white">
+              <span className="unread-badge grid h-5 min-w-5 place-items-center rounded-full bg-sakura px-1.5 text-[11px] font-semibold text-white">
                 {conversation.unread}
               </span>
             ) : null}
