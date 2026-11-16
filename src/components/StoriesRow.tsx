@@ -3,8 +3,7 @@
 //
 // The row prefers the Supabase store when the stories migration has been
 // applied and falls back to the local demo store otherwise, exactly like
-// Communities: a small banner explains the fallback, and the rest of the
-// app is never broken by a missing table.
+// Communities. The rest of the app is never broken by a missing table.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSession } from '../context/SessionContext'
@@ -21,7 +20,6 @@ import type { Profile } from '../types'
 export function StoriesRow({ me }: { me: Profile }) {
   const { mode } = useSession()
   const [store, setStore] = useState<StoryStore | null>(null)
-  const [fallback, setFallback] = useState(false)
   const [stories, setStories] = useState<Story[]>([])
   const [viewer, setViewer] = useState<{ authorId: string; storyId: string } | null>(null)
   const [composerOpen, setComposerOpen] = useState(false)
@@ -49,28 +47,24 @@ export function StoriesRow({ me }: { me: Profile }) {
           if (live) {
             storeRef.current = live
             setStore(live)
-            setFallback(false)
           } else {
             storeRef.current = local
             setStore(local)
-            setFallback(true)
           }
         } else {
           storeRef.current = local
           setStore(local)
-          setFallback(false)
         }
         await refresh()
       } catch (caught) {
         if (cancelled) return
         storeRef.current = local
         setStore(local)
-        setFallback(true)
         setError(caught instanceof Error ? caught.message : 'Stories could not be loaded.')
         try {
           await refresh()
         } catch {
-          // The banner above already explains the fallback.
+          // Already falling back to the local store; nothing more to do.
         }
       }
     }
@@ -163,13 +157,6 @@ export function StoriesRow({ me }: { me: Profile }) {
           />
         ))}
       </div>
-      {fallback ? (
-        <p className="mt-1 text-xs leading-5 text-mist">
-          Stories are running in local demo mode: the Supabase stories migration has not been applied yet, so stories
-          stay in this browser. Apply <code>supabase/migrations/20261026120000_stories.sql</code> in Supabase to share
-          them across devices.
-        </p>
-      ) : null}
       {error ? <p className="mt-1 text-xs text-danger">{error}</p> : null}
       {viewer ? (
         <StoryViewer
