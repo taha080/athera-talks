@@ -22,6 +22,7 @@ import { cn } from '../lib/cn'
 import { type ThemeName } from '../lib/theme'
 import { grantPremium, revokePremium } from '../services/liveBackend'
 import { dangerButton, fieldClass, ghostButton, primaryButton } from '../lib/styles'
+import { disablePushNotifications, enablePushNotifications, getPushState, pushStateNote, type PushState } from '../lib/push'
 import type { BlockedPerson, UserReport } from '../types'
 import { formatListTime } from '../lib/format'
 
@@ -419,6 +420,7 @@ function PrivacySection() {
         checked={profile.notifyDesktop !== false}
         onChange={(checked) => void toggle({ notifyDesktop: checked })}
       />
+      <PushNotificationsSetting />
       <button type="button" className={`${ghostButton} w-full`} onClick={() => void allowDesktop()}>
         Allow desktop alerts
       </button>
@@ -558,6 +560,79 @@ function ReportsSection() {
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+// Push notifications: a notification even when Athera Talks is closed.
+// The toggle runs on a tap, so the browser allows the permission prompt
+// from it. The state is the real one: on / off / not supported /
+// permission denied / not set up yet (migration missing). Demo mode has
+// no server, so the toggle stays off there with a note.
+function PushNotificationsSetting() {
+  const session = useSession()
+  const profile = session.profile
+  const live = session.mode === 'live'
+  const [state, setState] = useState<PushState>('off')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!profile || !live) return
+    let cancel = false
+    void getPushState(profile.id)
+      .then(({ state: next }) => {
+        if (!cancel) setState(next)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancel = true
+    }
+  }, [profile, live])
+
+  if (!profile) return null
+
+  async function toggle() {
+    if (busy || !profile) return
+    if (!live) {
+      setError('Push notifications need the live Supabase connection.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      if (state === 'on') {
+        await disablePushNotifications()
+        setState('off')
+        return
+      }
+      const next = await enablePushNotifications(profile.id)
+      setState(next)
+      if (next === 'denied') setError('Notifications are blocked for this site in the browser settings.')
+      if (next === 'unavailable') setError('Push notifications are not set up yet — run the push_subscriptions migration in Supabase first.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not change that setting.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div>
+      <Toggle
+        label="Message notifications"
+        detail="Get a notification even when Athera Talks is closed."
+        checked={state === 'on'}
+        onChange={() => void toggle()}
+      />
+      <p className="mt-1 px-1 text-xs leading-5 text-mist">
+        {live ? pushStateNote(state) : 'Push notifications need the live Supabase connection.'}
+      </p>
+      {error ? (
+        <p className="mt-1 px-1 text-sm text-danger" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   )
 }
