@@ -57,7 +57,7 @@ export function NewGroup({
               <li key={person.id}>
                 <button
                   type="button"
-                  className="flex w-full items-center gap-3 rounded-lg px-1 py-2 text-left hover:bg-white/5"
+                  className="hover-wash flex w-full items-center gap-3 rounded-lg px-1 py-2 text-left"
                   aria-pressed={on}
                   onClick={() => toggle(person.id)}
                 >

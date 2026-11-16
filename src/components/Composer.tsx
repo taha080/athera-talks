@@ -369,7 +369,7 @@ export function Composer({
   const recording = phase !== 'idle'
 
   return (
-    <div className="composer-shell rounded-xl border border-line bg-panel px-2 py-1.5 shadow-md">
+    <div className="composer-shell rounded-2xl border border-line bg-panel px-2 py-1.5 shadow-md">
       {editing ? (
         <div className="mb-2 flex items-center gap-2 rounded-lg border-l-4 border-sakura bg-elevated px-3 py-2 text-sm">
           <p className="min-w-0 flex-1 truncate text-mist">Editing message</p>

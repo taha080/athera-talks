@@ -341,12 +341,15 @@ body {
 .bubble-own {
   background: var(--accent);
   color: #fff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.12);
 }
 
 .bubble-other {
   background: var(--elevated);
   color: var(--paper);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--line) 90%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--line) 90%, transparent),
+    0 1px 2px rgb(15 23 42 / 0.08);
 }
 
 .bubble-creator {
@@ -606,6 +609,86 @@ body {
   max-width: 100%;
   margin: 0;
   overflow-wrap: break-word;
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+
+/* Chat header type and a hairline shadow, shared by every theme. Light
+   and midnight already set these values in their scoped blocks. */
+.chat-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.chat-status {
+  margin-top: 1px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.chat-header {
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.06);
+}
+
+/* Forest and Sakura accents are light, so white text on them is weak.
+   Dark ink on the own bubble and on accent fills, like the light theme. */
+[data-theme='forest'] .bubble-own {
+  color: #0c2416;
+}
+
+[data-theme='forest'] .bubble-own .msg-meta {
+  color: rgb(12 36 22 / 0.65);
+}
+
+[data-theme='forest'] .bubble-own [class*='text-white'] {
+  color: #0c2416;
+}
+
+[data-theme='forest'] .bubble-own [class~='bg-white'] {
+  background-color: #0c2416;
+}
+
+[data-theme='forest'] .bubble-own [class~='bg-white/20'] {
+  background-color: rgb(12 36 22 / 0.14);
+}
+
+[data-theme='forest'] .bubble-own [class*='border-white'] {
+  border-color: rgb(12 36 22 / 0.35);
+}
+
+[data-theme='forest'] .bg-sakura {
+  color: #0c2416;
+}
+
+[data-theme='sakura'] .bubble-own {
+  color: #2a0d18;
+}
+
+[data-theme='sakura'] .bubble-own .msg-meta {
+  color: rgb(42 13 24 / 0.65);
+}
+
+[data-theme='sakura'] .bubble-own [class*='text-white'] {
+  color: #2a0d18;
+}
+
+[data-theme='sakura'] .bubble-own [class~='bg-white'] {
+  background-color: #2a0d18;
+}
+
+[data-theme='sakura'] .bubble-own [class~='bg-white/20'] {
+  background-color: rgb(42 13 24 / 0.14);
+}
+
+[data-theme='sakura'] .bubble-own [class*='border-white'] {
+  border-color: rgb(42 13 24 / 0.35);
+}
+
+[data-theme='sakura'] .bg-sakura {
+  color: #2a0d18;
 }
 
 /* Time and ticks follow the last word, and wrap under it only when the line is full. */

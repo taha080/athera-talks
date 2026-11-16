@@ -537,7 +537,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
         </div>
       ) : null}
 
-      <div ref={scroller} className="chat-stream min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-6" onScroll={onScroll}>
+      <div ref={scroller} className="chat-stream min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6" onScroll={onScroll}>
         {chat.messagesLoading ? <MessageSkeleton /> : null}
         {!chat.messagesLoading && chat.messages.length === 0 && calls.length === 0 ? (
           <p className="mx-auto mt-16 max-w-xs text-center text-sm leading-6 text-mist">No messages yet. Say hello, send a photo, or tap the mic for a voice note.</p>
@@ -577,7 +577,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
           const pos = groupPosition(chat.messages, index)
           const hit = Boolean(query) && !message.deletedAt && message.body.toLowerCase().includes(query)
           return (
-            <div key={message.id} data-message-id={message.id} className={pos === 'start' || pos === 'single' ? 'msg-cluster mt-2.5 first:mt-0' : 'msg-follow mt-0.5'}>
+            <div key={message.id} data-message-id={message.id} className={pos === 'start' || pos === 'single' ? 'msg-cluster mt-3.5 first:mt-0' : 'msg-follow mt-0.5'}>
               {showDay ? (
                 <div className="sticky top-2 z-10 my-3 flex justify-center">
                   <span className="day-chip rounded-full border border-line bg-panel/95 px-3 py-1 text-[11px] font-medium text-mist shadow-sm backdrop-blur">
@@ -685,7 +685,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
           )}
         </div>
       ) : (
-      <div className="composer-dock px-2 pb-2 pt-1 sm:px-4">
+      <div className="composer-dock px-3 pb-3 pt-1.5 sm:px-4">
         <Composer
           key={conversation.id}
           peerName={group ? title : `@${conversation.peer.username}`}

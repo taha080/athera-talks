@@ -110,6 +110,14 @@ Communities are a separate, multi-user layer beside chats and groups: create a c
 
 To share communities across devices, apply `supabase/migrations/20261024120000_communities.sql` in Supabase (SQL Editor, or `supabase db push`). Until that migration is applied, the Communities page shows a banner and runs in local demo mode in that browser only, so the rest of the site is never broken by a missing table. Group voice rooms reuse the existing WebRTC TURN/ICE helpers over a Supabase Realtime broadcast channel; they are a small-room peer mesh, not a media server.
 
+### Stories
+
+Stories sit at the top of the chat list, WhatsApp Status style: your own circle first (with a + affordance), then your contacts' stories, unseen first. A coloured ring means unviewed, a grey ring means seen. Two kinds of story: a photo (up to 30 MB, with an optional caption) or a short text on a gradient background. Every story disappears 24 hours after it is posted. Only accepted contacts can see a story — strangers never see one.
+
+The full-screen viewer shows progress bars, auto-advances (5 seconds for a photo, 7 for text), and moves between stories and authors with a tap left/right or the arrow keys. Opening a story marks it seen; your own stories show a view count and a delete button.
+
+To share stories across devices, apply `supabase/migrations/20261026120000_stories.sql` in Supabase (SQL Editor, or `supabase db push`). It creates the `stories` and `story_views` tables with Row Level Security (insert your own, read only your own and your accepted contacts', delete your own) and a private `stories` storage bucket readable only by accepted contacts. Until that migration is applied, the stories row shows a banner and runs in local demo mode in that browser only, so the rest of the site is never broken by a missing table.
+
 ### Email auth
 
 1. Open **Authentication → Providers → Email** and leave it enabled.

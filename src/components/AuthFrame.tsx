@@ -34,7 +34,7 @@ export function AuthFrame({
           <p className="mt-4 text-xl font-semibold tracking-tight text-paper">{APP_NAME}</p>
           <p className="mt-1 text-sm text-mist">{subtitle}</p>
         </div>
-        <div className="rounded-xl border border-line bg-panel p-6 shadow-md">
+        <div className="rounded-2xl border border-line bg-panel p-6 shadow-md">
           {title ? <h1 className="mb-4 text-base font-semibold text-paper">{title}</h1> : null}
           {children}
         </div>

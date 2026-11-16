@@ -45,7 +45,7 @@ export function SettingsPage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex h-14 items-center gap-2 border-b border-line bg-panel px-2">
-        <Link to="/" className="grid h-10 w-10 place-items-center rounded-lg hover:bg-white/8 md:hidden" aria-label="Back to chats">
+        <Link to="/" className="hover-wash grid h-10 w-10 place-items-center rounded-lg md:hidden" aria-label="Back to chats">
           <BackIcon className="h-5 w-5" />
         </Link>
         <h1 className="text-lg font-semibold">Settings</h1>
@@ -58,7 +58,7 @@ export function SettingsPage() {
               to={item.id === 'profile' ? '/settings' : `/settings/${item.id}`}
               className={cn(
                 'rounded-lg px-3 py-2 text-sm font-medium transition',
-                current === item.id ? 'bg-white/10 text-paper' : 'text-mist hover:text-paper',
+                current === item.id ? 'bg-elevated text-paper' : 'text-mist hover:text-paper',
               )}
               aria-current={current === item.id ? 'page' : undefined}
             >
@@ -268,7 +268,7 @@ function AppearanceSection() {
                     type="button"
                     aria-pressed={theme === choice.id}
                     onClick={() => void chooseTheme(choice.id)}
-                    className={cn('rounded-lg border px-3 py-3 text-left text-sm transition hover:bg-white/5', theme === choice.id ? 'border-sakura ring-2 ring-sakura/30' : 'border-line')}
+                    className={cn('hover-wash rounded-lg border px-3 py-3 text-left text-sm transition', theme === choice.id ? 'border-sakura ring-2 ring-sakura/30' : 'border-line')}
                   >
                     <span
                       data-theme={choice.id}
@@ -571,12 +571,12 @@ function Toggle({
   onChange: (checked: boolean) => void
 }) {
   return (
-    <button type="button" className="flex w-full items-center gap-4 rounded-lg border border-line px-4 py-3 text-left transition hover:bg-white/5" onClick={() => onChange(!checked)} aria-pressed={checked}>
+    <button type="button" className="hover-wash flex w-full items-center gap-4 rounded-lg border border-line px-4 py-3 text-left transition" onClick={() => onChange(!checked)} aria-pressed={checked}>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-medium">{label}</span>
         <span className="mt-1 block text-xs leading-5 text-mist">{detail}</span>
       </span>
-      <span className={cn('h-7 w-12 rounded-full p-1 transition', checked ? 'bg-sakura' : 'bg-white/10')}>
+      <span className={cn('h-7 w-12 rounded-full p-1 transition', checked ? 'bg-sakura' : 'bg-line')}>
         <span className={cn('block h-5 w-5 rounded-full bg-white transition', checked ? 'translate-x-5' : '')} />
       </span>
     </button>
