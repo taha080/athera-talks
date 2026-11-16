@@ -11,8 +11,10 @@ import {
 
 // Full-screen welcome on a fresh open: the user's welcome video plays
 // (about 4 seconds), the "ATHERA TALKS" title fades in during the last
-// second, then it goes away on its own. A tap anywhere, or Skip,
-// dismisses it early. Browsers block autoplay with sound, so the video
+// second, then it goes away on its own. On portrait phones the video
+// fills the screen; on wide (laptop) screens it is shown whole,
+// contained, with a blurred copy filling the sides, so the head and
+// fist are never cropped. A tap anywhere, or Skip, dismisses it early. Browsers block autoplay with sound, so the video
 // first tries to play with sound; if that is blocked it plays muted
 // and a "Tap for sound" button appears instead.
 
@@ -22,6 +24,7 @@ export function WelcomeSplash({ storage, onDone }: { storage: WelcomeStorage | n
   const [progress, setProgress] = useState(0)
   const [showTitle, setShowTitle] = useState(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const backdropRef = useRef<HTMLVideoElement | null>(null)
   const doneRef = useRef(false)
   const finishTimerRef = useRef<number | null>(null)
   const onDoneRef = useRef(onDone)
@@ -45,6 +48,9 @@ export function WelcomeSplash({ storage, onDone }: { storage: WelcomeStorage | n
     markWelcomeShown(storage)
     const video = videoRef.current
     if (!video) return
+    // The blurred backdrop copy plays muted on a loop, so it can
+    // autoplay anywhere; a rejection here is harmless.
+    void backdropRef.current?.play().catch(() => {})
     // Try with sound first. A rejection means the browser blocked
     // autoplay with sound, so fall back to muted playback and offer
     // the tap button.
@@ -94,6 +100,22 @@ export function WelcomeSplash({ storage, onDone }: { storage: WelcomeStorage | n
       aria-label="Welcome to Athera Talks"
       onClick={finish}
     >
+      {/* Blurred copy of the same video behind the main one. It is
+          hidden on portrait phones (the main video already fills the
+          screen there) and only shows on wide screens, where the main
+          video is contained instead of cropped — see index.css. */}
+      <video
+        ref={backdropRef}
+        className="welcome-backdrop"
+        src={welcomeVideoUrl}
+        muted
+        loop
+        playsInline
+        autoPlay
+        preload="auto"
+        aria-hidden="true"
+        tabIndex={-1}
+      />
       <video
         ref={videoRef}
         className="welcome-video"
