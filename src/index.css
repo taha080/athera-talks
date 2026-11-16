@@ -1897,6 +1897,41 @@ audio[data-call-audio]::-webkit-media-controls-enclosure {
   object-fit: cover;
 }
 
+/* Blurred copy of the same video, used as the backdrop on wide
+   screens only. Hidden on portrait phones, where the main video
+   already fills the whole screen. */
+.welcome-backdrop {
+  position: absolute;
+  inset: 0;
+  display: none;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(28px) brightness(0.5) saturate(1.3);
+  transform: scale(1.12);
+  pointer-events: none;
+}
+
+/* Wide / landscape screens (laptops): the video is 9:16 vertical, so
+   cover would crop away most of the frame — the head and the raised
+   fist. Show the whole frame instead (contained, full height,
+   centered) and let the blurred copy fill the sides, so the splash
+   still feels full-screen instead of a floating rectangle. Portrait
+   phones keep the full-bleed cover above, untouched. */
+@media (min-aspect-ratio: 1/1) {
+  .welcome-splash {
+    background: radial-gradient(120% 100% at 50% 0%, #2a1250 0%, #150829 55%, #0b0318 100%);
+  }
+
+  .welcome-backdrop {
+    display: block;
+  }
+
+  .welcome-video {
+    object-fit: contain;
+  }
+}
+
 /* Bold modern anime-style title, glowing, fading in for the last
    second of the video (the video itself has no title text). */
 .welcome-brand {
