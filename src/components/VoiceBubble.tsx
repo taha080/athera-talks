@@ -17,7 +17,10 @@ export function VoiceBubble({
   const [playing, setPlaying] = useState(false)
   const [progress, setProgress] = useState(0)
   const [rate, setRate] = useState(1)
-  const bars = waveform && waveform.length > 0 ? waveform.slice(0, 40) : Array.from({ length: 24 }, (_, index) => 30 + ((index * 17) % 50))
+  // 26 bars max: at a 360px phone the bubble caps at ~262px wide, and the
+  // full 40-bar waveform (280px) overflowed it and forced the whole chat
+  // stream to scroll sideways. The wrapper below also clips as a safety net.
+  const bars = waveform && waveform.length > 0 ? waveform.slice(0, 26) : Array.from({ length: 24 }, (_, index) => 30 + ((index * 17) % 50))
   const total = seconds && seconds > 0 ? seconds : 0
 
   useEffect(() => {
@@ -62,15 +65,15 @@ export function VoiceBubble({
     <div className="flex items-center gap-2">
       <button
         type="button"
-        className={mine ? 'grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/20' : 'grid h-9 w-9 shrink-0 place-items-center rounded-full bg-sakura/15 text-sakura'}
+        className={mine ? 'grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/20' : 'grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura/15 text-sakura'}
         aria-label={playing ? 'Pause voice message' : 'Play voice message'}
         onClick={() => void toggle()}
         disabled={!src}
       >
         {playing ? <PauseIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
       </button>
-      <div>
-        <div className="flex h-8 items-end gap-[3px]" aria-hidden="true">
+      <div className="min-w-0 flex-1">
+        <div className="flex h-8 items-end gap-[3px] overflow-hidden" aria-hidden="true">
           {bars.map((height, index) => {
             const active = bars.length > 0 && index / bars.length <= progress
             return (

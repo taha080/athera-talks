@@ -98,7 +98,7 @@ export function ProfileSheet({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex justify-end">
-          <button type="button" className="profile-close grid h-8 w-8 place-items-center rounded-lg" aria-label="Close profile" onClick={onClose}>
+          <button type="button" className="profile-close grid h-10 w-10 place-items-center rounded-lg" aria-label="Close profile" onClick={onClose}>
             <CloseIcon className="h-4 w-4" />
           </button>
         </div>

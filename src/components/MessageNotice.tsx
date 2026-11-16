@@ -89,7 +89,7 @@ function NoticeCard({
         {notice.groupTitle ? <p className="notice-group truncate text-xs">{notice.groupTitle}</p> : null}
         <p className="notice-preview truncate text-sm">{notice.preview}</p>
       </div>
-      <button type="button" className="notice-close grid h-7 w-7 shrink-0 place-items-center rounded-full" aria-label="Dismiss notification" onClick={onDismiss}>
+      <button type="button" className="notice-close grid h-9 w-9 shrink-0 place-items-center rounded-full" aria-label="Dismiss notification" onClick={onDismiss}>
         <CloseIcon className="h-4 w-4" />
       </button>
     </article>

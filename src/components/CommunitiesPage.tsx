@@ -504,14 +504,14 @@ function CommunityDetail(props: {
                   ) : null}
                   <div className="mt-1 flex gap-2 text-xs">
                     {manager ? (
-                      <button type="button" className="text-mist hover:underline" onClick={() => {
+                      <button type="button" className="py-1.5 text-mist hover:underline" onClick={() => {
                         if (!store) return
                         void props.onRun(() => store.togglePin(item.id))
                       }}>
                         {item.pinned ? 'Unpin' : 'Pin'}
                       </button>
                     ) : null}
-                    <button type="button" className="text-mist hover:underline" onClick={() => setReportingId(item.id)}>Report</button>
+                    <button type="button" className="py-1.5 text-mist hover:underline" onClick={() => setReportingId(item.id)}>Report</button>
                   </div>
                   {reportingId === item.id ? (
                     <form

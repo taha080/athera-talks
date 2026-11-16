@@ -175,7 +175,7 @@ export function Sidebar() {
         <h1 className="min-w-0 flex-1 text-lg font-semibold tracking-tight">{showRequests ? 'Requests' : 'Chats'}</h1>
         <Link
           to={showRequests ? '/' : '/?requests=1'}
-          className="relative grid h-9 place-items-center rounded-lg px-2 text-sm font-medium text-mist hover:text-paper md:hidden"
+          className="relative grid h-10 place-items-center rounded-lg px-2 text-sm font-medium text-mist hover:text-paper md:hidden"
           aria-label={chat.incomingRequests > 0 ? `Requests, ${chat.incomingRequests} incoming` : 'Requests'}
         >
           {showRequests ? 'Chats' : 'Requests'}
@@ -644,10 +644,10 @@ function PersonActions({
   const outgoing = person.requestStatus === 'pending' && person.requestFromId === meId
   const safety = (
     <>
-      <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium text-paper" onClick={() => void (blocked ? onUnblock() : onBlock())}>
+      <button type="button" className="h-10 rounded-lg border border-line px-3 text-xs font-medium text-paper" onClick={() => void (blocked ? onUnblock() : onBlock())}>
         {blocked ? 'Unblock' : 'Block'}
       </button>
-      <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium text-paper" onClick={onReport}>
+      <button type="button" className="h-10 rounded-lg border border-line px-3 text-xs font-medium text-paper" onClick={onReport}>
         Report
       </button>
     </>
@@ -655,7 +655,7 @@ function PersonActions({
   if (person.requestStatus === 'accepted') {
     return (
       <>
-        <button type="button" className={`${primaryButton} h-9 px-3 text-xs`} onClick={() => void onMessage()}>
+        <button type="button" className={`${primaryButton} h-10 px-3 text-xs`} onClick={() => void onMessage()}>
           Message
         </button>
         {safety}
@@ -665,10 +665,10 @@ function PersonActions({
   if (incoming) {
     return (
       <>
-        <button type="button" className={`${primaryButton} h-9 px-3 text-xs`} onClick={() => void onAccept()}>
+        <button type="button" className={`${primaryButton} h-10 px-3 text-xs`} onClick={() => void onAccept()}>
           Accept
         </button>
-        <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium text-paper" onClick={() => void onDecline()}>
+        <button type="button" className="h-10 rounded-lg border border-line px-3 text-xs font-medium text-paper" onClick={() => void onDecline()}>
           Decline
         </button>
         {safety}
@@ -678,7 +678,7 @@ function PersonActions({
   if (outgoing) {
     return (
       <>
-        <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium text-mist" onClick={() => void onCancel()}>
+        <button type="button" className="h-10 rounded-lg border border-line px-3 text-xs font-medium text-mist" onClick={() => void onCancel()}>
           Request sent
         </button>
         {safety}
@@ -687,7 +687,7 @@ function PersonActions({
   }
   return (
     <>
-      <button type="button" className={`${primaryButton} h-9 px-3 text-xs`} onClick={() => void onAdd()}>
+      <button type="button" className={`${primaryButton} h-10 px-3 text-xs`} onClick={() => void onAdd()}>
         Send request
       </button>
       {safety}
@@ -722,10 +722,10 @@ function RequestsPanel({
                 <DisplayName name={request.peer.username} creator={request.peer.isCreator} premium={hasPremium(request.peer)} className="text-sm font-semibold" />
               </div>
               <div className="mt-3 flex gap-2">
-                <button type="button" className={`${primaryButton} h-9 px-3 text-xs`} onClick={() => void onAccept(request.id)}>
+                <button type="button" className={`${primaryButton} h-10 px-3 text-xs`} onClick={() => void onAccept(request.id)}>
                   Accept
                 </button>
-                <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium" onClick={() => void onDecline(request.id)}>
+                <button type="button" className="h-10 rounded-lg border border-line px-3 text-xs font-medium" onClick={() => void onDecline(request.id)}>
                   Decline
                 </button>
               </div>
@@ -744,7 +744,7 @@ function RequestsPanel({
                 <DisplayName name={request.peer.username} creator={request.peer.isCreator} premium={hasPremium(request.peer)} className="text-sm font-semibold" />
                 <span className="text-xs text-mist">Pending</span>
               </span>
-              <button type="button" className="h-9 rounded-lg border border-line px-3 text-xs font-medium" onClick={() => void onCancel(request.id)}>
+              <button type="button" className="h-10 rounded-lg border border-line px-3 text-xs font-medium" onClick={() => void onCancel(request.id)}>
                 Cancel
               </button>
             </li>

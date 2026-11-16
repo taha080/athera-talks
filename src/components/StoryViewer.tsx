@@ -162,7 +162,7 @@ export function StoryViewer({
             <button
               type="button"
               className={cn(
-                'grid h-9 min-w-9 place-items-center rounded-full px-2 text-xs font-medium text-white transition hover:bg-white/20',
+                'grid h-10 min-w-10 place-items-center rounded-full px-2 text-xs font-medium text-white transition hover:bg-white/20',
                 confirmDelete ? 'bg-danger/80' : '',
               )}
               onClick={() => void handleDelete()}
@@ -174,7 +174,7 @@ export function StoryViewer({
           ) : null}
           <button
             type="button"
-            className="grid h-9 w-9 place-items-center rounded-full text-white transition hover:bg-white/20"
+            className="grid h-10 w-10 place-items-center rounded-full text-white transition hover:bg-white/20"
             onClick={onClose}
             aria-label="Close stories"
           >
