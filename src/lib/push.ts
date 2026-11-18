@@ -30,6 +30,9 @@ export type PushPayload = {
   body: string
   conversationId: string
   messageId: string
+  // Total unread for the recipient, when the Edge Function could count it.
+  // Absent when it could not — the service worker then shows a plain dot.
+  unreadCount?: number
 }
 
 // The same shape the service worker parses in public/sw.js. Keep the two
@@ -42,7 +45,15 @@ export function parsePushPayload(data: unknown): PushPayload | null {
   const conversationId = typeof record.conversationId === 'string' ? record.conversationId : ''
   const messageId = typeof record.messageId === 'string' ? record.messageId : ''
   if (!conversationId && !body) return null
-  return { title, body, conversationId, messageId }
+  const payload: PushPayload = { title, body, conversationId, messageId }
+  if (
+    typeof record.unreadCount === 'number' &&
+    Number.isFinite(record.unreadCount) &&
+    record.unreadCount >= 0
+  ) {
+    payload.unreadCount = Math.floor(record.unreadCount)
+  }
+  return payload
 }
 
 export function pushSupported(): boolean {

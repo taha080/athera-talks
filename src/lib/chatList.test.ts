@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { archivedChats, byChatOrder, chatTitle, inboxChats, PIN_LIMIT, showSenderName } from './chatList'
+import { archivedChats, byChatOrder, chatTitle, inboxChats, PIN_LIMIT, showSenderName, totalUnread } from './chatList'
 import { foldConversation } from './conversations'
 import type { Conversation } from '../types'
 
@@ -38,6 +38,16 @@ describe('chat list order', () => {
   it('names a group by its title', () => {
     expect(chatTitle(chat({ id: 'g', updatedAt: '2026-10-19T08:00:00.000Z', kind: 'group', title: 'Night watch' }))).toBe('Night watch')
     expect(chatTitle(chat({ id: 'd', updatedAt: '2026-10-19T08:00:00.000Z', peer: { id: 's', username: 'sakura', avatarUrl: null, favouriteAnime: null } }))).toBe('sakura')
+  })
+
+  it('sums unread across inbox and archived chats', () => {
+    const rows = [
+      chat({ id: 'a', updatedAt: '2026-10-19T08:00:00.000Z', unread: 2 }),
+      chat({ id: 'b', updatedAt: '2026-10-19T09:00:00.000Z', unread: 0 }),
+      chat({ id: 'c', updatedAt: '2026-10-19T10:00:00.000Z', unread: 3, archived: true }),
+    ]
+    expect(totalUnread(rows)).toBe(5)
+    expect(totalUnread([])).toBe(0)
   })
 
   it('brings an archived chat back when a new message arrives, unless it is muted', () => {

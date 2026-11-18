@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from 'react'
 import { appendMessage, foldConversation } from '../lib/conversations'
+import { syncAppBadge } from '../lib/appBadge'
+import { totalUnread } from '../lib/chatList'
 import { messagePreview } from '../lib/messages'
 import { hasPremium } from '../lib/premium'
 import {
@@ -311,6 +313,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       cancelled = true
     }
   }, [chat])
+
+  // Launcher icon badge (Badging API): mirror the total unread count onto
+  // the installed app's icon, and re-sync whenever the app becomes
+  // visible — a badge left by the service worker while the app was
+  // closed gets corrected once the user is back in the app.
+  useEffect(() => {
+    syncAppBadge(totalUnread(conversations))
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') syncAppBadge(totalUnread(conversationsRef.current))
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [conversations])
 
   useEffect(() => {
     return chat.subscribe({

@@ -15,9 +15,18 @@
 //
 // The payload the send-push Edge Function sends is JSON:
 //   { "title": "sender name", "body": "short preview",
-//     "conversationId": "<uuid>", "messageId": "<uuid>" }
-// The same shape is parsed by parsePushPayload() in src/lib/push.ts;
-// keep the two in step if the payload ever changes.
+//     "conversationId": "<uuid>", "messageId": "<uuid>",
+//     "unreadCount": 3 }
+// `unreadCount` is the recipient's total unread count (absent when the
+// Edge Function could not count it). The same shape is parsed by
+// parsePushPayload() in src/lib/push.ts; keep the two in step if the
+// payload ever changes.
+//
+// The badge: when a push arrives, the launcher icon badge is set to the
+// total unread count (or a plain dot when no count was sent). The app
+// itself re-syncs the badge from its own unread total whenever it is
+// open, so the worker's badge is only a stand-in for when the app is
+// closed. Badge work is best-effort and never breaks the notification.
 
 function pushTarget(event) {
   try {
@@ -26,9 +35,32 @@ function pushTarget(event) {
     const title = typeof data.title === 'string' && data.title ? data.title : 'Athera Talks'
     const body = typeof data.body === 'string' ? data.body : ''
     const conversationId = typeof data.conversationId === 'string' ? data.conversationId : ''
-    return { title, body, conversationId }
+    const unreadCount =
+      typeof data.unreadCount === 'number' && Number.isFinite(data.unreadCount) && data.unreadCount >= 0
+        ? Math.floor(data.unreadCount)
+        : null
+    return { title, body, conversationId, unreadCount }
   } catch {
     return null
+  }
+}
+
+// Set the launcher icon badge for this push: the total unread count when
+// the payload carries one, a plain dot when it does not, and clear it
+// when the count is zero. Never throws — a badge failure must not break
+// the notification.
+async function setIconBadge(unreadCount) {
+  if (typeof navigator === 'undefined' || !('setAppBadge' in navigator)) return
+  try {
+    if (unreadCount === null) {
+      await navigator.setAppBadge()
+    } else if (unreadCount > 0) {
+      await navigator.setAppBadge(unreadCount)
+    } else if ('clearAppBadge' in navigator) {
+      await navigator.clearAppBadge()
+    }
+  } catch {
+    // Badge is cosmetic; ignore.
   }
 }
 
@@ -46,6 +78,7 @@ self.addEventListener('push', (event) => {
           client.url.includes(`/c/${target.conversationId}`),
       )
       if (alreadyOpen) return
+      await setIconBadge(target.unreadCount)
       const url = target.conversationId ? `c/${target.conversationId}` : ''
       await self.registration.showNotification(target.title, {
         body: target.body || 'New message',
