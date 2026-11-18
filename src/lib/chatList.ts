@@ -33,3 +33,8 @@ export function inboxChats(list: Conversation[]): Conversation[] {
 export function archivedChats(list: Conversation[]): Conversation[] {
   return list.filter((item) => item.archived).sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
 }
+
+/** Total unread across every conversation — the number the launcher icon badge mirrors. */
+export function totalUnread(list: Conversation[]): number {
+  return list.reduce((sum, item) => sum + (item.unread || 0), 0)
+}

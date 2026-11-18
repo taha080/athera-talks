@@ -37,6 +37,26 @@ describe('push helpers', () => {
     })
   })
 
+  it('keeps a valid unread count for the icon badge and drops a bad one', () => {
+    expect(
+      parsePushPayload({ body: 'Hi', conversationId: 'c1', messageId: 'm1', unreadCount: 4 }),
+    ).toEqual({
+      title: 'Athera Talks',
+      body: 'Hi',
+      conversationId: 'c1',
+      messageId: 'm1',
+      unreadCount: 4,
+    })
+    expect(
+      parsePushPayload({ body: 'Hi', conversationId: 'c1', messageId: 'm1', unreadCount: 2.7 }),
+    ).toMatchObject({ unreadCount: 2 })
+    for (const bad of ['4', -1, Number.NaN, Infinity, null]) {
+      expect(parsePushPayload({ body: 'Hi', conversationId: 'c1', messageId: 'm1', unreadCount: bad })).not.toHaveProperty(
+        'unreadCount',
+      )
+    }
+  })
+
   it('rejects payloads with nothing to show', () => {
     expect(parsePushPayload(null)).toBeNull()
     expect(parsePushPayload('hello')).toBeNull()

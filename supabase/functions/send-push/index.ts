@@ -30,6 +30,11 @@
 //    (chat_prefs.muted) gets nothing for that person.
 //  * Deleted messages are skipped. Group chats notify every member
 //    except the sender, with "Sender in Group name" as the title.
+//  * The payload carries the recipient's total unread count as
+//    `unreadCount`, so the service worker can put the number on the
+//    app icon (Badging API). When the count cannot be determined the
+//    field is left out and the worker shows a plain dot instead — a
+//    missing count is never guessed.
 //  * A subscription whose push endpoint answers 404 or 410 is expired
 //    and is deleted, so dead devices stop being retried.
 //  * No message content is stored anywhere by this function.
@@ -66,6 +71,51 @@ function previewText(record: MessageRecord): string {
   if (record.kind === 'image') return 'Photo'
   if (record.kind === 'video') return 'Video'
   return 'New message'
+}
+
+// The recipient's TOTAL unread count, mirroring exactly what the app
+// itself shows: the sum of the per-conversation `unread` counts from
+// list_my_conversations() — messages in conversations the user is a
+// member of, sent by someone else, never read, not deleted, and not
+// hidden by the user. Returns null when the count cannot be determined
+// (the push is still sent, just without a count).
+async function totalUnreadCount(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<number | null> {
+  const { data: memberships, error: membersError } = await supabase
+    .from('conversation_members')
+    .select('conversation_id')
+    .eq('user_id', userId)
+  if (membersError) return null
+  const conversationIds = ((memberships ?? []) as { conversation_id: string }[])
+    .map((row) => row.conversation_id)
+  if (conversationIds.length === 0) return 0
+  // PostgREST count queries are GETs, so keep the URL short: with too
+  // many conversations to list, or too many hidden messages to exclude,
+  // report "unknown" instead of risking a failed query.
+  if (conversationIds.length > 200) return null
+
+  const { data: hidden, error: hiddenError } = await supabase
+    .from('message_hides')
+    .select('message_id')
+    .eq('user_id', userId)
+  if (hiddenError) return null
+  const hiddenIds = ((hidden ?? []) as { message_id: string }[]).map((row) => row.message_id)
+  if (hiddenIds.length > 500) return null
+
+  const base = supabase
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .in('conversation_id', conversationIds)
+    .neq('sender_id', userId)
+    .is('read_at', null)
+    .is('deleted_at', null)
+  const { count, error } = hiddenIds.length > 0
+    ? await base.not('id', 'in', `(${hiddenIds.join(',')})`)
+    : await base
+  if (error) return null
+  return count ?? 0
 }
 
 Deno.serve(async (req) => {
@@ -128,13 +178,12 @@ Deno.serve(async (req) => {
   const recipientIds = ((members ?? []) as { user_id: string }[]).map((row) => row.user_id)
   if (recipientIds.length === 0) return json({ sent: 0, expired: 0, failed: 0 })
 
-  const message = {
+  const baseMessage = {
     title,
     body: previewText(record),
     conversationId: record.conversation_id,
     messageId: record.id,
   }
-  const text = JSON.stringify(message)
 
   let sent = 0
   let expired = 0
@@ -147,6 +196,11 @@ Deno.serve(async (req) => {
       .eq('conversation_id', record.conversation_id)
       .maybeSingle()
     if ((pref as { muted?: boolean } | null)?.muted) continue
+
+    // One payload per recipient: the badge count is theirs alone.
+    const unreadCount = await totalUnreadCount(supabase, recipientId)
+    const message = unreadCount === null ? baseMessage : { ...baseMessage, unreadCount }
+    const text = JSON.stringify(message)
 
     const { data: subscriptions } = await supabase
       .from('push_subscriptions')
