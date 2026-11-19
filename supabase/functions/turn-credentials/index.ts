@@ -1,8 +1,51 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
+// L18 (deep security audit): per-user TURN quota. Any signed-in user
+// could previously fetch fresh Metered TURN credentials without limit,
+// so one account could burn the shared Metered quota for everyone.
+// An in-memory counter cannot work here: Edge Functions are stateless
+// and ephemeral, so the counter lives in Postgres instead — the same
+// public.rate_limits table created by
+// supabase/migrations/20261119140000_rate_limiting.sql — via the
+// service-role-only RPC public.check_rate_limit_for(). The limit is
+// 30 credential fetches per user per hour: a fetch happens once per call
+// setup (src/lib/webrtc.ts fetchTurnIceServers), so 30/hour is generous
+// for a human and only stops quota abuse.
+// Option (b) from the audit — requiring a call context — was NOT used:
+// the app calls this function with no body at all
+// (supabase.functions.invoke('turn-credentials')), so there is no
+// conversation/call id to verify without an app change. If the app later
+// passes a call id, the function can additionally verify participation.
+// DEPLOY ORDER: apply migration 20261119140000_rate_limiting.sql to the
+// live Supabase project BEFORE deploying this function — until the table
+// and RPC exist, the quota check below fails closed (503) and no TURN
+// credentials are issued. That is deliberate: fail closed, not open.
 // Deploy: Supabase MCP deploy_edge_function, project jvjgouivqzklfzshmdti,
 // name turn-credentials, verify_jwt true, entrypoint index.ts.
-// Secret (never a VITE_ var): METERED_API_KEY
+// Secrets (never a VITE_ var): METERED_API_KEY, SUPABASE_SERVICE_ROLE_KEY
+// (injected by Supabase).
+const TURN_CREDENTIALS_PER_HOUR = 30
+
+async function checkTurnQuota(
+  url: string,
+  serviceRoleKey: string,
+  userId: string,
+): Promise<{ limited: boolean; unavailable: boolean }> {
+  const admin = createClient(url, serviceRoleKey)
+  const { error } = await admin.rpc('check_rate_limit_for', {
+    p_user_id: userId,
+    p_action: 'turn-credentials',
+    p_max: TURN_CREDENTIALS_PER_HOUR,
+    p_window_seconds: 3600,
+  })
+  if (!error) return { limited: false, unavailable: false }
+  // The RPC raises 'Rate limit exceeded ...' when the user is over quota.
+  if (typeof error.message === 'string' && error.message.includes('Rate limit exceeded')) {
+    return { limited: true, unavailable: false }
+  }
+  console.error('turn-credentials quota check failed:', error.message)
+  return { limited: false, unavailable: true }
+}
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -67,6 +110,19 @@ Deno.serve(async (req) => {
   const supabase = createClient(url, anon, { global: { headers: { Authorization: auth } } })
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (userError || !userData.user) return json({ error: 'Sign in required.' }, 401)
+
+  // Per-user TURN quota (L18). Fail closed: if the quota table/RPC is not
+  // in place yet (migration not applied) or the service-role key is missing,
+  // refuse rather than handing out unlimited relay credentials.
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  if (!serviceRoleKey) return json({ error: 'Voice relay is not configured.' }, 503)
+  const quota = await checkTurnQuota(url, serviceRoleKey, userData.user.id)
+  if (quota.limited) {
+    return json({ error: 'Too many voice relay requests. Try again later.' }, 429)
+  }
+  if (quota.unavailable) {
+    return json({ error: 'Voice relay is temporarily unavailable.' }, 503)
+  }
 
   const apiKey = Deno.env.get('METERED_API_KEY') ?? ''
   if (!apiKey) return json({ error: 'TURN relay is not configured.' }, 503)
