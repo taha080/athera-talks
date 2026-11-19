@@ -217,7 +217,7 @@ Deno.serve(async (req) => {
         const { body, headers } = await encryptPushPayload(row, text, vapidKeys, vapidSubject)
         const response = await fetch(row.endpoint, { method: 'POST', headers, body: body as BodyInit })
         if (response.status === 404 || response.status === 410) {
-          await supabase.from('push_subscriptions').delete().eq('endpoint', row.endpoint)
+          await supabase.from('push_subscriptions').delete().eq('endpoint', row.endpoint).eq('user_id', recipientId)
           expired++
           console.log(`send-push endpoint ...${fingerprint} status=${response.status} expired`)
         } else if (response.ok) {
