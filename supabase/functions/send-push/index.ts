@@ -208,21 +208,33 @@ Deno.serve(async (req) => {
       .eq('user_id', recipientId)
     const rows = ((subscriptions ?? []) as PushSubscriptionKeys[])
     for (const row of rows) {
+      // Log each endpoint's outcome (last 12 chars only — enough to tell
+      // devices apart in the logs without printing the full endpoint).
+      // The dashboard shows only the HTTP 200 of this function, so without
+      // these lines a failing phone endpoint is invisible.
+      const fingerprint = row.endpoint.slice(-12)
       try {
         const { body, headers } = await encryptPushPayload(row, text, vapidKeys, vapidSubject)
         const response = await fetch(row.endpoint, { method: 'POST', headers, body: body as BodyInit })
         if (response.status === 404 || response.status === 410) {
           await supabase.from('push_subscriptions').delete().eq('endpoint', row.endpoint)
           expired++
+          console.log(`send-push endpoint ...${fingerprint} status=${response.status} expired`)
         } else if (response.ok) {
           sent++
+          console.log(`send-push endpoint ...${fingerprint} status=${response.status} sent`)
         } else {
           failed++
+          console.log(`send-push endpoint ...${fingerprint} status=${response.status} failed`)
         }
-      } catch {
+      } catch (error) {
         failed++
+        console.log(
+          `send-push endpoint ...${fingerprint} error=${error instanceof Error ? error.message : 'unknown'} failed`,
+        )
       }
     }
   }
+  console.log(`send-push message=${record.id} sent=${sent} expired=${expired} failed=${failed}`)
   return json({ sent, expired, failed })
 })
