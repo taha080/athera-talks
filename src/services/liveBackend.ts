@@ -193,16 +193,21 @@ function memberRole(value: string | null | undefined): MemberRole {
   return value === 'admin' ? 'admin' : 'member'
 }
 
-function groupPhotoUrl(path: string | null | undefined, version: string): string | null {
+async function groupPhotoUrl(path: string | null | undefined, version: string): Promise<string | null> {
   if (!path) return null
-  const { data } = client().storage.from('group-photos').getPublicUrl(path)
-  if (!data?.publicUrl) return null
-  return `${data.publicUrl}?v=${encodeURIComponent(version)}`
+  // The group-photos bucket is private (see M4), so a public URL no
+  // longer works — mint a signed URL the same way wallpapers do.
+  // The signed URL already carries a ?token= query, so the cache-buster
+  // version goes after it with &.
+  const { data, error } = await client().storage.from('group-photos').createSignedUrl(path, 60 * 60 * 24 * 7)
+  if (error || !data?.signedUrl) return null
+  const separator = data.signedUrl.includes('?') ? '&' : '?'
+  return `${data.signedUrl}${separator}v=${encodeURIComponent(version)}`
 }
 
-function mapConversation(row: ConversationRow): Conversation {
+async function mapConversation(row: ConversationRow): Promise<Conversation> {
   const group = row.kind === 'group'
-  const photoUrl = group ? groupPhotoUrl(row.photo_path, row.updated_at) : null
+  const photoUrl = group ? await groupPhotoUrl(row.photo_path, row.updated_at) : null
   return {
     id: row.id,
     updatedAt: row.updated_at,
@@ -504,7 +509,7 @@ export const liveChat = {
   async listConversations(): Promise<Conversation[]> {
     const { data, error } = await client().rpc('list_my_conversations')
     if (error) throw new Error(error.message)
-    return ((data ?? []) as ConversationRow[]).map(mapConversation)
+    return Promise.all(((data ?? []) as ConversationRow[]).map(mapConversation))
   },
 
   async listMessages(conversationId: string): Promise<Message[]> {
