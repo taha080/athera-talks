@@ -15,13 +15,18 @@
       this project's Supabase host (REST, Edge Functions, storage, and
       Realtime over wss); images and media may also come from Supabase
       storage signed URLs, plus data:/blob: URLs the app creates locally.
+      worker-src allows 'self' blob: because the Supabase Realtime client
+      runs its heartbeat in a worker created from a blob: URL, and the push
+      service worker is served from this origin — without it, worker
+      creation falls back to script-src, 'self' rejects blob:, and the
+      Realtime socket never connects (live messages stop arriving).
       Known dev-mode trade-off: Vite's React Fast Refresh preamble is an
       inline script, so `npm run dev` hot-reloads less reliably while
       this policy is in place; the production build is unaffected.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co; media-src 'self' blob: https://*.supabase.co; connect-src 'self' https://jvjgouivqzklfzshmdti.supabase.co wss://jvjgouivqzklfzshmdti.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+      content="default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co; media-src 'self' blob: https://*.supabase.co; connect-src 'self' https://jvjgouivqzklfzshmdti.supabase.co wss://jvjgouivqzklfzshmdti.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     />
     <meta name="application-name" content="Athera Talks" />
     <meta property="og:title" content="Athera Talks" />
