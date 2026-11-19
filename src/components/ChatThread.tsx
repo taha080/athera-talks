@@ -899,9 +899,13 @@ function MessageRow({
     window.addEventListener('pointermove', move)
   }
 
+  // touch-pan-y on the group (below): on mobile the browser must not
+  // swallow a horizontal drag as a scroll — vertical scrolling still
+  // works, but a sideways swipe reaches the pointer handlers so
+  // swipe-to-reply can fire.
   return (
     <div
-      className={`msg-group relative flex w-fit min-w-0 max-w-[min(80%,26rem)] flex-col ${mine ? 'ml-auto items-end' : 'mr-auto items-start'} ${actionsOpen ? 'is-actions-open' : ''}`}
+      className={`msg-group relative flex w-fit min-w-0 max-w-[min(80%,26rem)] touch-pan-y flex-col ${mine ? 'ml-auto items-end' : 'mr-auto items-start'} ${actionsOpen ? 'is-actions-open' : ''}`}
       onPointerDown={onPointerDown}
       onContextMenu={(event) => {
         event.preventDefault()
