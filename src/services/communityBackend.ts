@@ -110,7 +110,11 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
     if (!supabase) throw new CommunitiesNotReadyError()
     return supabase
   }
-  const communityColumns = 'id, name, description, visibility, invite_code, owner_id, favourite_anime, slow_mode_seconds, word_filter, created_at'
+  // invite_code is NOT selected here (L4): RLS is row-level, so no
+  // SELECT policy can hide one column. The code is fetched only where
+  // it is actually needed, via the owner/manager-only
+  // community_invite_code() function below.
+  const communityColumns = 'id, name, description, visibility, owner_id, favourite_anime, slow_mode_seconds, word_filter, created_at'
   const memberColumns = 'user_id, role, muted_until, joined_at, profiles(username, avatar_url, favourite_anime)'
 
   // Membership rows are read with a plain query instead of an embedded
@@ -143,6 +147,14 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
       .maybeSingle()
     if (error) notReady(error)
     return data ? roleOf(data.role) : null
+  }
+  // The invite code, only for a community this user owns or manages.
+  // community_invite_code() returns null for everyone else, so the code
+  // is never exposed to ordinary members or strangers.
+  async function fetchInviteCode(communityId: string): Promise<string> {
+    const { data, error } = await client().rpc('community_invite_code', { p_community_id: communityId })
+    if (error) notReady(error)
+    return typeof data === 'string' ? data : ''
   }
   async function requireManager(communityId: string): Promise<void> {
     const role = await myRole(communityId)
@@ -187,10 +199,20 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
         .order('created_at', { ascending: false })
       if (error) notReady(error)
       const membership = await membershipByCommunity()
-      return ((data ?? []) as CommunityRow[]).map((row) => {
+      const communities = ((data ?? []) as CommunityRow[]).map((row) => {
         const entry = membership.get(row.id)
         return mapCommunity(row, entry?.myRole ?? null, entry?.count ?? 0)
       })
+      // Fetch the invite code only for communities this user owns or
+      // manages — everyone else sees an empty code (L4).
+      await Promise.all(
+        communities
+          .filter((c) => c.myRole === 'owner' || c.myRole === 'admin')
+          .map(async (c) => {
+            c.inviteCode = await fetchInviteCode(c.id)
+          }),
+      )
+      return communities
     },
     async createCommunity(input) {
       const { data, error } = await client()
@@ -206,6 +228,8 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
         .single()
       if (error) notReady(error)
       const community = mapCommunity(data as CommunityRow, 'owner', 1)
+      // The creator is the owner, so the code is visible to them.
+      community.inviteCode = await fetchInviteCode(community.id)
       const { error: memberError } = await client()
         .from('community_members')
         .insert({ community_id: community.id, user_id: me.id, role: 'owner' })
@@ -232,6 +256,17 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
       // supabase/migrations/20261027130000_community_delete.sql.
     },
     async joinCommunity(communityId, inviteCode) {
+      // Server-verified join (L4): join_community_by_invite checks the
+      // invite code, the ban list and the visibility itself, and returns
+      // the role the caller now has — public -> member, invite-only ->
+      // member with the right code, private -> pending. Re-joining
+      // returns the existing role. No direct community_members insert.
+      const { data: roleData, error: joinError } = await client().rpc('join_community_by_invite', {
+        p_community_id: communityId,
+        p_invite_code: inviteCode?.trim() ? inviteCode.trim() : null,
+      })
+      if (joinError) notReady(joinError)
+      const role = roleOf(typeof roleData === 'string' ? roleData : null)
       const { data, error } = await client()
         .from('communities')
         .select(communityColumns)
@@ -239,17 +274,13 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
         .single()
       if (error) notReady(error)
       const row = data as CommunityRow
-      if (row.visibility === 'invite-only' && inviteCode?.trim().toUpperCase() !== (row.invite_code ?? '')) {
-        throw new Error('That invite code does not match this community.')
-      }
-      const role: CommunityRole = row.visibility === 'public' ? 'member' : 'pending'
-      const { error: joinError } = await client()
-        .from('community_members')
-        .upsert({ community_id: communityId, user_id: me.id, role }, { onConflict: 'community_id,user_id' })
-      if (joinError) notReady(joinError)
       const membership = await membershipByCommunity()
       const entry = membership.get(communityId)
-      return mapCommunity(row, role, entry?.count ?? 0)
+      const community = mapCommunity(row, role, entry?.count ?? 0)
+      if (role === 'owner' || role === 'admin') {
+        community.inviteCode = await fetchInviteCode(community.id)
+      }
+      return community
     },
     async approveMember(communityId, userId) {
       await requireManager(communityId)
