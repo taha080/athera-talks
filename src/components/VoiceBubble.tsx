@@ -62,7 +62,7 @@ export function VoiceBubble({
   const elapsed = total > 0 ? Math.round(progress * total) : 0
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 flex-1 items-center gap-2">
       <button
         type="button"
         className={mine ? 'grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/20' : 'grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sakura/15 text-sakura'}

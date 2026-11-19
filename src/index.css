@@ -709,6 +709,7 @@ body {
 
 .msg-voice > .msg-meta {
   margin-left: 0;
+  flex-shrink: 0;
 }
 
 .msg-meta-on-media {
