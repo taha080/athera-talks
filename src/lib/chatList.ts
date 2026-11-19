@@ -38,3 +38,15 @@ export function archivedChats(list: Conversation[]): Conversation[] {
 export function totalUnread(list: Conversation[]): number {
   return list.reduce((sum, item) => sum + (item.unread || 0), 0)
 }
+
+/**
+ * The chat the user is looking at is being read right now, so it never
+ * carries an unread count — whatever a refresh re-fetched from the server.
+ * Without this, a heartbeat refresh can restore a stale server unread
+ * count for the open chat, and its badge sticks at 1 even though the user
+ * is staring at the messages.
+ */
+export function withOpenChatRead(list: Conversation[], activeId: string | null): Conversation[] {
+  if (!activeId) return list
+  return list.map((item) => (item.id === activeId ? { ...item, unread: 0 } : item))
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { archivedChats, byChatOrder, chatTitle, inboxChats, PIN_LIMIT, showSenderName, totalUnread } from './chatList'
+import { archivedChats, byChatOrder, chatTitle, inboxChats, PIN_LIMIT, showSenderName, totalUnread, withOpenChatRead } from './chatList'
 import { foldConversation } from './conversations'
 import type { Conversation } from '../types'
 
@@ -48,6 +48,19 @@ describe('chat list order', () => {
     ]
     expect(totalUnread(rows)).toBe(5)
     expect(totalUnread([])).toBe(0)
+  })
+
+  it('never shows an unread count on the chat that is open right now', () => {
+    const rows = [
+      chat({ id: 'a', updatedAt: '2026-10-19T08:00:00.000Z', unread: 1 }),
+      chat({ id: 'b', updatedAt: '2026-10-19T09:00:00.000Z', unread: 2 }),
+    ]
+    // A stale server count for the open chat is forced to zero.
+    expect(withOpenChatRead(rows, 'a').map((item) => item.unread)).toEqual([0, 2])
+    expect(totalUnread(withOpenChatRead(rows, 'a'))).toBe(2)
+    // No open chat: nothing changes.
+    expect(withOpenChatRead(rows, null)).toBe(rows)
+    expect(withOpenChatRead(rows, 'missing').map((item) => item.unread)).toEqual([1, 2])
   })
 
   it('brings an archived chat back when a new message arrives, unless it is muted', () => {
