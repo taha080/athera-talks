@@ -3,13 +3,14 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
 } from 'react'
 import { appendMessage, foldConversation } from '../lib/conversations'
 import { syncAppBadge } from '../lib/appBadge'
-import { totalUnread } from '../lib/chatList'
+import { totalUnread, withOpenChatRead } from '../lib/chatList'
 import { messagePreview } from '../lib/messages'
 import { hasPremium } from '../lib/premium'
 import {
@@ -107,6 +108,35 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   conversationsRef.current = conversations
   profileRef.current = profile
   const me = profile?.id ?? ''
+
+  // The open conversation is being read right now, so it never shows an
+  // unread badge — in the chat list, the Unread filter, or the launcher
+  // icon. Deriving it here (rather than clearing it in each refresh)
+  // makes the badge immune to a heartbeat refresh restoring a stale
+  // server count for the chat the user is staring at.
+  const visibleConversations = useMemo(() => withOpenChatRead(conversations, activeId), [conversations, activeId])
+  const visibleConversationsRef = useRef(visibleConversations)
+  visibleConversationsRef.current = visibleConversations
+
+  // Marking a conversation read can fail on a flaky network. The badge
+  // above is cleared optimistically anyway, but the server still needs
+  // the read, or the badge returns when the user leaves the chat — so
+  // retry once after a short delay instead of failing silently.
+  const markRead = useCallback(
+    (conversationId: string) => {
+      void chat
+        .markRead(conversationId)
+        .then(() => {
+          setConversations((prev) => prev.map((item) => (item.id === conversationId ? { ...item, unread: 0 } : item)))
+        })
+        .catch(() => {
+          window.setTimeout(() => {
+            void chat.markRead(conversationId).catch(() => undefined)
+          }, 1500)
+        })
+    },
+    [chat],
+  )
 
   const pushToast = useCallback((text: string) => {
     const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -227,9 +257,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const viewing = activeRef.current === ready.conversationId
       const tabHidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
       if (viewing && !mine && !tabHidden) {
-        void chat.markRead(ready.conversationId).then(() => {
-          setConversations((prev) => prev.map((item) => (item.id === ready.conversationId ? { ...item, unread: 0 } : item)))
-        })
+        markRead(ready.conversationId)
       }
       const convo = conversationsRef.current.find((item) => item.id === ready.conversationId)
       const blocked = Boolean(convo?.blocked || convo?.blockedByMe || blockedRef.current.has(ready.senderId))
@@ -271,7 +299,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         })
       }
     },
-    [applyUpdate, chat, me, pushNotice, refresh, senderFor],
+    [applyUpdate, chat, markRead, me, pushNotice, refresh, senderFor],
   )
 
   useEffect(() => {
@@ -319,13 +347,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // visible — a badge left by the service worker while the app was
   // closed gets corrected once the user is back in the app.
   useEffect(() => {
-    syncAppBadge(totalUnread(conversations))
+    syncAppBadge(totalUnread(visibleConversations))
     const onVisible = () => {
-      if (document.visibilityState === 'visible') syncAppBadge(totalUnread(conversationsRef.current))
+      if (document.visibilityState === 'visible') syncAppBadge(totalUnread(visibleConversationsRef.current))
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [conversations])
+  }, [visibleConversations])
 
   useEffect(() => {
     return chat.subscribe({
@@ -380,14 +408,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       .finally(() => {
         if (!cancelled) setMessagesLoading(false)
       })
-    void chat.markRead(activeId).then(() => {
-      if (cancelled) return
-      setConversations((prev) => prev.map((item) => (item.id === activeId ? { ...item, unread: 0 } : item)))
-    })
+    markRead(activeId)
     return () => {
       cancelled = true
     }
-  }, [activeId, chat])
+  }, [activeId, chat, markRead])
 
   const setActive = useCallback((id: string | null) => {
     activeRef.current = id
@@ -612,7 +637,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   )
 
   const value: ChatValue = {
-    conversations,
+    conversations: visibleConversations,
     messages,
     loading,
     messagesLoading,
