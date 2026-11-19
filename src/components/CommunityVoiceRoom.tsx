@@ -17,14 +17,9 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { getSupabase } from '../lib/supabase'
 import { createPeerConnection, mediaError } from '../lib/webrtc'
 import { ghostButton, primaryButton } from '../lib/styles'
-import type { CommunityVoiceRoom } from '../lib/communities'
+import { parseVoiceSignalPayload, type CommunityVoiceRoom, type CommunityVoiceSignal } from '../lib/communities'
 
-type SignalPayload = {
-  from: string
-  kind: 'join' | 'offer' | 'answer' | 'ice' | 'leave'
-  sdp?: RTCSessionDescriptionInit
-  candidate?: RTCIceCandidateInit
-}
+type SignalPayload = CommunityVoiceSignal
 
 export function CommunityVoiceRoom({ room, meId, meName }: { room: CommunityVoiceRoom; meId: string; meName: string }) {
   const [joined, setJoined] = useState(false)
@@ -151,7 +146,10 @@ export function CommunityVoiceRoom({ room, meId, meName }: { room: CommunityVoic
     const channel = supabase.channel(`community-voice:${room.id}`, { config: { broadcast: { self: false } } })
     channelRef.current = channel
     channel.on('broadcast', { event: 'voice-signal' }, ({ payload }) => {
-      void handleSignal(payload as SignalPayload)
+      // Drop spoofed or malformed signals: the sender id and the signal
+      // shape must check out before any peer connection is touched.
+      const signal = parseVoiceSignalPayload(payload, meId)
+      if (signal) void handleSignal(signal)
     })
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {

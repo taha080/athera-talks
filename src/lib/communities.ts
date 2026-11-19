@@ -95,6 +95,45 @@ export type CommunityReport = {
   createdAt: string
 }
 
+export type CommunityVoiceSignal = {
+  from: string
+  kind: 'join' | 'offer' | 'answer' | 'ice' | 'leave'
+  sdp?: RTCSessionDescriptionInit
+  candidate?: RTCIceCandidateInit
+}
+
+const VOICE_SIGNAL_KINDS: CommunityVoiceSignal['kind'][] = ['join', 'offer', 'answer', 'ice', 'leave']
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// Voice-room signalling rides an unauthenticated broadcast channel, so a
+// payload is only trusted when its sender id looks like a real user id
+// and its shape matches the signal it claims to be. Anything else is
+// dropped: a spoofed `from` could otherwise inject offers, answers, or
+// ICE candidates as another member, or make the room show phantom
+// participants. Outgoing signals always carry the local authenticated
+// profile id (see CommunityVoiceRoom); the receiver can never prove a
+// peer's id from the payload alone. Full per-sender authorization needs
+// Supabase Realtime Authorization (private channels plus RLS on
+// realtime.messages) — a server-side migration, not a client change.
+export function parseVoiceSignalPayload(payload: unknown, meId: string): CommunityVoiceSignal | null {
+  if (!payload || typeof payload !== 'object') return null
+  const record = payload as Record<string, unknown>
+  const from = record.from
+  if (typeof from !== 'string' || !UUID_PATTERN.test(from)) return null
+  if (from === meId) return null
+  const kind = record.kind
+  if (typeof kind !== 'string' || !(VOICE_SIGNAL_KINDS as string[]).includes(kind)) return null
+  const signal = kind as CommunityVoiceSignal['kind']
+  if ((signal === 'offer' || signal === 'answer') && (typeof record.sdp !== 'object' || !record.sdp)) return null
+  if (signal === 'ice' && (typeof record.candidate !== 'object' || !record.candidate)) return null
+  const parsed: CommunityVoiceSignal = { from, kind: signal }
+  if (typeof record.sdp === 'object' && record.sdp) parsed.sdp = record.sdp as RTCSessionDescriptionInit
+  if (typeof record.candidate === 'object' && record.candidate) {
+    parsed.candidate = record.candidate as RTCIceCandidateInit
+  }
+  return parsed
+}
+
 export const COMMUNITY_ROLES: CommunityRole[] = ['owner', 'admin', 'member', 'pending']
 
 export function isCommunityManager(role: CommunityRole | null | undefined): boolean {

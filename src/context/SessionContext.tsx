@@ -14,7 +14,6 @@ import {
   googleAuthMode,
   googleSignInError,
   normalizeUsername,
-  signUpNeedsPasswordSignIn,
   usernameIssue,
   type GoogleAuthMode,
 } from '../lib/auth'
@@ -26,6 +25,7 @@ import { blobToDataUrl, fitImage } from '../lib/image'
 import { getSupabase } from '../lib/supabase'
 import { PASSWORD_RESET_REDIRECT, appUrl, isPasswordRecoveryUrl } from '../lib/url'
 import {
+  clearCachedUserId,
   clearWallpaper,
   fetchProfile,
   liveChat,
@@ -55,7 +55,7 @@ type SessionValue = {
   enterDemo: () => void
   leaveDemo: () => void
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (input: { email: string; password: string; username: string }) => Promise<void>
+  signUp: (input: { email: string; password: string; username: string }) => Promise<{ needsEmailConfirmation: boolean }>
   signInWithGoogle: () => Promise<void>
   sendPasswordReset: (email: string) => Promise<{ demoReset: boolean }>
   updatePassword: (password: string) => Promise<void>
@@ -132,6 +132,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setRecovery(true)
         window.setTimeout(() => navigate('/reset-password'), 0)
       }
+      if (event === 'SIGNED_OUT') {
+        // Drop the cached sender id so a later sign-in as another
+        // account in the same tab can never reuse the old id.
+        clearCachedUserId()
+      }
       // Supabase warns against awaiting other queries inside this callback.
       window.setTimeout(() => {
         void hydrate(session)
@@ -165,7 +170,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const next = await demoBackend.signUp({ ...input, username })
         setProfile(next)
         setEmail(demoBackend.currentEmail())
-        return
+        return { needsEmailConfirmation: false }
       }
       const supabase = getSupabase()!
       const email = input.email.trim()
@@ -179,15 +184,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       })
       if (error) throw new Error(error.message)
 
-      let session = data.session
-      if (signUpNeedsPasswordSignIn(session)) {
-        const signedIn = await supabase.auth.signInWithPassword({ email, password: input.password })
-        if (signedIn.error) throw new Error(signedIn.error.message)
-        session = signedIn.data.session
-      }
-      if (!session) throw new Error('Could not start your session.')
+      // No session means the account is waiting for email confirmation.
+      // Never sign in with the password here: that would bypass
+      // confirmation entirely. The caller shows "check your email".
+      if (!data.session?.access_token) return { needsEmailConfirmation: true }
+      const session = data.session
       setEmail(session.user.email ?? email)
       setProfile(await fetchProfile(session.user.id))
+      return { needsEmailConfirmation: false }
     },
     [mode],
   )
@@ -259,6 +263,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       demoBackend.signOut()
     } else {
       await getSupabase()?.auth.signOut()
+      clearCachedUserId()
     }
     sessionStorage.removeItem(RECOVERY_KEY)
     setRecovery(false)

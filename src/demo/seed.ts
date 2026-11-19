@@ -14,9 +14,15 @@ export const GROUP_CHAT = 'c1000000-0000-4000-8000-000000000005'
 
 export const DEMO_EMAIL = 'taha@tatalk.app'
 export const DEMO_PASSWORD = 'tatalk1'
+// The seeded account stores the password hash, not the password itself:
+// buildSeed writes DEMO_PASSWORD_HASH so the plaintext demo password
+// never ships in the bundle. DEMO_PASSWORD stays exported for tests,
+// which sign in with it; production code never imports it.
+export const DEMO_PASSWORD_HASH = 'demo-hash:13d53c96e7535c'
 
 export type DemoAccount = {
   email: string
+  // Stored as a `demo-hash:…` hash (see demo/backend.ts), never plaintext.
   password: string
   profileId: string
 }
@@ -120,7 +126,7 @@ export function buildSeed(now = Date.now()): DemoData {
     version: 1,
     currentUserId: null,
     profiles,
-    accounts: [{ email: DEMO_EMAIL, password: DEMO_PASSWORD, profileId: TAHA_ID }],
+    accounts: [{ email: DEMO_EMAIL, password: DEMO_PASSWORD_HASH, profileId: TAHA_ID }],
     conversations: [
       { id: SAKURA_CHAT, memberIds: [TAHA_ID, SAKURA_ID], updatedAt: at(4 * 60 * 1000) },
       { id: KENJI_CHAT, memberIds: [TAHA_ID, KENJI_ID], updatedAt: at(day + 3 * hour) },

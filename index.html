@@ -5,6 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#ffffff" />
     <meta name="description" content="Athera Talks — private messages and voice calls. Created by Taha Ahsan." />
+    <!--
+      Content-Security-Policy. Auth tokens live in localStorage, so a
+      successful script injection would be a full account takeover; this
+      policy is the fence around that. script-src stays 'self' with no
+      'unsafe-inline' (the theme bootstrap lives in theme-init.js, not
+      inline). style-src keeps 'unsafe-inline' because React sets inline
+      style attributes in several components. connect-src is limited to
+      this project's Supabase host (REST, Edge Functions, storage, and
+      Realtime over wss); images and media may also come from Supabase
+      storage signed URLs, plus data:/blob: URLs the app creates locally.
+      Known dev-mode trade-off: Vite's React Fast Refresh preamble is an
+      inline script, so `npm run dev` hot-reloads less reliably while
+      this policy is in place; the production build is unaffected.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co; media-src 'self' blob: https://*.supabase.co; connect-src 'self' https://jvjgouivqzklfzshmdti.supabase.co wss://jvjgouivqzklfzshmdti.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    />
     <meta name="application-name" content="Athera Talks" />
     <meta property="og:title" content="Athera Talks" />
     <meta property="og:description" content="Private messages and voice calls." />
@@ -21,15 +39,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>Athera Talks</title>
-    <script>
-      try {
-        var themes = ['dark','naruto','midnight','sakura','ocean','forest','light','amoled','blush','lavender','peach','rosegold','cotton','mint','blossom','coquette']
-        var savedTheme = localStorage.getItem('tatalk:theme')
-        document.documentElement.setAttribute('data-theme', themes.indexOf(savedTheme) >= 0 ? savedTheme : 'midnight')
-      } catch (e) {
-        document.documentElement.setAttribute('data-theme', 'midnight')
-      }
-    </script>
+    <script src="%BASE_URL%theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

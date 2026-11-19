@@ -23,35 +23,35 @@ describe('push helpers', () => {
   })
 
   it('parses a push payload and falls back to the app name', () => {
-    expect(parsePushPayload({ title: 'sakura', body: 'Hi there', conversationId: 'c1', messageId: 'm1' })).toEqual({
+    expect(parsePushPayload({ title: 'sakura', body: 'Hi there', conversationId: 'c1000000-0000-4000-8000-000000000001', messageId: 'm1' })).toEqual({
       title: 'sakura',
       body: 'Hi there',
-      conversationId: 'c1',
+      conversationId: 'c1000000-0000-4000-8000-000000000001',
       messageId: 'm1',
     })
-    expect(parsePushPayload({ body: 'Hi there', conversationId: 'c1' })).toEqual({
+    expect(parsePushPayload({ body: 'Hi there', conversationId: 'c1000000-0000-4000-8000-000000000001' })).toEqual({
       title: 'Athera Talks',
       body: 'Hi there',
-      conversationId: 'c1',
+      conversationId: 'c1000000-0000-4000-8000-000000000001',
       messageId: '',
     })
   })
 
   it('keeps a valid unread count for the icon badge and drops a bad one', () => {
     expect(
-      parsePushPayload({ body: 'Hi', conversationId: 'c1', messageId: 'm1', unreadCount: 4 }),
+      parsePushPayload({ body: 'Hi', conversationId: 'c1000000-0000-4000-8000-000000000001', messageId: 'm1', unreadCount: 4 }),
     ).toEqual({
       title: 'Athera Talks',
       body: 'Hi',
-      conversationId: 'c1',
+      conversationId: 'c1000000-0000-4000-8000-000000000001',
       messageId: 'm1',
       unreadCount: 4,
     })
     expect(
-      parsePushPayload({ body: 'Hi', conversationId: 'c1', messageId: 'm1', unreadCount: 2.7 }),
+      parsePushPayload({ body: 'Hi', conversationId: 'c1000000-0000-4000-8000-000000000001', messageId: 'm1', unreadCount: 2.7 }),
     ).toMatchObject({ unreadCount: 2 })
     for (const bad of ['4', -1, Number.NaN, Infinity, null]) {
-      expect(parsePushPayload({ body: 'Hi', conversationId: 'c1', messageId: 'm1', unreadCount: bad })).not.toHaveProperty(
+      expect(parsePushPayload({ body: 'Hi', conversationId: 'c1000000-0000-4000-8000-000000000001', messageId: 'm1', unreadCount: bad })).not.toHaveProperty(
         'unreadCount',
       )
     }
@@ -62,6 +62,23 @@ describe('push helpers', () => {
     expect(parsePushPayload('hello')).toBeNull()
     expect(parsePushPayload({})).toBeNull()
     expect(parsePushPayload({ title: 'sakura' })).toBeNull()
+  })
+
+  it('rejects a non-UUID conversation id and caps over-long text', () => {
+    expect(
+      parsePushPayload({ title: 'sakura', body: 'Hi', conversationId: 'c1', messageId: 'm1' }),
+    ).toBeNull()
+    expect(
+      parsePushPayload({ title: 'sakura', body: 'Hi', conversationId: 42, messageId: 'm1' }),
+    ).toBeNull()
+    const long = parsePushPayload({
+      title: 'x'.repeat(150),
+      body: 'y'.repeat(300),
+      conversationId: 'c1000000-0000-4000-8000-000000000001',
+      messageId: 'm1',
+    })
+    expect(long?.title).toHaveLength(100)
+    expect(long?.body).toHaveLength(200)
   })
 
   it('explains every push state in plain words', () => {

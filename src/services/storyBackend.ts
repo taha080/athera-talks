@@ -221,9 +221,23 @@ function createSupabaseStoryStore(me: Profile): StoryStore {
       if (error) notReady(error)
     },
     async deleteStory(storyId) {
-      const { data } = await client().from('stories').select('media_path').eq('id', storyId).maybeSingle()
-      const { error } = await client().from('stories').delete().eq('id', storyId).eq('author_id', me.id)
+      // Only the author's own row may be read or deleted, and the stored
+      // photo is only removed when a row was actually deleted — otherwise
+      // a delete aimed at someone else's story could wipe their media.
+      const { data } = await client()
+        .from('stories')
+        .select('media_path')
+        .eq('id', storyId)
+        .eq('author_id', me.id)
+        .maybeSingle()
+      const { data: deleted, error } = await client()
+        .from('stories')
+        .delete()
+        .eq('id', storyId)
+        .eq('author_id', me.id)
+        .select('id')
       if (error) notReady(error)
+      if (!deleted?.length) return
       const mediaPath = (data as { media_path?: string | null } | null)?.media_path
       if (mediaPath) await client().storage.from('stories').remove([mediaPath])
     },

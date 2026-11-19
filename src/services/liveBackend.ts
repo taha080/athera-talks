@@ -11,6 +11,7 @@ import { storageResumableEndpoint, uploadChatVideo } from '../lib/tusUpload'
 import { isDuplicateCallInsert } from '../lib/callLog'
 import { parseTheme } from '../lib/theme'
 import { encodeWaveform, extensionForMime, parseWaveform } from '../lib/voice'
+import { parseTypingPayload } from '../lib/typing'
 import { getSupabase } from '../lib/supabase'
 import type { BlockedPerson, CallLog, CallStatus, CallType, ChatPrefPatch, ContactRequest, ContactStatus, Conversation, GroupMember, MemberRole, Message, MessageListener, MessageReceipt, OutgoingMedia, Profile, Reaction, ReactionChange, ReplyTarget, SearchPerson, UserReport } from '../types'
 
@@ -435,6 +436,13 @@ async function currentUserId(): Promise<string> {
   if (error || !data.user) throw new Error('Sign in first.')
   cachedUserId = data.user.id
   return data.user.id
+}
+
+// The cached id is only valid for the current session. Clear it on
+// sign-out (see SessionContext) so an account switch in the same tab
+// can never send the previous account's id as a sender.
+export function clearCachedUserId(): void {
+  cachedUserId = null
 }
 
 function receiptsTableMissing(error: { code?: string; message: string }): boolean {
@@ -991,12 +999,20 @@ export const liveChat = {
 
   subscribeTyping(conversationId: string, onTyping: (userId: string, typing: boolean) => void): () => void {
     const supabase = client()
-    const channel = supabase.channel(`room:${conversationId}`)
+    // self: false keeps our own broadcast from echoing back to us.
+    const channel = supabase.channel(`room:${conversationId}`, { config: { broadcast: { self: false } } })
     channel.on('broadcast', { event: 'typing' }, ({ payload }) => {
-      if (!payload || typeof payload !== 'object' || !('userId' in payload)) return
-      const userId = String(payload.userId)
-      const typing = !('typing' in payload) || payload.typing !== false
-      if (userId) onTyping(userId, typing)
+      // Never trust payload.userId verbatim: the channel has no
+      // per-sender authorization, so anyone on it can send any id.
+      // parseTypingPayload drops malformed ids and our own echo; the
+      // sender side is bound to the authenticated session in
+      // broadcastTyping below.
+      void currentUserId()
+        .then((ownId) => {
+          const parsed = parseTypingPayload(payload, ownId)
+          if (parsed) onTyping(parsed.userId, parsed.typing)
+        })
+        .catch(() => undefined)
     })
     void channel.subscribe()
     return () => {
@@ -1005,6 +1021,8 @@ export const liveChat = {
   },
 
   async broadcastTyping(conversationId: string, typing = true): Promise<void> {
+    // The sender id comes from the authenticated session, never from
+    // caller input, so a client cannot broadcast as someone else.
     const userId = await currentUserId()
     const channel = client().channel(`room:${conversationId}`)
     await channel.send({ type: 'broadcast', event: 'typing', payload: { userId, typing } })

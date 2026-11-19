@@ -36,15 +36,22 @@ export type PushPayload = {
 }
 
 // The same shape the service worker parses in public/sw.js. Keep the two
-// in step if the payload ever changes.
+// in step if the payload ever changes. Validation matches sw.js:
+// the conversation id must be a UUID and the title/body are capped,
+// so a malformed or oversized payload is ignored instead of shown.
+const PUSH_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const PUSH_TITLE_MAX = 100
+const PUSH_BODY_MAX = 200
+
 export function parsePushPayload(data: unknown): PushPayload | null {
   if (!data || typeof data !== 'object') return null
   const record = data as Record<string, unknown>
-  const title = typeof record.title === 'string' && record.title ? record.title : 'Athera Talks'
-  const body = typeof record.body === 'string' ? record.body : ''
   const conversationId = typeof record.conversationId === 'string' ? record.conversationId : ''
+  if (!PUSH_UUID_PATTERN.test(conversationId)) return null
+  const title =
+    typeof record.title === 'string' && record.title ? record.title.slice(0, PUSH_TITLE_MAX) : 'Athera Talks'
+  const body = typeof record.body === 'string' ? record.body.slice(0, PUSH_BODY_MAX) : ''
   const messageId = typeof record.messageId === 'string' ? record.messageId : ''
-  if (!conversationId && !body) return null
   const payload: PushPayload = { title, body, conversationId, messageId }
   if (
     typeof record.unreadCount === 'number' &&

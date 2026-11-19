@@ -28,13 +28,25 @@
 // open, so the worker's badge is only a stand-in for when the app is
 // closed. Badge work is best-effort and never breaks the notification.
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const TITLE_MAX = 100
+const BODY_MAX = 200
+
 function pushTarget(event) {
   try {
     const data = event.data ? event.data.json() : null
     if (!data || typeof data !== 'object') return null
-    const title = typeof data.title === 'string' && data.title ? data.title : 'Athera Talks'
-    const body = typeof data.body === 'string' ? data.body : ''
+    // Only the send-push Edge Function sends a UUID conversation id.
+    // Anything else is not a message notification for this app, so a
+    // malformed or oversized payload from any other source is ignored
+    // instead of displayed. The notification text is rendered by the
+    // browser as plain text (no markup), so this is validation and
+    // defence-in-depth, not an XSS fix.
     const conversationId = typeof data.conversationId === 'string' ? data.conversationId : ''
+    if (!UUID_PATTERN.test(conversationId)) return null
+    const title =
+      typeof data.title === 'string' && data.title ? data.title.slice(0, TITLE_MAX) : 'Athera Talks'
+    const body = typeof data.body === 'string' ? data.body.slice(0, BODY_MAX) : ''
     const unreadCount =
       typeof data.unreadCount === 'number' && Number.isFinite(data.unreadCount) && data.unreadCount >= 0
         ? Math.floor(data.unreadCount)

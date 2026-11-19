@@ -1,7 +1,10 @@
 // Each call asks the turn-credentials Edge Function for Metered iceServers.
-// The Metered API key stays in the function secret METERED_API_KEY. If that
-// fetch fails, the call uses the static Metered relay below. An explicit
-// VITE_TURN_* override still wins. VITE_TURN_URLS=none stays on Google STUN.
+// The Metered API key stays in the function secret METERED_API_KEY and is
+// never shipped in this bundle. If that fetch fails, the call falls back
+// to Google STUN only — there is no static TURN credential in the client
+// any more, so a failed fetch can never leak a relay credential. An
+// explicit VITE_TURN_* override still wins. VITE_TURN_URLS=none stays on
+// Google STUN.
 
 import { CONNECT_TIMEOUT_MESSAGE } from './callMachine'
 import { getSupabase } from './supabase'
@@ -35,27 +38,12 @@ export async function turnRestCredential(
 }
 
 // Some relays advertise port 53. Browsers time out on it.
-export const METERED_FALLBACK_USERNAME = '8c806b1e87da68a6d13d1051'
-export const METERED_FALLBACK_CREDENTIAL = 'CWOTQy7sg1frPlo+'
-
-export const METERED_FALLBACK_URLS = [
-  'stun:stun.relay.metered.ca:80',
-  'turn:global.relay.metered.ca:80',
-  'turn:global.relay.metered.ca:80?transport=tcp',
-  'turn:global.relay.metered.ca:443',
-  'turns:global.relay.metered.ca:443?transport=tcp',
-] as const
-
-export function meteredFallbackServers(): RTCIceServer[] {
-  return METERED_FALLBACK_URLS.map((urls) =>
-    urls.startsWith('turn')
-      ? { urls, username: METERED_FALLBACK_USERNAME, credential: METERED_FALLBACK_CREDENTIAL }
-      : { urls },
-  )
-}
-
 export function iceServersOrFallback(fetched: RTCIceServer[] | null): RTCIceServer[] {
-  return fetched?.length ? fetched : meteredFallbackServers()
+  // No static TURN fallback: when the Edge Function cannot be reached the
+  // call stays on Google STUN instead of using a credential baked into
+  // the shipped bundle. Calls still connect where the network allows
+  // direct peer-to-peer; relay-only networks wait for the next fetch.
+  return fetched?.length ? fetched : googleStunServers()
 }
 
 export function usableTurnUrl(url: string): boolean {
