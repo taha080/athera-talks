@@ -581,6 +581,14 @@ body {
   width: fit-content;
   max-width: min(80%, 26rem);
   min-width: 0;
+  /* No native text selection on a message: a long-press opens the app's own
+     menu (Reply/React/Copy/Delete), and Copy uses the clipboard API, so
+     nothing here needs a selection. Without this, the mobile browser
+     selects the bubble text on long-press and shows its own copy/search
+     bar over the menu. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .msg-bubble {
