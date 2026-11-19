@@ -17,6 +17,7 @@ import { isOnline, presenceLabel } from '../lib/presence'
 import { TYPING_TTL_MS } from '../lib/typing'
 import { canViewSharedProfile } from '../lib/profileAccess'
 import { receiptTick } from '../lib/receipts'
+import { isSwipeToReply, swipeReplyOffset } from '../lib/swipeReply'
 import { iconButton } from '../lib/styles'
 import type { CallLog, Conversation, GroupMember, Message, ReplyTarget } from '../types'
 import { Avatar } from './Avatar'
@@ -537,7 +538,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
         </div>
       ) : null}
 
-      <div ref={scroller} className="chat-stream min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6" onScroll={onScroll}>
+      <div ref={scroller} className="chat-stream min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 sm:px-6" onScroll={onScroll}>
         {chat.messagesLoading ? <MessageSkeleton /> : null}
         {!chat.messagesLoading && chat.messages.length === 0 && calls.length === 0 ? (
           <p className="mx-auto mt-16 max-w-xs text-center text-sm leading-6 text-mist">No messages yet. Say hello, send a photo, or tap the mic for a voice note.</p>
@@ -846,6 +847,11 @@ function MessageRow({
           : 'bubble-other'
   const tail = forger || featured || !tailed ? '' : mine ? 'tail-own' : 'tail-other'
   const cancelPress = useRef<(() => void) | null>(null)
+  // Swipe-to-reply drag state: the bubble follows the finger to the right
+  // (WhatsApp/Instagram style); `swiping` keeps the live drag free of the
+  // spring-back transition, which only runs when the finger lifts.
+  const [swipeX, setSwipeX] = useState(0)
+  const [swiping, setSwiping] = useState(false)
 
   useEffect(() => () => cancelPress.current?.(), [])
 
@@ -856,23 +862,40 @@ function MessageRow({
     const startX = event.clientX
     const startY = event.clientY
     const timer = window.setTimeout(() => {
-      stop()
+      cleanup()
       window.getSelection()?.removeAllRanges()
       onShowMenu(startX, startY)
     }, 450)
-    function stop() {
+    function cleanup() {
       window.clearTimeout(timer)
-      window.removeEventListener('pointerup', stop)
-      window.removeEventListener('pointercancel', stop)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
       window.removeEventListener('pointermove', move)
       cancelPress.current = null
     }
-    function move(moveEvent: PointerEvent) {
-      if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) > 12) stop()
+    function up() {
+      cleanup()
+      setSwiping(false)
+      setSwipeX(0)
     }
-    cancelPress.current = stop
-    window.addEventListener('pointerup', stop)
-    window.addEventListener('pointercancel', stop)
+    function move(moveEvent: PointerEvent) {
+      const dx = moveEvent.clientX - startX
+      const dy = moveEvent.clientY - startY
+      if (isSwipeToReply(dx, dy)) {
+        cleanup()
+        setSwiping(false)
+        setSwipeX(0)
+        onReply()
+        return
+      }
+      if (Math.hypot(dx, dy) > 12) window.clearTimeout(timer)
+      const offset = swipeReplyOffset(dx, dy)
+      setSwiping(offset > 0)
+      setSwipeX(offset)
+    }
+    cancelPress.current = cleanup
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
     window.addEventListener('pointermove', move)
   }
 
@@ -886,6 +909,15 @@ function MessageRow({
         onShowMenu(event.clientX, event.clientY)
       }}
     >
+      {swipeX > 0 ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-0 top-1/2 z-0 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full border border-line bg-panel text-sakura shadow-sm"
+          style={{ opacity: Math.min(1, swipeX / 40) }}
+        >
+          <ReplyIcon className="h-4 w-4" />
+        </span>
+      ) : null}
       {(pos === 'start' || pos === 'single') && showSender ? (
         onOpenSender ? (
           <button type="button" className="msg-sender mb-0.5 px-1 text-left text-[11px] font-medium" aria-label={`View @${senderName}`} onClick={onOpenSender}>
@@ -903,7 +935,13 @@ function MessageRow({
           <Tiny label="Delete" onClick={onOpenMenu}><TrashIcon className="h-3.5 w-3.5" /></Tiny>
         </div>
       ) : null}
-      <div className={`relative min-w-0 max-w-full ${highlighted ? 'rounded-[18px] ring-2 ring-sakura/70' : ''}`}>
+      <div
+        className={`relative min-w-0 max-w-full ${highlighted ? 'rounded-[18px] ring-2 ring-sakura/70' : ''}`}
+        style={{
+          transform: swipeX ? `translateX(${swipeX}px)` : undefined,
+          transition: swiping ? 'none' : 'transform 160ms ease-out',
+        }}
+      >
         {forger ? <ForgerAnya mine={mine} /> : null}
         <div data-forger-bubble={forger ? 'true' : undefined} data-creator-bubble={!forger && senderCreator && !deleted ? 'true' : undefined} data-premium-bubble={!forger && senderPremium && !senderCreator && !deleted ? 'true' : undefined} className={`msg-bubble ${bubble} bubble-in relative min-w-0 max-w-full text-left ${radius} ${(image || video) && !featured ? 'overflow-hidden p-1' : 'bubble-pad'} ${tail}`}>
           {message.replyPreview && !deleted ? (
