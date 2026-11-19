@@ -6,7 +6,7 @@ import { useSession } from '../context/SessionContext'
 import { isValidEmail, normalizeUsername, passwordIssue, usernameIssue } from '../lib/auth'
 import { cn } from '../lib/cn'
 import { fieldClass, primaryButton } from '../lib/styles'
-import { DEMO_EMAIL, DEMO_PASSWORD } from '../demo/seed'
+import { DEMO_EMAIL } from '../demo/seed'
 
 type AuthMode = 'sign-in' | 'sign-up' | 'forgot'
 
@@ -152,7 +152,10 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
           setError(status === 'taken' ? 'That username is taken.' : 'Choose a different username.')
           return
         }
-        await session.signUp({ email, password, username })
+        const result = await session.signUp({ email, password, username })
+        if (result.needsEmailConfirmation) {
+          setInfo('Check your email to confirm your account, then sign in.')
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Could not create the account.')
       } finally {
@@ -278,7 +281,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
           <label className="block text-sm">
             <span className="mb-1.5 flex items-center justify-between font-medium text-paper">
               Password
-              {mode === 'sign-up' ? <span className="text-xs font-normal text-mist">At least 6 characters</span> : null}
+              {mode === 'sign-up' ? <span className="text-xs font-normal text-mist">At least 12 characters</span> : null}
             </span>
             <span className="relative block">
               <input
@@ -379,7 +382,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
 
       {session.mode === 'demo' ? (
         <p className="mt-4 text-center text-xs text-mist">
-          Demo · {DEMO_EMAIL} · {DEMO_PASSWORD}
+          Demo mode · sample data, no real account.
         </p>
       ) : null}
       {session.mode === 'demo' ? (

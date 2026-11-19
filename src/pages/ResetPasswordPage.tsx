@@ -46,7 +46,7 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <AuthFrame title="Set new password" subtitle="Use at least 6 characters.">
+    <AuthFrame title="Set new password" subtitle="Use at least 12 characters.">
       {canReset ? (
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <label className="block text-sm">

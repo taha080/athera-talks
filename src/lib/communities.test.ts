@@ -5,6 +5,7 @@ import {
   containsFilteredWord,
   inviteCodeFor,
   isCommunityManager,
+  parseVoiceSignalPayload,
   pollTotalVotes,
   slowModeBlocked,
   upcomingEvents,
@@ -70,5 +71,36 @@ describe('communities', () => {
       id: 'next', communityId: 'c1', title: 'Next', description: '', startsAt: '2030-01-01T00:00:00.000Z', createdBy: 'u1', rsvps: [],
     }
     expect(upcomingEvents([past, next], new Date('2026-01-01T00:00:00.000Z'))).toEqual([next])
+  })
+})
+
+describe('parseVoiceSignalPayload', () => {
+  const peer = 'b2000000-0000-4000-8000-000000000001'
+  const me = 'b2000000-0000-4000-8000-000000000002'
+
+  it('accepts well-formed join, offer, answer, ice, and leave signals', () => {
+    expect(parseVoiceSignalPayload({ from: peer, kind: 'join' }, me)).toEqual({ from: peer, kind: 'join' })
+    expect(parseVoiceSignalPayload({ from: peer, kind: 'leave' }, me)).toEqual({ from: peer, kind: 'leave' })
+    expect(parseVoiceSignalPayload({ from: peer, kind: 'offer', sdp: { type: 'offer', sdp: 'v=0' } }, me)).toEqual({
+      from: peer, kind: 'offer', sdp: { type: 'offer', sdp: 'v=0' },
+    })
+    expect(parseVoiceSignalPayload({ from: peer, kind: 'answer', sdp: { type: 'answer', sdp: 'v=0' } }, me)).toEqual({
+      from: peer, kind: 'answer', sdp: { type: 'answer', sdp: 'v=0' },
+    })
+    expect(parseVoiceSignalPayload({ from: peer, kind: 'ice', candidate: { candidate: 'a=candidate:1' } }, me)).toEqual({
+      from: peer, kind: 'ice', candidate: { candidate: 'a=candidate:1' },
+    })
+  })
+
+  it('drops spoofed, malformed, and own voice signals', () => {
+    // A display name is not a sender id, and our own echo is not a peer.
+    expect(parseVoiceSignalPayload({ from: 'sakura', kind: 'join' }, me)).toBeNull()
+    expect(parseVoiceSignalPayload({ from: me, kind: 'join' }, me)).toBeNull()
+    expect(parseVoiceSignalPayload({ from: peer, kind: 'shout' }, me)).toBeNull()
+    expect(parseVoiceSignalPayload({ from: peer, kind: 'offer' }, me)).toBeNull()
+    expect(parseVoiceSignalPayload({ from: peer, kind: 'offer', sdp: 'v=0' }, me)).toBeNull()
+    expect(parseVoiceSignalPayload({ from: peer, kind: 'ice' }, me)).toBeNull()
+    expect(parseVoiceSignalPayload({ kind: 'join' }, me)).toBeNull()
+    expect(parseVoiceSignalPayload(null, me)).toBeNull()
   })
 })

@@ -9,9 +9,6 @@ import {
   hasLiveAudioSender,
   iceServersOrFallback,
   mediaError,
-  meteredFallbackServers,
-  METERED_FALLBACK_CREDENTIAL,
-  METERED_FALLBACK_USERNAME,
   turnRestCredential,
   usableTurnUrl,
 } from './webrtc'
@@ -62,28 +59,11 @@ describe('buildIceServers', () => {
     expect(urls).not.toContain('turn:turn.example.com:53?transport=udp')
   })
 
-  it('falls back to the static Metered relay when the credential fetch fails', () => {
-    const servers = meteredFallbackServers()
-    expect(servers.map((server) => server.urls)).toEqual([
-      'stun:stun.relay.metered.ca:80',
-      'turn:global.relay.metered.ca:80',
-      'turn:global.relay.metered.ca:80?transport=tcp',
-      'turn:global.relay.metered.ca:443',
-      'turns:global.relay.metered.ca:443?transport=tcp',
-    ])
-    expect(servers[0]?.username).toBeUndefined()
-    expect(servers[1]).toMatchObject({
-      username: METERED_FALLBACK_USERNAME,
-      credential: METERED_FALLBACK_CREDENTIAL,
-    })
-    expect(servers[4]).toMatchObject({
-      username: METERED_FALLBACK_USERNAME,
-      credential: METERED_FALLBACK_CREDENTIAL,
-    })
+  it('falls back to STUN-only when the credential fetch fails', () => {
     const fetched = [{ urls: 'turn:fresh.example.com:443', username: 'short', credential: 'lived' }]
     expect(iceServersOrFallback(fetched)).toBe(fetched)
-    expect(iceServersOrFallback(null)).toEqual(servers)
-    expect(iceServersOrFallback([])).toEqual(servers)
+    expect(iceServersOrFallback(null)).toEqual(googleStunServers())
+    expect(iceServersOrFallback([])).toEqual(googleStunServers())
   })
 })
 

@@ -152,6 +152,32 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
     const role = await myRole(communityId)
     if (!role || role === 'pending') throw new Error('Join this community first.')
   }
+  // Channel and message calls only carry their own id, so resolve the
+  // owning community first and check membership there. RLS is still the
+  // enforcement layer; this keeps non-members from even issuing the
+  // query instead of relying on the database to reject it.
+  async function communityIdForChannel(channelId: string): Promise<string> {
+    const { data, error } = await client()
+      .from('community_channels')
+      .select('community_id')
+      .eq('id', channelId)
+      .maybeSingle()
+    if (error) notReady(error)
+    const communityId = (data as { community_id?: string } | null)?.community_id
+    if (!communityId) throw new Error('That channel was not found.')
+    return communityId
+  }
+  async function communityIdForMessage(messageId: string): Promise<string> {
+    const { data, error } = await client()
+      .from('community_channel_messages')
+      .select('channel_id')
+      .eq('id', messageId)
+      .maybeSingle()
+    if (error) notReady(error)
+    const channelId = (data as { channel_id?: string } | null)?.channel_id
+    if (!channelId) throw new Error('That message was not found.')
+    return communityIdForChannel(channelId)
+  }
 
   return {
     async listCommunities() {
@@ -362,6 +388,7 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
       return { id: row.id, communityId: row.community_id, name: row.name, kind: row.kind === 'announcements' ? 'announcements' as const : 'text' as const, createdAt: row.created_at }
     },
     async listMessages(channelId) {
+      await requireMember(await communityIdForChannel(channelId))
       const { data, error } = await client()
         .from('community_channel_messages')
         .select('id, channel_id, sender_id, body, created_at, pinned, poll_options, poll_votes, profiles(username, avatar_url, favourite_anime)')
@@ -390,6 +417,7 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
       })
     },
     async sendMessage(channelId, body) {
+      await requireMember(await communityIdForChannel(channelId))
       const text = body.trim()
       if (!text) throw new Error('Write a message first.')
       const { data, error } = await client()
@@ -406,6 +434,7 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
       }
     },
     async togglePin(messageId) {
+      await requireMember(await communityIdForMessage(messageId))
       const { data, error } = await client()
         .from('community_channel_messages')
         .select('pinned')
@@ -419,6 +448,7 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
       if (updateError) notReady(updateError)
     },
     async createPoll(channelId, question, options) {
+      await requireMember(await communityIdForChannel(channelId))
       const cleanOptions = options.map((item) => item.trim()).filter(Boolean).slice(0, 5)
       if (!question.trim() || cleanOptions.length < 2) throw new Error('A poll needs a question and at least two options.')
       const { data, error } = await client()
@@ -436,6 +466,7 @@ function createSupabaseCommunityStore(me: Profile): CommunityStore {
       }
     },
     async votePoll(messageId, optionIndex) {
+      await requireMember(await communityIdForMessage(messageId))
       const { data, error } = await client()
         .from('community_channel_messages')
         .select('poll_votes')

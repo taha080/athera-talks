@@ -63,11 +63,56 @@ function newId(prefix: string): string {
   return `${prefix}-${Math.random().toString(16).slice(2)}`
 }
 
+// Demo passwords used to be stored in plaintext in localStorage, and the
+// sign-in error printed the demo credentials on screen. Both are gone:
+// the error no longer names any credential, and stored passwords are a
+// salted hash instead of the password itself. This is a small,
+// non-cryptographic hash (cyrb53) — demo-only defence-in-depth so a
+// localStorage dump no longer reads as a password list. It is not a
+// substitute for real password hashing, and demo mode never runs on the
+// live site.
+const DEMO_HASH_PREFIX = 'demo-hash:'
+const DEMO_HASH_SALT = 'tatalk-demo:'
+
+function hashDemoPassword(password: string): string {
+  const input = DEMO_HASH_SALT + password
+  let h1 = 0xdeadbeef
+  let h2 = 0x41c6ce57
+  for (let i = 0; i < input.length; i++) {
+    const ch = input.charCodeAt(i)
+    h1 = Math.imul(h1 ^ ch, 2654435761)
+    h2 = Math.imul(h2 ^ ch, 1597334677)
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507)
+  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507)
+  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+  return `${DEMO_HASH_PREFIX}${(4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16)}`
+}
+
+function demoPasswordMatches(stored: string, supplied: string): boolean {
+  if (stored.startsWith(DEMO_HASH_PREFIX)) return stored === hashDemoPassword(supplied)
+  // A row written before hashing (plaintext) still matches once; it is
+  // re-hashed by normalizeAccounts() when the backend loads.
+  return stored === supplied
+}
+
+// Re-hash any plaintext passwords (seed rows, or a localStorage dump
+// written by an older build) in place. Already-hashed rows are untouched.
+function normalizeAccounts(data: DemoData): void {
+  for (const account of data.accounts) {
+    if (!account.password.startsWith(DEMO_HASH_PREFIX)) {
+      account.password = hashDemoPassword(account.password)
+    }
+  }
+}
+
 // Local stand-in for Supabase so the UI can be clicked through with no project.
 export function createDemoBackend(options: Options = {}) {
   const persist = options.persist ?? false
   const storage = options.storage
   let data: DemoData = options.initial ?? load(storage) ?? buildSeed(options.now)
+  normalizeAccounts(data)
   const listeners = new Set<MessageListener>()
   const reactionListeners = new Set<(change: ReactionChange) => void>()
   const requestListeners = new Set<() => void>()
@@ -283,8 +328,8 @@ export function createDemoBackend(options: Options = {}) {
 
     async signIn(email: string, password: string): Promise<Profile> {
       const account = accountByEmail(email)
-      if (!account || account.password !== password) {
-        throw new Error('That email and password do not match. Demo fan: taha@tatalk.app / tatalk1')
+      if (!account || !demoPasswordMatches(account.password, password)) {
+        throw new Error('That email and password do not match.')
       }
       data.currentUserId = account.profileId
       save()
@@ -310,7 +355,7 @@ export function createDemoBackend(options: Options = {}) {
         favouriteAnime: null,
       }
       data.profiles.push(profile)
-      data.accounts.push({ email, password: input.password, profileId: profile.id })
+      data.accounts.push({ email, password: hashDemoPassword(input.password), profileId: profile.id })
       data.currentUserId = profile.id
       save()
       return profile
@@ -336,7 +381,7 @@ export function createDemoBackend(options: Options = {}) {
       if (issue) throw new Error(issue)
       const account = accountByEmail(email)
       if (!account) throw new Error('No demo account uses that email.')
-      account.password = password
+      account.password = hashDemoPassword(password)
       save()
     },
 
@@ -993,6 +1038,7 @@ export function createDemoBackend(options: Options = {}) {
     reset() {
       const signedIn = data.currentUserId === TAHA_ID || data.currentUserId === null
       data = buildSeed()
+      normalizeAccounts(data)
       data.currentUserId = signedIn && data.currentUserId === null ? TAHA_ID : data.currentUserId
       // Keep the visitor signed in as Taha after a reset of the sample circle.
       if (data.accounts.some((account) => account.profileId === TAHA_ID)) {

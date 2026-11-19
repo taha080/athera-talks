@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { googleAuthMode, googleSignInError, passwordIssue, signUpNeedsPasswordSignIn, usernameIssue } from './auth'
+import { googleAuthMode, googleSignInError, passwordIssue, usernameIssue } from './auth'
 
 describe('usernameIssue', () => {
   it('accepts a normal username and rejects spaces or short names', () => {
@@ -9,19 +9,11 @@ describe('usernameIssue', () => {
   })
 })
 
-describe('signUpNeedsPasswordSignIn', () => {
-  it('enters on the sign-up session and only signs in when that session is missing', () => {
-    expect(signUpNeedsPasswordSignIn({ access_token: 'session' })).toBe(false)
-    expect(signUpNeedsPasswordSignIn(null)).toBe(true)
-    expect(signUpNeedsPasswordSignIn(undefined)).toBe(true)
-    expect(signUpNeedsPasswordSignIn({})).toBe(true)
-  })
-})
-
 describe('passwordIssue', () => {
-  it('requires 6 characters', () => {
-    expect(passwordIssue('short')).toMatch(/6/)
-    expect(passwordIssue('longenough')).toBeNull()
+  it('requires 12 characters', () => {
+    expect(passwordIssue('short')).toMatch(/12/)
+    expect(passwordIssue('elevenchars')).toMatch(/12/)
+    expect(passwordIssue('twelvechars!')).toBeNull()
   })
 })
 

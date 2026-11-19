@@ -28,14 +28,29 @@ describe('demo auth and chat', () => {
     expect(createDemoBackend({ persist: true, storage }).currentProfile()).toBeNull()
   })
 
+  it('stores demo passwords as hashes, never plaintext', async () => {
+    const storage = memory()
+    const demo = createDemoBackend({ persist: true, storage })
+    await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
+    await demo.signUp({ email: 'hash@example.com', password: 'secretpassword1', username: 'hashfan' })
+    const raw = storage.getItem('tatalk:demo-data-v1') ?? ''
+    expect(raw).not.toContain(DEMO_PASSWORD)
+    expect(raw).not.toContain('secretpassword1')
+    expect(raw).toContain('demo-hash:')
+
+    const again = createDemoBackend({ persist: true, storage })
+    await again.signIn(DEMO_EMAIL, DEMO_PASSWORD)
+    await expect(again.signIn(DEMO_EMAIL, 'wrongpassword1')).rejects.toThrow(/do not match/)
+  })
+
   it('rejects a taken username and creates a new fan', async () => {
     const demo = createDemoBackend({ now: Date.parse('2026-10-19T12:00:00Z') })
     await expect(
-      demo.signUp({ email: 'new@example.com', password: 'secret1', username: 'Taha' }),
+      demo.signUp({ email: 'new@example.com', password: 'secretpassword1', username: 'Taha' }),
     ).rejects.toThrow(/taken/)
     const created = await demo.signUp({
       email: 'new@example.com',
-      password: 'secret1',
+      password: 'secretpassword1',
       username: 'Hana',
     })
     expect(created.username).toBe('hana')
@@ -46,9 +61,9 @@ describe('demo auth and chat', () => {
     const demo = createDemoBackend()
     expect(demo.requestPasswordReset('missing@example.com').found).toBe(false)
     expect(demo.requestPasswordReset(DEMO_EMAIL).found).toBe(true)
-    demo.resetPassword(DEMO_EMAIL, 'newpass')
+    demo.resetPassword(DEMO_EMAIL, 'newpassword123')
     await expect(demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)).rejects.toThrow(/do not match/)
-    await demo.signIn(DEMO_EMAIL, 'newpass')
+    await demo.signIn(DEMO_EMAIL, 'newpassword123')
     demo.signOut()
     const google = await demo.signInWithGoogle()
     expect(google.id).toBe(TAHA_ID)
@@ -131,7 +146,7 @@ describe('demo auth and chat', () => {
       { id: azan, username: 'azan_', avatarUrl: 'https://example.com/azan.gif', favouriteAnime: 'Naruto', isCreator: false },
       { id: azanx, username: 'azanx', avatarUrl: null, favouriteAnime: null },
     )
-    seed.accounts.push({ email: 'sakura@example.com', password: 'secret1', profileId: SAKURA_ID })
+    seed.accounts.push({ email: 'sakura@example.com', password: 'secretpassword1', profileId: SAKURA_ID })
     const demo = createDemoBackend({ initial: seed })
     await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
     expect((await demo.searchUsers('AZAN_')).map((person) => person.username)).toEqual(['azan_'])
@@ -146,7 +161,7 @@ describe('demo auth and chat', () => {
     await demo.blockUser(azan)
     expect(await demo.searchUsers('azan_')).toEqual([])
     demo.signOut()
-    await demo.signIn('sakura@example.com', 'secret1')
+    await demo.signIn('sakura@example.com', 'secretpassword1')
     await demo.blockUser(TAHA_ID)
     demo.signOut()
     await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
@@ -155,7 +170,7 @@ describe('demo auth and chat', () => {
 
   it('blocks a chat until the contact request is accepted', async () => {
     const demo = createDemoBackend()
-    const hana = await demo.signUp({ email: 'hana@example.com', password: 'secret1', username: 'hana' })
+    const hana = await demo.signUp({ email: 'hana@example.com', password: 'secretpassword1', username: 'hana' })
     demo.signOut()
     await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
 
@@ -172,7 +187,7 @@ describe('demo auth and chat', () => {
 
     await demo.requestContact(hana.id)
     demo.signOut()
-    await demo.signIn('hana@example.com', 'secret1')
+    await demo.signIn('hana@example.com', 'secretpassword1')
     const incoming = await demo.listRequests()
     expect(incoming).toHaveLength(1)
     expect(incoming[0]?.fromId).not.toBe(hana.id)
@@ -183,7 +198,7 @@ describe('demo auth and chat', () => {
     await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
     await demo.requestContact(hana.id)
     demo.signOut()
-    await demo.signIn('hana@example.com', 'secret1')
+    await demo.signIn('hana@example.com', 'secretpassword1')
     const again = await demo.listRequests()
     const chatId = await demo.acceptRequest(again[0].id)
     const sent = await demo.sendMessage(chatId, 'hello')
@@ -204,8 +219,8 @@ describe('demo auth and chat', () => {
     mira.showLastSeen = false
     mira.showReadReceipts = false
     seed.accounts.push(
-      { email: 'mira@example.com', password: 'secret1', profileId: MIRA_ID },
-      { email: 'sakura@example.com', password: 'secret1', profileId: SAKURA_ID },
+      { email: 'mira@example.com', password: 'secretpassword1', profileId: MIRA_ID },
+      { email: 'sakura@example.com', password: 'secretpassword1', profileId: SAKURA_ID },
     )
     const demo = createDemoBackend({ initial: seed })
 
@@ -217,7 +232,7 @@ describe('demo auth and chat', () => {
     const sent = await demo.sendMessage(MIRA_CHAT, 'still there?')
 
     demo.signOut()
-    await demo.signIn('mira@example.com', 'secret1')
+    await demo.signIn('mira@example.com', 'secretpassword1')
     await demo.markRead(MIRA_CHAT)
 
     demo.signOut()
@@ -226,24 +241,24 @@ describe('demo auth and chat', () => {
     expect(creatorThread.find((message) => message.id === sent.id)?.readAt).toBeTruthy()
 
     demo.signOut()
-    await demo.signIn('sakura@example.com', 'secret1')
+    await demo.signIn('sakura@example.com', 'secretpassword1')
     await demo.requestContact(MIRA_ID)
     demo.signOut()
-    await demo.signIn('mira@example.com', 'secret1')
+    await demo.signIn('mira@example.com', 'secretpassword1')
     const request = (await demo.listRequests())[0]
     const chatId = await demo.acceptRequest(request.id)
     demo.signOut()
-    await demo.signIn('sakura@example.com', 'secret1')
+    await demo.signIn('sakura@example.com', 'secretpassword1')
     const fromSakura = await demo.sendMessage(chatId, 'hello mira')
     const hiddenPresence = (await demo.listConversations()).find((chat) => chat.id === chatId)
     expect(hiddenPresence?.peer.lastSeenAt ?? null).toBeNull()
     expect(hiddenPresence?.peer.showReadReceipts).toBe(false)
 
     demo.signOut()
-    await demo.signIn('mira@example.com', 'secret1')
+    await demo.signIn('mira@example.com', 'secretpassword1')
     await demo.markRead(chatId)
     demo.signOut()
-    await demo.signIn('sakura@example.com', 'secret1')
+    await demo.signIn('sakura@example.com', 'secretpassword1')
     const hiddenThread = await demo.listMessages(chatId)
     expect(hiddenThread.find((message) => message.id === fromSakura.id)?.readAt ?? null).toBeNull()
     expect(hiddenThread.find((message) => message.id === fromSakura.id)?.deliveredAt ?? null).toBeNull()
@@ -253,7 +268,7 @@ describe('demo auth and chat', () => {
 
   it('blocks messaging both ways, stores a report, and shows reports only to the creator', async () => {
     const seed = buildSeed()
-    seed.accounts.push({ email: 'sakura@example.com', password: 'secret1', profileId: SAKURA_ID })
+    seed.accounts.push({ email: 'sakura@example.com', password: 'secretpassword1', profileId: SAKURA_ID })
     const demo = createDemoBackend({ initial: seed })
     await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
     await demo.blockUser(SAKURA_ID)
@@ -263,7 +278,7 @@ describe('demo auth and chat', () => {
     expect((await demo.listConversations()).find((chat) => chat.id === SAKURA_CHAT)?.blockedByMe).toBe(true)
 
     demo.signOut()
-    await demo.signIn('sakura@example.com', 'secret1')
+    await demo.signIn('sakura@example.com', 'secretpassword1')
     await expect(demo.sendMessage(SAKURA_CHAT, 'hello?')).rejects.toThrow(/blocked/)
     await demo.reportUser(TAHA_ID, 'Spam', 'sent the same link', SAKURA_CHAT)
     await expect(demo.listReports()).rejects.toThrow(/creator/)
@@ -298,7 +313,7 @@ describe('demo auth and chat', () => {
 
   it('creates a group, names senders, and lets an admin remove a member', async () => {
     const seed = buildSeed()
-    seed.accounts.push({ email: 'sakura@example.com', password: 'secret1', profileId: SAKURA_ID })
+    seed.accounts.push({ email: 'sakura@example.com', password: 'secretpassword1', profileId: SAKURA_ID })
     const demo = createDemoBackend({ initial: seed })
     await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
     const existing = (await demo.listConversations()).find((chat) => chat.id === GROUP_CHAT)
@@ -312,7 +327,7 @@ describe('demo auth and chat', () => {
     expect((await demo.listMembers(created)).map((member) => member.username)).toEqual(['taha', 'sakura'])
     await demo.setMemberRole(created, SAKURA_ID, 'admin')
     demo.signOut()
-    await demo.signIn('sakura@example.com', 'secret1')
+    await demo.signIn('sakura@example.com', 'secretpassword1')
     await demo.leaveGroup(created)
     demo.signOut()
     await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
@@ -325,9 +340,9 @@ describe('demo auth and chat', () => {
     const seed = buildSeed()
     const kenji = seed.profiles.find((profile) => profile.id === KENJI_ID)
     if (kenji) kenji.showLastSeen = false
-    seed.accounts.push({ email: 'sakura@example.com', password: 'secret1', profileId: SAKURA_ID })
+    seed.accounts.push({ email: 'sakura@example.com', password: 'secretpassword1', profileId: SAKURA_ID })
     const demo = createDemoBackend({ initial: seed })
-    await demo.signIn('sakura@example.com', 'secret1')
+    await demo.signIn('sakura@example.com', 'secretpassword1')
     const hidden = await demo.listMembers(GROUP_CHAT)
     expect(hidden.find((member) => member.id === KENJI_ID)?.lastSeenAt).toBeNull()
     expect(hidden.find((member) => member.id === SAKURA_ID)?.lastSeenAt).toBeTruthy()
@@ -339,7 +354,7 @@ describe('demo auth and chat', () => {
 
   it('pins three chats, mutes, and unarchives on a new message unless muted', async () => {
     const seed = buildSeed()
-    seed.accounts.push({ email: 'sakura@example.com', password: 'secret1', profileId: SAKURA_ID })
+    seed.accounts.push({ email: 'sakura@example.com', password: 'secretpassword1', profileId: SAKURA_ID })
     const demo = createDemoBackend({ initial: seed })
     await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
     await demo.setChatPref(SAKURA_CHAT, { pinned: true })
@@ -353,7 +368,7 @@ describe('demo auth and chat', () => {
     await demo.setChatPref(SAKURA_CHAT, { archived: true })
     expect((await demo.listConversations()).find((chat) => chat.id === SAKURA_CHAT)?.archived).toBe(true)
     demo.signOut()
-    await demo.signIn('sakura@example.com', 'secret1')
+    await demo.signIn('sakura@example.com', 'secretpassword1')
     await demo.sendMessage(SAKURA_CHAT, 'you there?')
     demo.signOut()
     await demo.signIn(DEMO_EMAIL, DEMO_PASSWORD)
