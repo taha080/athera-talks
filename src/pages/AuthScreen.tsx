@@ -3,7 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AuthFrame } from '../components/AuthFrame'
 import { GoogleIcon } from '../components/Icons'
 import { useSession } from '../context/SessionContext'
-import { isValidEmail, normalizeUsername, passwordIssue, usernameIssue } from '../lib/auth'
+import { isValidEmail, normalizeUsername, passwordIssue, signInPasswordIssue, usernameIssue } from '../lib/auth'
 import { cn } from '../lib/cn'
 import { fieldClass, primaryButton } from '../lib/styles'
 import { DEMO_EMAIL } from '../demo/seed'
@@ -100,6 +100,11 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
     if (mode === 'forgot') {
       setPasswordError('')
       return true
+    }
+    if (mode === 'sign-in') {
+      const issue = signInPasswordIssue(password)
+      setPasswordError(issue ?? '')
+      return !issue
     }
     const issue = passwordIssue(password)
     setPasswordError(issue ?? '')

@@ -27,6 +27,15 @@ export function passwordIssue(password: string): string | null {
   return null
 }
 
+// Sign-in only needs a password present; the server checks whether it
+// is right. The 12-character minimum above applies when a NEW password
+// is created (sign-up, reset), so existing accounts whose password
+// predates that rule can still sign in.
+export function signInPasswordIssue(password: string): string | null {
+  if (!password) return 'Enter your password.'
+  return null
+}
+
 // Demo mode always offers a pretend Google button so the landing can be previewed.
 // Live mode waits for VITE_SUPABASE_GOOGLE_ENABLED so a missing provider cannot fail the click.
 export function googleAuthMode(flag: string | undefined, demo: boolean): GoogleAuthMode {
