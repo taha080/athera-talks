@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronLeft,
   Copy,
+  Download,
   Eye,
   Plus,
   Reply,
@@ -129,6 +130,10 @@ export function PauseIcon({ className }: IconProps) {
 
 export function CopyIcon({ className }: IconProps) {
   return glyph(Copy, className)
+}
+
+export function DownloadIcon({ className }: IconProps) {
+  return glyph(Download, className)
 }
 
 export function PlusIcon({ className }: IconProps) {

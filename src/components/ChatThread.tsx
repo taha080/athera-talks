@@ -12,6 +12,7 @@ import { chatTitle, isGroup, showSenderName } from '../lib/chatList'
 import { QUICK_REACTIONS, groupPosition, groupedReactions, linkHost, linkParts, type GroupPos } from '../lib/chatView'
 import { dayKey, formatDayLabel, formatMessageTime } from '../lib/format'
 import { messagePreview } from '../lib/messages'
+import { downloadFileName, downloadMedia } from '../lib/downloadMedia'
 import { firstChatAttachment } from '../lib/chatVideo'
 import { isOnline, presenceLabel } from '../lib/presence'
 import { TYPING_TTL_MS } from '../lib/typing'
@@ -29,7 +30,7 @@ import { GroupPanel } from './GroupPanel'
 import { ProfileSheet, type SharedProfile } from './ProfileSheet'
 import { ReportDialog } from './ReportDialog'
 import { VoiceBubble } from './VoiceBubble'
-import { BackIcon, CheckIcon, CloseIcon, CopyIcon, DownIcon, MoreIcon, PhoneIcon, ReplyIcon, SearchIcon, SmileIcon, TrashIcon } from './Icons'
+import { BackIcon, CheckIcon, CloseIcon, CopyIcon, DownIcon, DownloadIcon, MoreIcon, PhoneIcon, ReplyIcon, SearchIcon, SmileIcon, TrashIcon } from './Icons'
 
 export function ChatThread({ conversation }: { conversation: Conversation | undefined }) {
   const navigate = useNavigate()
@@ -357,6 +358,15 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
     setActionsId(null)
   }
 
+  async function downloadMessage(message: Message) {
+    if (!message.mediaUrl) return
+    setMenuId(null)
+    setMenuPoint(null)
+    setActionsId(null)
+    const ok = await downloadMedia(message.mediaUrl, downloadFileName(message))
+    chat.pushToast(ok ? 'Download started' : 'Could not download — opened the file instead')
+  }
+
   return (
     <div
       className={`chat-column relative flex h-full min-h-0 flex-col ${specialWallpaper || wallpaperClass(wallpaper)}`}
@@ -624,6 +634,7 @@ export function ChatThread({ conversation }: { conversation: Conversation | unde
                 }}
                 onReact={() => setReactId((current) => (current === message.id ? null : message.id))}
                 onCopy={() => void copyMessage(message)}
+                onDownload={() => void downloadMessage(message)}
                 onHide={() => void act(chat.hideMessage(message.id))}
                 onDelete={() => void act(chat.deleteForEveryone(message))}
                 onEdit={() => {
@@ -788,6 +799,7 @@ function MessageRow({
   onReply,
   onReact,
   onCopy,
+  onDownload,
   onHide,
   onDelete,
   onEdit,
@@ -815,6 +827,7 @@ function MessageRow({
   onReply: () => void
   onReact: () => void
   onCopy: () => void
+  onDownload: () => void
   onHide: () => void
   onDelete: () => void
   onEdit: () => void
@@ -965,6 +978,14 @@ function MessageRow({
                 <button type="button" className="block max-w-full" aria-label="Open photo" onClick={() => onOpenImage(message.mediaUrl as string)}>
                   <img src={message.mediaUrl} alt={message.body && message.body !== 'Photo' ? message.body : 'Photo'} className="max-h-72 max-w-full rounded-[14px] object-cover" />
                 </button>
+                <button
+                  type="button"
+                  className="absolute right-2 top-2 z-10 grid h-8 w-8 place-items-center rounded-full bg-black/60 text-white"
+                  aria-label="Download photo"
+                  onClick={onDownload}
+                >
+                  <DownloadIcon className="h-4 w-4" />
+                </button>
                 {message.body.trim() === 'Photo' ? <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine} onMedia /> : null}
               </div>
             ) : (
@@ -977,7 +998,7 @@ function MessageRow({
           {video ? (
             message.mediaUrl ? (
               <div className="msg-media-frame">
-                <VideoBubble src={message.mediaUrl} seconds={message.mediaSeconds} />
+                <VideoBubble src={message.mediaUrl} seconds={message.mediaSeconds} onDownload={onDownload} />
                 {message.body.trim() === 'Video' ? <Meta mine={ownTone} createdAt={message.createdAt} tick={tick} showTick={mine} onMedia /> : null}
               </div>
             ) : (
@@ -1059,6 +1080,9 @@ function MessageRow({
             <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onReply}>Reply</button>
             <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onReact}>React</button>
             <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onCopy}>Copy</button>
+            {(image || video) && message.mediaUrl ? (
+              <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onDownload}>Download</button>
+            ) : null}
             <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm" onClick={onHide}>Delete for me</button>
             {mine ? (
               <button type="button" role="menuitem" className="hover-wash block w-full rounded-lg px-3 py-2 text-left text-sm text-danger" onClick={onDelete}>Delete for everyone</button>

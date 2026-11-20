@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { formatCallClock, formatDuration } from '../lib/format'
-import { PlayIcon } from './Icons'
+import { DownloadIcon, PlayIcon } from './Icons'
 
-export function VideoBubble({ src, seconds }: { src: string; seconds?: number | null }) {
+export function VideoBubble({ src, seconds, onDownload }: { src: string; seconds?: number | null; onDownload?: () => void }) {
   const node = useRef<HTMLVideoElement>(null)
   const [playing, setPlaying] = useState(false)
   const length = seconds != null && Number.isFinite(seconds) && seconds >= 0 ? (seconds >= 3600 ? formatCallClock(seconds) : formatDuration(seconds)) : null
@@ -68,6 +68,16 @@ export function VideoBubble({ src, seconds }: { src: string; seconds?: number | 
           {length ? <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-1.5 py-0.5 text-[11px] text-white">{length}</span> : null}
         </button>
       )}
+      {onDownload ? (
+        <button
+          type="button"
+          className="absolute left-2 top-2 z-10 grid h-8 w-8 place-items-center rounded-full bg-black/60 text-white"
+          aria-label="Download video"
+          onClick={onDownload}
+        >
+          <DownloadIcon className="h-4 w-4" />
+        </button>
+      ) : null}
     </div>
   )
 }
