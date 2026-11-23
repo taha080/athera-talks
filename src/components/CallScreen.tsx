@@ -3,7 +3,7 @@ import { useCall } from '../context/CallContext'
 import { RETURN_BANNER } from '../lib/callBackground'
 import { callHeadline, RELAY_RETRY_STATUS } from '../lib/callMachine'
 import { cn } from '../lib/cn'
-import { Avatar } from './Avatar'
+import { Avatar, CreatorFrame } from './Avatar'
 import { avatarAnimates, hasPremium } from '../lib/premium'
 import { DisplayName } from './CreatorBadge'
 import { EndIcon, MicIcon, PhoneIcon, VolumeIcon } from './Icons'
@@ -133,13 +133,14 @@ export function CallScreen() {
 }
 
 function CallPortrait({ name, url, creator, premium }: { name: string; url?: string | null; creator?: boolean; premium?: boolean }) {
-  const gold = Boolean(creator || premium)
+  const gold = !creator && Boolean(premium)
   if (url && avatarAnimates(url, Boolean(creator), Boolean(premium))) {
-    return (
-      <span className={cn('inline-flex overflow-hidden rounded-full', gold ? 'creator-ring creator-ring-lg' : 'ring-1 ring-white/15')}>
+    const disc = (
+      <span className={cn('inline-flex overflow-hidden rounded-full', gold ? 'creator-ring creator-ring-lg' : creator ? '' : 'ring-1 ring-white/15')}>
         <img src={url} alt="" draggable={false} className="block h-60 w-60 object-cover" />
       </span>
     )
+    return creator ? <CreatorFrame>{disc}</CreatorFrame> : disc
   }
   return <Avatar name={name} url={url} size="call" creator={creator} premium={premium} />
 }
