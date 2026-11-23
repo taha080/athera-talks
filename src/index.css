@@ -1227,6 +1227,17 @@ textarea:-webkit-autofill {
   animation: creator-ring-pulse 2.5s ease-in-out infinite;
 }
 
+.creator-frame-art {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 5;
+  max-width: none;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  user-select: none;
+}
+
 .creator-ring-lg {
   padding: 5px;
 }

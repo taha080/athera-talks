@@ -1,6 +1,36 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { cn } from '../lib/cn'
 import { avatarAnimates } from '../lib/premium'
+import creatorFrameWebp from '../assets/frames/creator-frame.webp'
+import creatorFrameGif from '../assets/frames/creator-frame.gif'
+
+// The creator's animated frame. The art is a square whose transparent
+// centre hole is 54.77% of its width, centred (measured from the art).
+// Scaling the overlay by 1 / 0.5477 makes the avatar fill the hole exactly
+// at any avatar size. The overlay is absolutely positioned, so it never
+// changes layout, and it ignores pointer events.
+const CREATOR_FRAME_HOLE = 0.5477
+
+export function CreatorFrame({ children }: { children: ReactNode }) {
+  const scale = `${(100 / CREATOR_FRAME_HOLE).toFixed(2)}%`
+  return (
+    <span className="creator-frame relative inline-flex shrink-0">
+      {children}
+      <picture>
+        <source srcSet={creatorFrameWebp} type="image/webp" />
+        <img
+          src={creatorFrameGif}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          decoding="async"
+          className="creator-frame-art"
+          style={{ width: scale, height: scale }}
+        />
+      </picture>
+    </span>
+  )
+}
 
 const PALETTES = [
   ['#1a56db', '#3b82f6'],
@@ -81,7 +111,8 @@ export function Avatar({
   premium?: boolean
 }) {
   const px = { sm: 'h-10 w-10 text-xs', md: 'h-12 w-12 text-sm', lg: 'h-16 w-16 text-lg', xl: 'h-36 w-36 text-3xl', call: 'h-60 w-60 text-4xl' }[size]
-  const gold = Boolean(creator || premium)
+  // Creator gets the animated frame; premium users keep the gold ring.
+  const gold = !creator && Boolean(premium)
   const ring = gold ? (size === 'xl' || size === 'call' ? 'creator-ring creator-ring-lg' : 'creator-ring') : ''
   const animate = avatarAnimates(url, Boolean(creator), Boolean(premium))
   const face = !url ? (
@@ -91,9 +122,10 @@ export function Avatar({
   ) : (
     <StillGif url={url} name={name} className={px} />
   )
+  const disc = <span className={cn('inline-flex overflow-hidden rounded-full shadow-[0_1px_4px_rgb(15_23_42/0.30)]', ring)}>{face}</span>
   return (
     <span className="relative inline-flex shrink-0">
-      <span className={cn('inline-flex overflow-hidden rounded-full shadow-[0_1px_4px_rgb(15_23_42/0.30)]', ring)}>{face}</span>
+      {creator ? <CreatorFrame>{disc}</CreatorFrame> : disc}
       {online ? <span className="absolute bottom-0 right-0 z-10 h-3 w-3 rounded-full border-2 border-panel bg-foam" aria-label="Online" /> : null}
     </span>
   )
