@@ -7,14 +7,26 @@ import creatorFrameGif from '../assets/frames/creator-frame.gif'
 // The creator's animated frame. The art is a square whose transparent
 // centre hole is 54.77% of its width, centred (measured from the art).
 // Scaling the overlay by 1 / 0.5477 makes the avatar fill the hole exactly
-// at any avatar size. The overlay is absolutely positioned, so it never
-// changes layout, and it ignores pointer events.
+// at any avatar size. The overlay ignores pointer events.
 const CREATOR_FRAME_HOLE = 0.5477
+// How far the visible art (crown, wings, bottom ornaments) reaches past the
+// avatar on each side, as a fraction of the avatar diameter (measured from
+// the art). The wrapper reserves this space with margins so a username,
+// tick or badge laid out next to or under the avatar is never covered.
+const CREATOR_FRAME_REACH = { top: 0.21, side: 0.3, bottom: 0.3 }
 
-export function CreatorFrame({ children }: { children: ReactNode }) {
+export function CreatorFrame({ children, px, stacked = false }: { children: ReactNode; px: number; stacked?: boolean }) {
   const scale = `${(100 / CREATOR_FRAME_HOLE).toFixed(2)}%`
+  // In list rows (stacked = false) only the sides are reserved so rows keep
+  // their height; the frame's top and bottom may spill into row padding.
+  const margin = {
+    marginTop: stacked ? Math.round(px * CREATOR_FRAME_REACH.top) : 0,
+    marginBottom: stacked ? Math.round(px * CREATOR_FRAME_REACH.bottom) : 0,
+    marginLeft: Math.round(px * CREATOR_FRAME_REACH.side),
+    marginRight: Math.round(px * CREATOR_FRAME_REACH.side),
+  }
   return (
-    <span className="creator-frame relative inline-flex shrink-0">
+    <span className="creator-frame relative inline-flex shrink-0" style={margin}>
       {children}
       <picture>
         <source srcSet={creatorFrameWebp} type="image/webp" />
@@ -110,6 +122,7 @@ export function Avatar({
   creator?: boolean
   premium?: boolean
 }) {
+  const sizePx = { sm: 40, md: 48, lg: 64, xl: 144, call: 240 }[size]
   const px = { sm: 'h-10 w-10 text-xs', md: 'h-12 w-12 text-sm', lg: 'h-16 w-16 text-lg', xl: 'h-36 w-36 text-3xl', call: 'h-60 w-60 text-4xl' }[size]
   // Creator gets the animated frame; premium users keep the gold ring.
   const gold = !creator && Boolean(premium)
@@ -122,11 +135,17 @@ export function Avatar({
   ) : (
     <StillGif url={url} name={name} className={px} />
   )
-  const disc = <span className={cn('inline-flex overflow-hidden rounded-full shadow-[0_1px_4px_rgb(15_23_42/0.30)]', ring)}>{face}</span>
-  return (
+  const disc = (
     <span className="relative inline-flex shrink-0">
-      {creator ? <CreatorFrame>{disc}</CreatorFrame> : disc}
+      <span className={cn('inline-flex overflow-hidden rounded-full shadow-[0_1px_4px_rgb(15_23_42/0.30)]', ring)}>{face}</span>
       {online ? <span className="absolute bottom-0 right-0 z-10 h-3 w-3 rounded-full border-2 border-panel bg-foam" aria-label="Online" /> : null}
     </span>
+  )
+  return creator ? (
+    <CreatorFrame px={sizePx} stacked={size === 'lg' || size === 'xl' || size === 'call'}>
+      {disc}
+    </CreatorFrame>
+  ) : (
+    disc
   )
 }
