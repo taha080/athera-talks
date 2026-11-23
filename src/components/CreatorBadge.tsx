@@ -117,7 +117,7 @@ export function DisplayName({
   className?: string
 }) {
   return (
-    <span className={cn('inline-flex min-w-0 max-w-full items-center gap-1', className)}>
+    <span className={cn('relative z-[6] inline-flex min-w-0 max-w-full items-center gap-1', className)}>
       <span className="truncate">{name}</span>
       {creator ? <CreatorBadge /> : premium ? <VerifiedTick /> : null}
     </span>

@@ -140,7 +140,13 @@ function CallPortrait({ name, url, creator, premium }: { name: string; url?: str
         <img src={url} alt="" draggable={false} className="block h-60 w-60 object-cover" />
       </span>
     )
-    return creator ? <CreatorFrame>{disc}</CreatorFrame> : disc
+    return creator ? (
+      <CreatorFrame px={240} stacked>
+        {disc}
+      </CreatorFrame>
+    ) : (
+      disc
+    )
   }
   return <Avatar name={name} url={url} size="call" creator={creator} premium={premium} />
 }
